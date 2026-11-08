@@ -59,7 +59,7 @@ Only add a format-specific tool when a format has an operation the common tools 
 | `offset` | int | byte offset in the original (decompressed) file, for jump-to-raw |
 | `segment` | int | boot/clock segment within the source |
 | `ts_raw` | text | timestamp exactly as written |
-| `clock` | enum | `wall_local`, `wall_utc`, `monotonic`, `boottime`, `dlt_ecu_ticks`, `none` |
+| `clock` | enum | `wall_local`, `wall_utc`, `monotonic`, `boottime`, `ticks`, `none` (unit per source) |
 | `ts_src` | int64 ns | timestamp on the source's own clock |
 | `ts` | int64 ns UTC | on the common timeline after alignment; null until aligned |
 | `ts_conf` | enum | `exact`, `anchored`, `estimated`, `none` |
@@ -125,7 +125,8 @@ Shared filter object, used by every query tool:
   "level": "W",                  "tags": ["HvacCtrl", "VHAL*"],   "not_tags": ["chatty"],
   "pid": 1234, "tid": null,      "process": "vendor.hvac*",
   "ecu": "HU1", "app_id": "HVAC", "ctx_id": null,
-  "segment": 2,                  "template_id": null
+  "segment": 2,                  "template_id": null,
+  "attrs": {"node_id": "ZC2"}
 }
 ```
 
@@ -206,6 +207,8 @@ class Container(Protocol):    # zip, tar, gz, bugreport, split DLT files
 
 The core does everything else: level normalization, templates, redaction, segment detection, batched inserts, FTS indexing.
 
+**Third-party connectors**, without forking: a YAML regex connector, a `command` connector (any program that writes `RawRecord` JSON lines), or a Python package registered under the entry point `automotive_log_mcp.connectors`. They extend the built-in set; replacing a built-in one is configured. The connector interface is public API (D11).
+
 **Connectors**
 
 | Connector | Phase | Notes |
@@ -216,7 +219,7 @@ The core does everything else: level normalization, templates, redaction, segmen
 | `regex-yaml` | 1 | A YAML file per format with a line regex, named groups mapped to record fields, timestamp format and clock. Covers vendor service logs, QNX `slog2info` text output, test-runner logs. |
 | artifact parsers: `tombstone`, `anr`, `java_crash`, `dropbox` | 1 | Text tombstones and ANR traces; dropbox by tag, body handed to the matching parser. |
 | artifact parsers: `dumpsys`, `kernel_panic`, tombstone `.pb` | 2 | `dumpsys` per service and subsection; pstore as previous-boot kernel records plus a panic artifact; tombstone `.pb` (Android 12+) via the AOSP protobuf schema when no text is present. Pulled earlier if an evaluation case needs one. |
-| `dlt` | 2 | Storage format (`DLT\x01` header): storage time, ECU ticks (0.1 ms), ECU/app/context ids, verbose arguments; non-verbose via FIBEX files in `options`. Parsing by ESR Labs `dlt-core` (Rust, Apache-2.0) in a sidecar binary `dlt2jsonl`; the Python connector reads its JSON lines. Split/rotated DLT files are one source via a container. |
+| `dlt` | 2 | Storage format (`DLT\x01` header): storage time, ECU ticks (0.1 ms), ECU/app/context ids, verbose arguments; non-verbose via FIBEX files in `options`. Parsing by ESR Labs `dlt-core` (Rust, Apache-2.0) in a sidecar binary `dlt2jsonl`, run through the `command` connector. Split/rotated DLT files are one source via a container. |
 | `dlt_file` (artifact parser) | 2 | Reassembles DLT file transfers; parses known types, stores coredumps as metadata only. |
 | later | — | CAN traces (`.asc`/`.blf`) if bus timing matters, perfetto/systrace summaries, QNX binary slog2, remote fetch from ticket systems or test benches. |
 
@@ -231,7 +234,7 @@ timestamp: { format: '%Y-%m-%d %H:%M:%S.%f', clock: wall_local }
 levels: { DBG: D, INF: I, WRN: W, ERR: E }
 ```
 
-Default rules and connectors ship in the package. Users add their own from configured rule directories (for example a team repo), which override defaults by name.
+Default rules and connectors ship in the package. Users add their own from configured rule directories (for example a team repo); rules override defaults by name.
 
 ## Large files
 
@@ -277,7 +280,7 @@ Missing year and zone come from the bugreport, then the case's `tz`, then file m
 Logs hold personal data: VINs, IMEI/serials, MAC addresses, GPS coordinates, phone numbers, account emails, Wi-Fi SSIDs. Many companies also restrict what may reach an AI model. The server supports this without knowing any company's rules:
 
 - **Redaction at index time, before template extraction**, so no tool can return the raw value and the `templates` table never holds one. Redaction is always on, with default rules that an installation can extend; there is no raw mode. Rules are a YAML list of regexes with replacement tokens (`<VIN>`, `<GPS>`). Redacted values carry a keyed hash suffix (`<VIN#a3f1>`, HMAC with a per-installation secret) so the agent can see that two lines mention the same vehicle without the value being recoverable.
-- **Policy file**: blocked sources or ECUs, allowed tools, byte budget per session, output caps.
+- **Policy file**: blocked sources or ECUs, allowed tools, allowed code connectors, byte budget per session, output caps.
 - **Call log**: one JSONL line per tool call (case, tool, arguments, result size, duration), without log content, for audit and cost tracking. Arguments are redacted with the same rules, because agents copy values from outputs into queries.
 - **CLI without an agent**: the same queries from the command line, for engineers or environments where no model may be used.
 - The original files are never modified or copied; the case stores path and hash, and engineers can still open them with their usual viewers. If a file moves, `relink` points the source to the new path after checking the hash; `list_sources` flags sources whose original is missing.

@@ -25,11 +25,12 @@ Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision
 | D5 | Redaction always on, at index time and before template extraction, with keyed-hash suffix; raw values never in records, templates or call log; no raw mode | Redact at output time; opt-in redaction | M1 |
 | D6 | Citations `log:<source>#<seq>` (seq 1-based per source) and `art:<id>[/section][:L<line>]` | Global row id | M3 |
 | D7 | Cases in `~/.automotive-log-mcp/cases/<case>.db`; originals referenced by path and hash, not copied; `relink` for moved files | Copy into a case folder | M1 |
-| D8 | Default detector rules and regex connectors ship in the package; extra rule directories from config override by name | Rules only in the package | M4 |
-| D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`; Python reads JSON lines | PyO3 binding; DLT Viewer export; own parser | M5 |
+| D8 | Default detector rules and regex connectors ship in the package; extra rule directories from config override rules by name | Rules only in the package | M4 |
+| D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`, run through the generic `command` connector | PyO3 binding; DLT Viewer export; own parser | M5 |
 | D10 | Single process; background indexing in one worker thread per case | Worker processes | M1 |
-| D11 | Tool names and parameters follow semver; breaking changes only in a major version | No API stability promise | all |
+| D11 | Tool names and parameters, and the connector interface, follow semver; breaking changes only in a major version | No API stability promise | all |
 | D12 | First release without DLT; DLT and alignment in M5 | DLT before the first evaluation | M4, M5 |
+| D13 | Third-party connectors: YAML, `command`, or Python entry points; extend by default, replace when configured; code connectors allowed by policy | Connectors only in this repo | M1, M5, M6 |
 
 ## Repository layout
 
@@ -57,6 +58,7 @@ automotive-log-mcp/
       archive.py              # zip / tar / gz
       bugreport.py            # container
       logcat.py, kernel.py, regex_yaml.py
+      command.py              # M5
       artifacts/              # M2: tombstone, anr, java_crash, dropbox; M5: dumpsys, kernel_panic, tombstone .pb, dlt_file
       dlt.py                  # M5, drives dlt2jsonl
     detect/
@@ -105,7 +107,7 @@ Done when: two different MCP clients list the tools, `list_sources` returns an e
 1. **Schema**: `sources`, `segments`, `records`, `templates`, `records_fts` (external content on `msg`, `tag`), `artifacts`, `artifact_sections`, `artifact_fts`, `meta` (schema version); indexes on `(source_id, seq)`, `(ts)`, `(source_id, ts_src)`, `tag`, `pid`, `template_id`, `level`; migration on open.
 2. **Batch writer**: 50k rows per transaction, WAL, `synchronous=NORMAL`, FTS in the same transaction.
 3. **Pipeline**: sniff → container → connector → levels → redact → templates → segments → writer; redaction before templates so no raw value reaches the `templates` table; progress per source.
-4. **Registry**: highest `sniff()` score above 0.5 wins, else "unknown format" with the top 3 guesses.
+4. **Registry**: built-in, YAML and entry-point connectors (D13). Highest `sniff()` score above 0.5 wins, else "unknown format" with the top 3 guesses.
 5. **Connectors**: `archive`; `logcat` (all formats and `-v` modifiers, buffer markers, multi-line); `kernel`; `bugreport` (sections, fingerprint, timezone, uptime, process list); `regex_yaml` (schema-validated).
 6. **Templates, redaction** (HMAC suffix, secret created on first run; same rules applied to call-log arguments), **segments** (monotonic reset, backwards wall jump > 60 s, boot markers; in logs without a year, month 12 → 01 increments the year instead of starting a segment).
 7. **Background indexing** in one worker thread per case; queries read committed rows.
@@ -129,7 +131,7 @@ Done when: every tombstone, ANR and dropbox entry in a real bugreport appears as
 
 ## M3 P0 tools (4 days)
 
-1. **Filter object**: validation, relative times, citation references, globs, clear errors.
+1. **Filter object**: validation, relative times, citation references, globs, `attrs` keys, clear errors.
 2. **Output**: compact text plus structured content; 200-character truncation with `…`; line and byte caps; "N more, narrow by …" footer; round-trip timestamps.
 3. **Tools**: `add_source`, `list_sources`, `search` (FTS5 text, regex with SQL prefilter and capped scan, `collapse`, `count_only`, cursor), `context` (`scope=source|pid`), `list_artifacts` (grouped by signature), `read_artifact` (summary, section list, ranges), `get_records`.
 4. Empty-result reasons; regex-looking query warning; search hits include the template's literal text, ready for a code search.
@@ -164,10 +166,11 @@ Done when: both evaluations are run on 5 closed defects and written up.
 2. **Automatic alignment**: anchors 1–3 from the design with residual error; `align` tool (`auto`, `anchor`, `offset`); results in `list_sources`.
 3. **`timeline`** and `context(scope=all)`: k-way merge on `ts`, `~` for non-exact times.
 4. **`dlt2jsonl`** (Rust, about 200–300 lines): reads DLT with `dlt-core` (`DltMessageReader`, optional `--fibex`), writes one JSON object per message (offset, storage time, ECU, ticks, session, app/ctx, type, level, verbose flag, arguments, payload text); static binaries for Linux, Windows and macOS from CI; Apache-2.0 notice shipped with the binary.
-5. **DLT connector**: runs `dlt2jsonl`, maps lines to records; control messages to `attrs`; FIBEX files via `options`; unmatched non-verbose messages keep message id and payload hex; split/rotated files as one source.
-6. **DLT file transfer** (`FLST/FLDA/FLFI`): reassembled from decoded arguments; known types parsed as artifacts, coredumps as metadata only.
-7. **Remaining artifact parsers** (about 1 day): `dumpsys` (per service and heading), `kernel_panic` (pstore/last_kmsg, also as previous-boot kernel records), tombstone `.pb` when no text is present; fixture `dumpsys car_service`.
-8. Benchmark on a real multi-GB DLT trace: time per stage (dlt-core, JSON decode, pipeline, SQLite), to decide whether more of the pipeline should move to Rust.
+5. **`command` connector** (D13).
+6. **DLT connector**: `dlt2jsonl` through `command`, maps lines to records; control messages to `attrs`; FIBEX files via `options`; unmatched non-verbose messages keep message id and payload hex; split/rotated files as one source.
+7. **DLT file transfer** (`FLST/FLDA/FLFI`): reassembled from decoded arguments; known types parsed as artifacts, coredumps as metadata only.
+8. **Remaining artifact parsers** (about 1 day): `dumpsys` (per service and heading), `kernel_panic` (pstore/last_kmsg, also as previous-boot kernel records), tombstone `.pb` when no text is present; fixture `dumpsys car_service`.
+9. Benchmark on a real multi-GB DLT trace: time per stage (dlt-core, JSON decode, pipeline, SQLite), to decide whether more of the pipeline should move to Rust.
 
 Tests: synthetic log pairs with known offset and drift (error < 10 ms for paired timestamps, < 500 ms for marker anchors); DLT fixtures per argument type; a non-verbose sample with FIBEX once available.
 
