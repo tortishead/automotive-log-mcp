@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "automotive-log-mcp"
+version = "0.0.1"
+description = "MCP server for defect analysis on automotive logs, with every finding cited to a log line"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.3,<3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "hypothesis>=6.100",
+    "types-PyYAML",
+]
+
+[project.scripts]
+automotive-log-mcp = "automotive_log_mcp.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/automotive_log_mcp"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+mypy_path = "src"
+packages = ["automotive_log_mcp"]
+
+[[tool.mypy.overrides]]
+module = ["mcp.*", "mcp_types.*"]
+follow_imports = "silent"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

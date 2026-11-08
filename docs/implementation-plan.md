@@ -102,6 +102,8 @@ To checkpoint: about 17–20 days. To M6: about 27–33 days.
 
 Done when: two different MCP clients list the tools, `list_sources` returns an empty list, and the call log has the lines.
 
+Status (Nov 8, 2026): done. Checked with Claude Code (`claude -p` with `examples/mcp-config/claude-code.mcp.json`), the Python SDK client and a raw JSON-RPC client over stdio (the last two in `tests/test_stdio.py`). Other tools return "not implemented yet (planned for M1/M3)".
+
 ## M1 Ingest core (5–6 days)
 
 1. **Schema**: `sources`, `segments`, `records`, `templates`, `records_fts` (external content on `msg`, `tag`), `artifacts`, `artifact_sections`, `artifact_fts`, `meta` (schema version); indexes on `(source_id, seq)`, `(ts)`, `(source_id, ts_src)`, `tag`, `pid`, `template_id`, `level`; migration on open.
