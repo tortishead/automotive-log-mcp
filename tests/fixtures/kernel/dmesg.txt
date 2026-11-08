@@ -1,0 +1,6 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x411fd070]
+[    0.000000] Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT
+[    1.234567] binder: 1234:1250 transaction failed 29189/-22, size 0-0 line 3074
+[    2.000001] init: Service 'vendor.hvac' (pid 1234) exited with status 1
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x411fd070]
+[    0.100000] after reboot

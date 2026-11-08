@@ -1,0 +1,54 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "Booting Linux on physical CPU 0x0",
+   "seg": 1,
+   "template": "Booting Linux on physical CPU <*>",
+   "ts_raw": "1.000000",
+   "ts_src": 1000000000
+  },
+  {
+   "cite": "log:1#2",
+   "level": "E",
+   "msg": "init: Service vendor.hvac crashed",
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service vendor.hvac crashed",
+   "ts_raw": "2.500000",
+   "ts_src": 2500000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "boot",
+   1,
+   2,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "kernel",
+   "id": 1,
+   "lines": 2,
+   "meta": {
+    "ts_format": "sec_us"
+   },
+   "name": "dmesg_facility.txt",
+   "range": [
+    "1.000000",
+    "2.500000"
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

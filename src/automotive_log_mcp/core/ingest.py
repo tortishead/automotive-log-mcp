@@ -60,6 +60,12 @@ def file_sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def _close(it: Any) -> None:
+    close = getattr(it, "close", None)
+    if close is not None:
+        close()
+
+
 def _now() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds")
 
@@ -458,11 +464,18 @@ class Ingestor:
                 if not isinstance(connector, TextConnector):
                     raise IngestError(f"{member.name}: connector {connector.name} cannot read text sections")
                 items = connector.parse_lines(member.lines, ctx)
-                self._consume(items, get, member.stream, writer)
+                try:
+                    self._consume(items, get, member.stream, writer)
+                finally:
+                    _close(items)
             else:
                 assert member.open is not None
                 with member.open() as stream:
-                    self._consume(connector.parse(stream, ctx), get, member.stream, writer)
+                    items = connector.parse(stream, ctx)
+                    try:
+                        self._consume(items, get, member.stream, writer)
+                    finally:
+                        _close(items)  # before the stream closes
             if not sources:
                 get(member.stream)  # an empty log is still a source
             writer.flush()

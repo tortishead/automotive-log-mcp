@@ -1,0 +1,78 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "Booting Linux on physical CPU 0x0",
+   "pid": 0,
+   "seg": 1,
+   "template": "Booting Linux on physical CPU <*>",
+   "ts_raw": "0.000000",
+   "ts_src": 0
+  },
+  {
+   "cite": "log:1#2",
+   "level": "E",
+   "msg": "init: Service vendor.hvac crashed",
+   "pid": 123,
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service vendor.hvac crashed",
+   "ts_raw": "5.123456",
+   "ts_src": 5123456000
+  },
+  {
+   "attrs": {
+    "cpu": 1
+   },
+   "cite": "log:1#3",
+   "level": "W",
+   "msg": "thermal: zone 3 trip",
+   "seg": 1,
+   "tag": "thermal",
+   "template": "thermal: zone <*> trip",
+   "ts_raw": "6.000000",
+   "ts_src": 6000000000
+  },
+  {
+   "cite": "log:1#4",
+   "level": "D",
+   "msg": "debug line",
+   "seg": 1,
+   "template": "debug line",
+   "ts_raw": "7.000000",
+   "ts_src": 7000000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "boot",
+   1,
+   4,
+   4
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "kernel",
+   "id": 1,
+   "lines": 4,
+   "meta": {
+    "ts_format": "sec_us"
+   },
+   "name": "dmesg_prio.txt",
+   "range": [
+    "0.000000",
+    "7.000000"
+   ],
+   "records": 4,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,59 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "E",
+   "msg": "setProperty failed",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed",
+   "tid": 1250,
+   "ts": "2026-10-11 08:12:03.412",
+   "ts_raw": "2026-10-11 08:12:03.412345"
+  },
+  {
+   "cite": "log:1#2",
+   "level": "I",
+   "msg": "Start proc 1234",
+   "pid": 999,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Start proc <*>",
+   "tid": 1001,
+   "ts": "2026-10-11 08:12:03.500",
+   "ts_raw": "2026-10-11 08:12:03.500000"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   2,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 2,
+   "meta": {
+    "zone": "+0200"
+   },
+   "name": "year_usec_zone.log",
+   "range": [
+    "2026-10-11 08:12:03.412",
+    "2026-10-11 08:12:03.500"
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

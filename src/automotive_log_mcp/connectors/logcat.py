@@ -108,7 +108,7 @@ class LogcatConnector(TextConnector):
                 markers += 1
             elif THREADTIME.match(ln) or TIME.match(ln) or LONG.match(ln):
                 strong += 1
-            elif BRIEF.match(ln) or PROCESS.match(ln) or THREAD.match(ln):
+            elif BRIEF.match(ln) or PROCESS.match(ln) or THREAD.match(ln) or TAG.match(ln):
                 weak += 1
         n = len(lines)
         frac = (strong + 0.6 * weak + markers) / n
@@ -126,6 +126,7 @@ class LogcatConnector(TextConnector):
         pending: RawRecord | None = None
         pending_key = ""
         long_mode = False
+        blank = 0
         tt_match = THREADTIME.match
         cont_match = CONTINUATION.match
         level_map = _LEVEL_MAP
@@ -184,13 +185,19 @@ class LogcatConnector(TextConnector):
                     continue
 
             if long_mode and pending is not None and not line.startswith("[ "):
-                # Body of a 'long' record: everything up to the next header.
+                # Body of a 'long' record: everything up to the next header. Blank lines are
+                # kept only between body lines (the one after each record is a separator).
+                if not line:
+                    blank += 1
+                    continue
                 if pending.lines == 0:
                     pending.msg = line
                 else:
-                    pending.msg += "\n" + line
-                pending.lines += 1
+                    pending.msg += "\n" * (blank + 1) + line
+                pending.lines += 1 + blank
+                blank = 0
                 continue
+            blank = 0
 
             rec, key = self._other_formats(line, clock, ctx)
             if rec is None:

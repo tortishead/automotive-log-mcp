@@ -1,0 +1,51 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "E",
+   "msg": "setProperty failed",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed"
+  },
+  {
+   "cite": "log:1#2",
+   "level": "I",
+   "msg": "Start proc 1234",
+   "pid": 999,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Start proc <*>"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   2,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 2,
+   "meta": {},
+   "name": "process.log",
+   "range": [
+    null,
+    null
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,7 @@
+[ 10-11 08:12:03.412  1234: 1250 E/HvacCtrl ]
+setProperty failed
+status=NOT_AVAILABLE
+
+[ 10-11 08:12:03.500   999: 1001 I/ActivityManager ]
+Start proc 1234
+

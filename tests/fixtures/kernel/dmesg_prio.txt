@@ -1,0 +1,4 @@
+<6>[    0.000000][    T0] Booting Linux on physical CPU 0x0
+<3>[    5.123456][  T123] init: Service vendor.hvac crashed
+<4>[    6.000000][    C1] thermal: zone 3 trip
+<7>[    7.000000] debug line

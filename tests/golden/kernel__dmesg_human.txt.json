@@ -1,0 +1,51 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "msg": "usb 1-1: new high-speed USB device",
+   "seg": 1,
+   "template": "usb <*><*>: new high-speed USB device",
+   "ts": "2026-10-11 08:12:03.000",
+   "ts_raw": "Sat Oct 11 08:12:03 2026"
+  },
+  {
+   "cite": "log:1#2",
+   "level": "E",
+   "msg": "init: Service vendor.hvac crashed",
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service vendor.hvac crashed",
+   "ts": "2026-10-11 08:12:04.000",
+   "ts_raw": "Sat Oct 11 08:12:04 2026"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   2,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "kernel",
+   "id": 1,
+   "lines": 2,
+   "meta": {},
+   "name": "dmesg_human.txt",
+   "range": [
+    "2026-10-11 08:12:03.000",
+    "2026-10-11 08:12:04.000"
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,73 @@
+{
+ "records": [
+  {
+   "attrs": {
+    "kseq": 1234
+   },
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "Booting Linux on physical CPU 0x0",
+   "seg": 1,
+   "template": "Booting Linux on physical CPU <*>",
+   "ts_raw": "5.000000",
+   "ts_src": 5000000000
+  },
+  {
+   "attrs": {
+    "DEVICE": "+platform:hvac",
+    "SUBSYSTEM": "platform",
+    "kseq": 1235
+   },
+   "cite": "log:1#2",
+   "level": "E",
+   "msg": "init: Service vendor.hvac crashed",
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service vendor.hvac crashed",
+   "ts_raw": "5.123456",
+   "ts_src": 5123456000
+  },
+  {
+   "attrs": {
+    "kseq": 1236
+   },
+   "cite": "log:1#3",
+   "level": "W",
+   "msg": "thermal: zone 3 trip",
+   "seg": 1,
+   "tag": "thermal",
+   "template": "thermal: zone <*> trip",
+   "ts_raw": "6.000000",
+   "ts_src": 6000000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "boot",
+   1,
+   3,
+   3
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "kernel",
+   "id": 1,
+   "lines": 3,
+   "meta": {},
+   "name": "kmsg.txt",
+   "range": [
+    "5.000000",
+    "6.000000"
+   ],
+   "records": 3,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "E",
+   "msg": "setProperty failed",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed",
+   "tid": 1250,
+   "ts_raw": "12.345678",
+   "ts_src": 12345678000
+  },
+  {
+   "cite": "log:1#2",
+   "level": "I",
+   "msg": "Start proc 1234",
+   "pid": 999,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Start proc <*>",
+   "tid": 1001,
+   "ts_raw": "13.000001",
+   "ts_src": 13000001000
+  },
+  {
+   "cite": "log:1#3",
+   "level": "I",
+   "msg": "second boot",
+   "pid": 1,
+   "seg": 2,
+   "tag": "init",
+   "template": "second boot",
+   "tid": 1,
+   "ts_raw": "0.500000",
+   "ts_src": 500000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   2,
+   2
+  ],
+  [
+   1,
+   2,
+   "monotonic_reset",
+   3,
+   3,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 3,
+   "meta": {},
+   "name": "monotonic.log",
+   "range": [
+    "0.500000",
+    "13.000001"
+   ],
+   "records": 3,
+   "segments": 2,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

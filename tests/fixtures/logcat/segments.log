@@ -1,0 +1,5 @@
+10-11 08:12:03.412  1234  1250 I boot_progress_start: 12345
+10-11 08:12:05.000  1234  1250 I Zygote: up
+10-11 08:00:00.000  1234  1250 I Zygote: clock set back 12 minutes
+10-11 08:00:01.000     1     1 I boot_progress_start: 999
+10-11 08:00:02.000     1     1 I init: after second boot

@@ -87,6 +87,9 @@ def connect(path: Path, create: bool = False) -> sqlite3.Connection:
     except sqlite3.DatabaseError as e:
         conn.close()
         raise StoreError(f"{path} is not a usable case DB: {e}") from e
+    except BaseException:
+        conn.close()
+        raise
     return conn
 
 
@@ -118,9 +121,9 @@ class BatchWriter:
     ``executemany`` holds the GIL. See docs/implementation-plan.md, M1 status.)
     """
 
-    def __init__(self, conn: sqlite3.Connection, batch_rows: int = BATCH_ROWS) -> None:
+    def __init__(self, conn: sqlite3.Connection, batch_rows: int | None = None) -> None:
         self.conn = conn
-        self.batch_rows = batch_rows
+        self.batch_rows = batch_rows or BATCH_ROWS
         self.rows: list[tuple[Any, ...]] = []
         self.fts: list[tuple[int, str, str | None]] = []
         self.tags: dict[str, int] = dict(conn.execute("SELECT name, id FROM tags").fetchall())

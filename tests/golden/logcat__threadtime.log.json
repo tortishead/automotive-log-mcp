@@ -1,0 +1,263 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "setTemp 21.5 for zone 1",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setTemp <*> for zone <*>",
+   "tid": 1250,
+   "ts": "2025-12-31 23:59:58.100",
+   "ts_raw": "12-31 23:59:58.100"
+  },
+  {
+   "cite": "log:1#2",
+   "level": "E",
+   "msg": "setProperty failed, status=NOT_AVAILABLE",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed, status=NOT_AVAILABLE",
+   "tid": 1250,
+   "ts": "2025-12-31 23:59:59.412",
+   "ts_raw": "12-31 23:59:59.412"
+  },
+  {
+   "cite": "log:1#3",
+   "level": "E",
+   "msg": "setProperty failed, status=NOT_AVAILABLE",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed, status=NOT_AVAILABLE",
+   "tid": 1250,
+   "ts": "2025-12-31 23:59:59.413",
+   "ts_raw": "12-31 23:59:59.413"
+  },
+  {
+   "cite": "log:1#4",
+   "level": "E",
+   "msg": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: 1234\njava.lang.NullPointerException: Attempt to read from null\n\tat com.example.hvac.Controller.update(Controller.java:42)\nCaused by: java.lang.IllegalStateException: not bound\n\t... 3 more",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "AndroidRuntime",
+   "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: Attempt to read from null\n\tat com.example.hvac.Controller.update(Controller.java:<*>)\nCaused by: java.lang.IllegalStateException: not bound\n\t... <*> more",
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "01-01 00:00:01.000"
+  },
+  {
+   "cite": "log:1#5",
+   "level": "I",
+   "msg": "Sending signal. PID: 1234 SIG: 9",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "AndroidRuntime",
+   "template": "Sending signal. PID: <*> SIG: <*>",
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "01-01 00:00:01.000"
+  },
+  {
+   "cite": "log:1#6",
+   "level": "I",
+   "msg": "bound to vehicle hal",
+   "pid": 1301,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "bound to vehicle hal",
+   "tid": 1301,
+   "ts": "2026-01-01 00:00:03.000",
+   "ts_raw": "01-01 00:00:03.000"
+  },
+  {
+   "cite": "log:1#7",
+   "msg": "read: unexpected EOF!",
+   "seg": 1,
+   "template": "read: unexpected EOF!"
+  },
+  {
+   "cite": "log:1#8",
+   "level": "F",
+   "msg": "Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 1301 (hvac)",
+   "pid": 1301,
+   "seg": 1,
+   "tag": "libc",
+   "template": "Fatal signal <*> (SIGABRT), code <*> (SI_QUEUE) in tid <*> (hvac)",
+   "tid": 1301,
+   "ts": "2026-01-01 00:00:03.100",
+   "ts_raw": "01-01 00:00:03.100"
+  },
+  {
+   "cite": "log:1#9",
+   "level": "F",
+   "msg": "Abort message: 'assertion failed'",
+   "pid": 1301,
+   "seg": 1,
+   "tag": "DEBUG",
+   "template": "Abort message: 'assertion failed'",
+   "tid": 1301,
+   "ts": "2026-01-01 00:00:03.200",
+   "ts_raw": "01-01 00:00:03.200"
+  },
+  {
+   "cite": "log:1#10",
+   "level": "E",
+   "msg": "message with empty tag-like text:",
+   "pid": 302,
+   "seg": 1,
+   "tag": "Tag With Space",
+   "template": "message with empty tag-like text:",
+   "tid": 302,
+   "ts": "2026-01-01 00:00:03.300",
+   "ts_raw": "01-01 00:00:03.300"
+  },
+  {
+   "cite": "log:1#11",
+   "level": "I",
+   "msg": "",
+   "pid": 302,
+   "seg": 1,
+   "tag": "EmptyMsg",
+   "template": "",
+   "tid": 302,
+   "ts": "2026-01-01 00:00:03.400",
+   "ts_raw": "01-01 00:00:03.400"
+  },
+  {
+   "cite": "log:2#1",
+   "level": "W",
+   "msg": "Process com.example.hvac (pid 1234) has died",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Process com.example.hvac (pid <*>) has died",
+   "tid": 1100,
+   "ts": "2026-01-01 00:00:02.000",
+   "ts_raw": "01-01 00:00:02.000"
+  },
+  {
+   "cite": "log:2#2",
+   "level": "I",
+   "msg": "Start proc 1301:com.example.hvac/u0a42 for service",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Start proc <*>:com.example.hvac/u0a4<*> for service",
+   "tid": 1100,
+   "ts": "2026-01-01 00:00:02.500",
+   "ts_raw": "01-01 00:00:02.500"
+  },
+  {
+   "cite": "log:2#3",
+   "level": "D",
+   "msg": "connected to <MAC:abcce245> ssid=\"<SSID:8f73d3ce>\" ip <IP:7d43c85b>",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "WifiService",
+   "template": "connected to <MAC> ssid=\"<SSID>\" ip <IP>",
+   "tid": 1120,
+   "ts": "2026-01-01 00:00:02.600",
+   "ts_raw": "01-01 00:00:02.600"
+  },
+  {
+   "cite": "log:3#1",
+   "level": "E",
+   "msg": "FATAL EXCEPTION: main",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "AndroidRuntime",
+   "template": "FATAL EXCEPTION: main",
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "01-01 00:00:01.000"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   11,
+   11
+  ],
+  [
+   2,
+   1,
+   "start",
+   1,
+   3,
+   3
+  ],
+  [
+   3,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 16,
+   "meta": {
+    "ts_format": "md_ms"
+   },
+   "name": "threadtime.log:main",
+   "range": [
+    "2025-12-31 23:59:58.100",
+    "2026-01-01 00:00:03.400"
+   ],
+   "records": 11,
+   "segments": 1,
+   "status": "done",
+   "stream": "main",
+   "unparsed": 1
+  },
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 2,
+   "lines": 3,
+   "meta": {
+    "ts_format": "md_ms"
+   },
+   "name": "threadtime.log:system",
+   "range": [
+    "2026-01-01 00:00:02.000",
+    "2026-01-01 00:00:02.600"
+   ],
+   "records": 3,
+   "segments": 1,
+   "status": "done",
+   "stream": "system",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 3,
+   "lines": 1,
+   "meta": {
+    "ts_format": "md_ms"
+   },
+   "name": "threadtime.log:crash",
+   "range": [
+    "2026-01-01 00:00:01.000",
+    "2026-01-01 00:00:01.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": "crash",
+   "unparsed": 0
+  }
+ ]
+}

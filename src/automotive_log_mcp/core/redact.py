@@ -137,7 +137,7 @@ DEFAULT_RULES: tuple[Rule, ...] = (
     ),
     Rule(
         "number",  # IMEI, IPv4, 'lat, lon' pairs
-        r"(?<![\w.+-])(?P<v>-?\d{1,2}\.\d{5,},\s?-?\d{1,3}\.\d{5,}|\d[\d.]{5,}\d)(?![\w.])",
+        r"(?<![\w.+-])(?P<v>-?\d{1,2}\.\d{5,},\s?-?\d{1,3}\.\d{5,}|\d[\d.]{5,}\d)(?!\w|\.\d)",
         _number,
     ),
     Rule("vin", r"(?<![A-Za-z0-9])(?P<v>[A-HJ-NPR-Z0-9]{17})(?![A-Za-z0-9])", _vin),

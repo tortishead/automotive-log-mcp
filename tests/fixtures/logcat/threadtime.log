@@ -1,0 +1,24 @@
+--------- beginning of main
+12-31 23:59:58.100  1234  1250 I HvacCtrl: setTemp 21.5 for zone 1
+12-31 23:59:59.412  1234  1250 E HvacCtrl: setProperty failed, status=NOT_AVAILABLE
+12-31 23:59:59.413  1234  1250 E HvacCtrl: setProperty failed, status=NOT_AVAILABLE
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: FATAL EXCEPTION: main
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: Process: com.example.hvac, PID: 1234
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: java.lang.NullPointerException: Attempt to read from null
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: 	at com.example.hvac.Controller.update(Controller.java:42)
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: Caused by: java.lang.IllegalStateException: not bound
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: 	... 3 more
+01-01 00:00:01.000  1234  1250 I AndroidRuntime: Sending signal. PID: 1234 SIG: 9
+--------- beginning of system
+01-01 00:00:02.000  1000  1100 W ActivityManager: Process com.example.hvac (pid 1234) has died
+01-01 00:00:02.500  1000  1100 I ActivityManager: Start proc 1301:com.example.hvac/u0a42 for service
+01-01 00:00:02.600  1000  1120 D WifiService: connected to 3c:5a:b4:01:02:03 ssid="HomeNet" ip 192.168.1.23
+--------- beginning of crash
+01-01 00:00:01.000  1234  1250 E AndroidRuntime: FATAL EXCEPTION: main
+--------- switch to main
+01-01 00:00:03.000  1301  1301 I HvacCtrl: bound to vehicle hal
+read: unexpected EOF!
+01-01 00:00:03.100  1301  1301 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 1301 (hvac)
+01-01 00:00:03.200  1301  1301 A DEBUG   : Abort message: 'assertion failed'
+01-01 00:00:03.300   302   302 E Tag With Space: message with empty tag-like text:
+01-01 00:00:03.400   302   302 I EmptyMsg: 

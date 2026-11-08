@@ -17,6 +17,7 @@ by default; one with the name of an existing connector replaces it only when it 
 from __future__ import annotations
 
 import codecs
+import contextlib
 import io
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
@@ -67,7 +68,8 @@ def iter_text_lines(stream: BinaryIO) -> Iterator[str]:
         for line in text:
             yield line.rstrip("\r\n")
     finally:
-        text.detach()
+        with contextlib.suppress(ValueError):  # the stream may already be closed
+            text.detach()
 
 
 class TextConnector:

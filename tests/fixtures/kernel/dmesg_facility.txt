@@ -1,0 +1,2 @@
+kern  :info  : [    1.000000] Booting Linux on physical CPU 0x0
+kern  :err   : [    2.500000] init: Service vendor.hvac crashed

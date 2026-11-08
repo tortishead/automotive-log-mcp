@@ -1,0 +1,60 @@
+========================================================
+== dumpstate: 2026-01-01 00:10:00
+========================================================
+
+Build: sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys
+Build fingerprint: 'google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys'
+Bootloader: unknown
+Radio: unknown
+Network: (unknown)
+Kernel: Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT
+Command line: androidboot.hardware=ranchu androidboot.serialno=EMULATOR35X1X11X0
+Uptime: up 0 weeks, 0 days, 0 hours, 12 minutes
+Bugreport format version: 2.0
+Dumpstate info: id=1 pid=4321 dry_run=0 parallel_run=1 args=-SBp extra_options=
+
+------ UPTIME (uptime) ------
+ 00:10:00 up 12 min,  0 users,  load average: 1.00, 0.90, 0.80
+------ 0.003s was the duration of 'UPTIME' ------
+------ MEMORY INFO (/proc/meminfo) ------
+MemTotal:        4022392 kB
+------ 0.001s was the duration of 'MEMORY INFO' ------
+------ SYSTEM LOG (logcat -v threadtime -v printable -v uid -d *:v) ------
+--------- beginning of main
+12-31 23:59:58.100  1000  1234  1250 I HvacCtrl: setTemp 21.5 for zone 1
+12-31 23:59:59.412  1000  1234  1250 E HvacCtrl: setProperty failed, status=NOT_AVAILABLE
+--------- beginning of system
+01-01 00:00:02.000  1000  1000  1100 W ActivityManager: Process com.example.hvac (pid 1234) has died
+--------- beginning of crash
+01-01 00:00:01.000 u0_a42  1234  1250 E AndroidRuntime: FATAL EXCEPTION: main
+01-01 00:00:01.000 u0_a42  1234  1250 E AndroidRuntime: Process: com.example.hvac, PID: 1234
+01-01 00:00:01.000 u0_a42  1234  1250 E AndroidRuntime: java.lang.NullPointerException: boom
+01-01 00:00:01.000 u0_a42  1234  1250 E AndroidRuntime: 	at com.example.hvac.Controller.update(Controller.java:42)
+------ 0.121s was the duration of 'SYSTEM LOG' ------
+------ EVENT LOG (logcat -b events -v threadtime -v printable -v uid -d *:v) ------
+--------- beginning of events
+12-31 23:58:00.000  1000   500   520 I boot_progress_start: 1234
+01-01 00:00:02.000  1000  1000  1100 I am_proc_died: [0,1234,com.example.hvac,900,2]
+------ 0.020s was the duration of 'EVENT LOG' ------
+------ KERNEL LOG (dmesg) ------
+<6>[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x411fd070]
+<3>[  123.456789] init: Service 'vendor.hvac' (pid 1234) exited with status 1
+<6>[  124.000000] wlan0: associated with 3c:5a:b4:01:02:03
+------ 0.010s was the duration of 'KERNEL LOG' ------
+------ SYSTEM PROPERTIES (getprop) ------
+[persist.sys.timezone]: [Europe/Berlin]
+[ro.build.fingerprint]: [google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys]
+[ro.product.model]: [sdk_car_x86_64]
+[ro.serialno]: [EMULATOR35X1X11X0]
+------ 0.004s was the duration of 'SYSTEM PROPERTIES' ------
+------ PROCESSES AND THREADS (ps -A -T -Z -O pri,nice,rtprio,sched,pcy,time) ------
+LABEL                          USER           PID   TID  PPID     VSZ    RSS WCHAN            ADDR S PRI  NI RTPRIO SCH  PCY     TIME CMD
+u:r:init:s0                    root             1     1     0 10943400 12345 0                   0 S  19   0     -   0   fg 00:00:01 init
+u:r:system_server:s0           system        1000  1000   500 15000000 300000 0                  0 S  18  -2     -   0   fg 00:00:30 system_server
+u:r:untrusted_app:s0           u0_a42        1234  1250   500 14000000 100000 0                  0 S  10  10     -   0   bg 00:00:02 hvac worker
+------ 0.050s was the duration of 'PROCESSES AND THREADS' ------
+------ DUMPSYS (/system/bin/dumpsys) ------
+-------------------------------------------------------------------------------
+DUMP OF SERVICE car_service:
+CarService state
+------ 0.500s was the duration of 'DUMPSYS' ------

@@ -163,6 +163,8 @@ class BugreportContainer:
             for _ in body:  # drain whatever the consumer left
                 pass
             header_line = state["next"]
+            if header_line is None:
+                header_line = self._next_header(lines)
         if skipped:
             ctx.notes.append(f"{member.name}: {len(skipped)} sections not indexed in this version")
 
@@ -171,6 +173,14 @@ class BugreportContainer:
         if "dumpstate_ns" in meta and "uptime_s" in meta:
             # Minute resolution at best: metadata for the clock model (M5), not used for ts.
             meta["boot_time_estimate"] = meta["dumpstate_ns"] - meta["uptime_s"] * NS
+
+    @staticmethod
+    def _next_header(lines: Iterator[str]) -> str | None:
+        """Skip text between sections (after a duration line) up to the next section header."""
+        for line in lines:
+            if line.startswith("------ ") and not SECTION_END.match(line) and SECTION.match(line):
+                return line
+        return None
 
     @staticmethod
     def _section(lines: Iterator[str], title: str, state: dict[str, Any]) -> Iterator[str]:

@@ -1,0 +1,111 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "12345",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "boot_progress_start",
+   "template": "<*>",
+   "tid": 1250,
+   "ts": "2026-10-11 08:12:03.412",
+   "ts_raw": "10-11 08:12:03.412"
+  },
+  {
+   "cite": "log:1#2",
+   "level": "I",
+   "msg": "up",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "Zygote",
+   "template": "up",
+   "tid": 1250,
+   "ts": "2026-10-11 08:12:05.000",
+   "ts_raw": "10-11 08:12:05.000"
+  },
+  {
+   "cite": "log:1#3",
+   "level": "I",
+   "msg": "clock set back 12 minutes",
+   "pid": 1234,
+   "seg": 2,
+   "tag": "Zygote",
+   "template": "clock set back <*> minutes",
+   "tid": 1250,
+   "ts": "2026-10-11 08:00:00.000",
+   "ts_raw": "10-11 08:00:00.000"
+  },
+  {
+   "cite": "log:1#4",
+   "level": "I",
+   "msg": "999",
+   "pid": 1,
+   "seg": 3,
+   "tag": "boot_progress_start",
+   "template": "<*>",
+   "tid": 1,
+   "ts": "2026-10-11 08:00:01.000",
+   "ts_raw": "10-11 08:00:01.000"
+  },
+  {
+   "cite": "log:1#5",
+   "level": "I",
+   "msg": "after second boot",
+   "pid": 1,
+   "seg": 3,
+   "tag": "init",
+   "template": "after second boot",
+   "tid": 1,
+   "ts": "2026-10-11 08:00:02.000",
+   "ts_raw": "10-11 08:00:02.000"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "boot",
+   1,
+   2,
+   2
+  ],
+  [
+   1,
+   2,
+   "wall_jump_back",
+   3,
+   3,
+   1
+  ],
+  [
+   1,
+   3,
+   "boot",
+   4,
+   5,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 5,
+   "meta": {
+    "ts_format": "md_ms"
+   },
+   "name": "segments.log",
+   "range": [
+    "2026-10-11 08:00:00.000",
+    "2026-10-11 08:12:05.000"
+   ],
+   "records": 5,
+   "segments": 3,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

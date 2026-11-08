@@ -1,0 +1,5 @@
+6,1234,5000000,-;Booting Linux on physical CPU 0x0
+3,1235,5123456,-;init: Service vendor.hvac crashed
+ SUBSYSTEM=platform
+ DEVICE=+platform:hvac
+4,1236,6000000,c;thermal: zone 3 trip

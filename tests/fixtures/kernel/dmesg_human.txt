@@ -1,0 +1,2 @@
+[Sat Oct 11 08:12:03 2026] usb 1-1: new high-speed USB device
+<3>[Sat Oct 11 08:12:04 2026] init: Service vendor.hvac crashed

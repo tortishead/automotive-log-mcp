@@ -1,0 +1,93 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "msg": "Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
+   "seg": 1,
+   "template": "Booting Linux on physical CPU <*> [<*>]",
+   "ts_raw": "0.000000",
+   "ts_src": 0
+  },
+  {
+   "cite": "log:1#2",
+   "msg": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+   "seg": 1,
+   "template": "Linux version <*>-android1<*> (build@host) #<*> SMP PREEMPT",
+   "ts_raw": "0.000000",
+   "ts_src": 0
+  },
+  {
+   "cite": "log:1#3",
+   "msg": "binder: 1234:1250 transaction failed 29189/-22, size 0-0 line 3074",
+   "seg": 1,
+   "tag": "binder",
+   "template": "binder: <*>:<*> transaction failed <*>/<*>, size <*><*> line <*>",
+   "ts_raw": "1.234567",
+   "ts_src": 1234567000
+  },
+  {
+   "cite": "log:1#4",
+   "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>",
+   "ts_raw": "2.000001",
+   "ts_src": 2000001000
+  },
+  {
+   "cite": "log:1#5",
+   "msg": "Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
+   "seg": 2,
+   "template": "Booting Linux on physical CPU <*> [<*>]",
+   "ts_raw": "0.000000",
+   "ts_src": 0
+  },
+  {
+   "cite": "log:1#6",
+   "msg": "after reboot",
+   "seg": 2,
+   "template": "after reboot",
+   "ts_raw": "0.100000",
+   "ts_src": 100000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "boot",
+   1,
+   4,
+   4
+  ],
+  [
+   1,
+   2,
+   "boot",
+   5,
+   6,
+   2
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "kernel",
+   "id": 1,
+   "lines": 6,
+   "meta": {
+    "ts_format": "sec_us"
+   },
+   "name": "dmesg.txt",
+   "range": [
+    "0.000000",
+    "2.000001"
+   ],
+   "records": 6,
+   "segments": 2,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,361 @@
+{
+ "records": [
+  {
+   "cite": "log:1#1",
+   "level": "I",
+   "msg": "older line",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "PersistLog",
+   "template": "older line",
+   "tid": 1100,
+   "ts": "2025-12-31 23:50:00.000",
+   "ts_raw": "12-31 23:50:00.000"
+  },
+  {
+   "attrs": {
+    "uid": "1000"
+   },
+   "cite": "log:2#1",
+   "level": "I",
+   "msg": "setTemp 21.5 for zone 1",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setTemp <*> for zone <*>",
+   "tid": 1250,
+   "ts": "2025-12-31 23:59:58.100",
+   "ts_raw": "12-31 23:59:58.100"
+  },
+  {
+   "attrs": {
+    "uid": "1000"
+   },
+   "cite": "log:2#2",
+   "level": "E",
+   "msg": "setProperty failed, status=NOT_AVAILABLE",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "HvacCtrl",
+   "template": "setProperty failed, status=NOT_AVAILABLE",
+   "tid": 1250,
+   "ts": "2025-12-31 23:59:59.412",
+   "ts_raw": "12-31 23:59:59.412"
+  },
+  {
+   "attrs": {
+    "uid": "1000"
+   },
+   "cite": "log:3#1",
+   "level": "W",
+   "msg": "Process com.example.hvac (pid 1234) has died",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "ActivityManager",
+   "template": "Process com.example.hvac (pid <*>) has died",
+   "tid": 1100,
+   "ts": "2026-01-01 00:00:02.000",
+   "ts_raw": "01-01 00:00:02.000"
+  },
+  {
+   "attrs": {
+    "uid": "u0_a42"
+   },
+   "cite": "log:4#1",
+   "level": "E",
+   "msg": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: 1234\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:42)",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "AndroidRuntime",
+   "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:<*>)",
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "01-01 00:00:01.000"
+  },
+  {
+   "attrs": {
+    "uid": "1000"
+   },
+   "cite": "log:5#1",
+   "level": "I",
+   "msg": "1234",
+   "pid": 500,
+   "seg": 1,
+   "tag": "boot_progress_start",
+   "template": "<*>",
+   "tid": 520,
+   "ts": "2025-12-31 23:58:00.000",
+   "ts_raw": "12-31 23:58:00.000"
+  },
+  {
+   "attrs": {
+    "uid": "1000"
+   },
+   "cite": "log:5#2",
+   "level": "I",
+   "msg": "[0,1234,com.example.hvac,900,2]",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "am_proc_died",
+   "template": "[<*>,<*>,com.example.hvac,<*>,<*>]",
+   "tid": 1100,
+   "ts": "2026-01-01 00:00:02.000",
+   "ts_raw": "01-01 00:00:02.000"
+  },
+  {
+   "cite": "log:6#1",
+   "level": "I",
+   "msg": "Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
+   "seg": 1,
+   "template": "Booting Linux on physical CPU <*> [<*>]",
+   "ts_raw": "0.000000",
+   "ts_src": 0
+  },
+  {
+   "cite": "log:6#2",
+   "level": "E",
+   "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "seg": 1,
+   "tag": "init",
+   "template": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>",
+   "ts_raw": "123.456789",
+   "ts_src": 123456789000
+  },
+  {
+   "cite": "log:6#3",
+   "level": "I",
+   "msg": "wlan0: associated with <MAC:abcce245>",
+   "seg": 1,
+   "tag": "wlan0",
+   "template": "wlan0: associated with <MAC>",
+   "ts_raw": "124.000000",
+   "ts_src": 124000000000
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   2,
+   1,
+   "start",
+   1,
+   2,
+   2
+  ],
+  [
+   3,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   4,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   5,
+   1,
+   "boot",
+   1,
+   2,
+   2
+  ],
+  [
+   6,
+   1,
+   "boot",
+   1,
+   3,
+   3
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "logcat",
+   "id": 1,
+   "lines": 1,
+   "meta": {
+    "ts_format": "md_ms"
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/misc/logd/logcat.01",
+   "range": [
+    "2025-12-31 23:50:00.000",
+    "2025-12-31 23:50:00.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "logcat",
+   "id": 2,
+   "lines": 2,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "md_ms",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:main",
+   "range": [
+    "2025-12-31 23:59:58.100",
+    "2025-12-31 23:59:59.412"
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": "main",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "logcat",
+   "id": 3,
+   "lines": 1,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "md_ms",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:system",
+   "range": [
+    "2026-01-01 00:00:02.000",
+    "2026-01-01 00:00:02.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": "system",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "logcat",
+   "id": 4,
+   "lines": 4,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "md_ms",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:crash",
+   "range": [
+    "2026-01-01 00:00:01.000",
+    "2026-01-01 00:00:01.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": "crash",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "logcat",
+   "id": 5,
+   "lines": 2,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "md_ms",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#EVENT LOG:events",
+   "range": [
+    "2025-12-31 23:58:00.000",
+    "2026-01-01 00:00:02.000"
+   ],
+   "records": 2,
+   "segments": 1,
+   "status": "done",
+   "stream": "events",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "kernel",
+   "id": 6,
+   "lines": 3,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "sec_us",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#KERNEL LOG:kernel",
+   "range": [
+    "0.000000",
+    "124.000000"
+   ],
+   "records": 3,
+   "segments": 1,
+   "status": "done",
+   "stream": "kernel",
+   "unparsed": 0
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+Oct 11 08:12:03 ivi-host hvacd[1234]: setProperty failed, status=NOT_AVAILABLE
+Oct 11 08:12:04 ivi-host kernel: usb 1-1: new device
+  continuation of the kernel line
+Oct 11 08:12:05.250 ivi-host systemd[1]: Started hvacd.service.
+not a syslog line
