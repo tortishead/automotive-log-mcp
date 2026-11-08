@@ -21,7 +21,7 @@ The first version of the API is designed for **defect analysis**: find what went
         │ record stream + artifacts
   ┌─────▼──────────────────────────────┐
   │ shared core                        │
-  │  normalize → template → redact     │
+  │  normalize → redact → template     │
   │  SQLite + FTS5 index per case      │
   │  clock model + alignment           │
   │  detectors (YAML rules)            │
@@ -131,7 +131,7 @@ Shared filter object, used by every query tool:
 
 Times accept absolute values, `+30s`/`-2m` relative to a reference, or citation references (`"from": "log:2#18233-5s"`).
 
-Tools in priority order. **P0** is the smallest set that answers a single-bugreport defect question; build it first and try it on real cases before adding more. **P1** makes agents cheaper and faster on big logs. **P2** is for multi-source cases and final reports.
+Tools in priority order. **P0** is the smallest set that answers a single-bugreport defect question; build it first and try it on real cases before adding more. **P1** makes agents cheaper and faster on big logs and checks citations mechanically. **P2** is for multi-source cases.
 
 | Prio | Tool | What it does | Why at this priority |
 | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ Tools in priority order. **P0** is the smallest set that answers a single-bugrep
 | P2 | `timeline(case, from, to, filter?)` | Merged, time-ordered records across sources. | Only useful once there are several aligned sources |
 | P2 | `align(case, source, method=auto\|anchor\|offset, …)` | Puts a source on the common timeline; returns offset, drift, confidence. | Needed when sources have different clocks (DLT + logcat); one bugreport shares a clock |
 | P2 | `diff(case, a, b, filter?)` | Templates only in A, only in B, and large count changes. | Strong for good-vs-bad runs, but needs a reference log |
-| P2 | `check_citations(case, markdown)` | Rejects citations to records or artifacts that don't exist; warns when nothing is cited. | Final reports and UIs |
+| P1 | `check_citations(case, markdown)` | Rejects `log:` and `art:` citations that don't exist; warns when nothing is cited. | The first evaluation needs valid citations, checked mechanically; later also used by UIs |
 
 Rules for all tools:
 
@@ -214,7 +214,8 @@ The core does everything else: level normalization, templates, redaction, segmen
 | `bugreport` (container) | 1 | Zip or `.txt`: splits sections (`SYSTEM LOG`, `EVENT LOG`, `KERNEL LOG`, `crash`, `DUMPSYS`, other dumpstate sections), reads fingerprint, uptime, timezone and the process list; sends tombstones, ANR traces, dropbox and pstore files to the artifact parsers. |
 | `kernel` | 1 | `dmesg` (`[  12.345678]`), `/proc/kmsg` / `dmesg -r` (`<6>`), `dmesg -T`. |
 | `regex-yaml` | 1 | A YAML file per format with a line regex, named groups mapped to record fields, timestamp format and clock. Covers vendor service logs, QNX `slog2info` text output, test-runner logs. |
-| artifact parsers: `tombstone`, `anr`, `java_crash`, `dropbox`, `dumpsys`, `kernel_panic` | 1 | Text tombstones first; tombstone `.pb` (Android 12+) via the AOSP protobuf schema when no text is present. |
+| artifact parsers: `tombstone`, `anr`, `java_crash`, `dropbox` | 1 | Text tombstones and ANR traces; dropbox by tag, body handed to the matching parser. |
+| artifact parsers: `dumpsys`, `kernel_panic`, tombstone `.pb` | 2 | `dumpsys` per service and subsection; pstore as previous-boot kernel records plus a panic artifact; tombstone `.pb` (Android 12+) via the AOSP protobuf schema when no text is present. Pulled earlier if an evaluation case needs one. |
 | `dlt` | 2 | Storage format (`DLT\x01` header): storage time, ECU ticks (0.1 ms), ECU/app/context ids, verbose arguments; non-verbose via FIBEX files in `options`. Parsing by ESR Labs `dlt-core` (Rust, Apache-2.0) in a sidecar binary `dlt2jsonl`; the Python connector reads its JSON lines. Split/rotated DLT files are one source via a container. |
 | `dlt_file` (artifact parser) | 2 | Reassembles DLT file transfers; parses known types, stores coredumps as metadata only. |
 | later | — | CAN traces (`.asc`/`.blf`) if bus timing matters, perfetto/systrace summaries, QNX binary slog2, remote fetch from ticket systems or test benches. |
@@ -240,7 +241,7 @@ Logcat from a long test drive is easily 0.5–2 GB; DLT traces from all ECUs can
 - **Index once, query many.** Records go into SQLite in batches of ~50k per transaction with WAL; FTS5 (external-content table over `msg` and `tag`) is filled in the same pass. Target at least 100k lines/s; measure on real traces.
 - **Background indexing.** `add_source` returns at once; `list_sources` shows progress, and queries on a source still indexing work on what is committed and say so.
 - **Dedup by template.** `collapse=true` turns 40k identical lines into one; this is the biggest token saver.
-- **Hash-based reuse.** Sources are keyed by file hash plus connector version, so loading the same file into a second case can reuse the index.
+- **Hash-based reuse.** Sources are keyed by file hash, connector version and redaction-rules hash, so loading the same file into a second case can reuse the index, and a changed redaction rule never reuses rows redacted under the old rules.
 - **Hard caps everywhere.** Line count, byte budget and cursors. When a query would return too much, the tool returns counts by tag/template and suggests filters.
 - **Beyond SQLite** (tens of GB per case): DuckDB over Parquet behind the same store interface. Not needed at first.
 
@@ -269,17 +270,17 @@ Each format has its own clock, so alignment is an explicit step, not a guess the
 
 **Honesty rule.** Cross-source outputs report alignment confidence, and the server's agent instructions say: do not claim "A caused B" from order alone when either side is `estimated` or the gap is smaller than the alignment error.
 
-Missing year and zone come from the bugreport, then the case's `tz`, then file mtime, in that order; the source is marked `estimated` if none exist.
+Missing year and zone come from the bugreport, then the case's `tz`, then file mtime, in that order; the source is marked `estimated` if none exist. A log without a year that crosses New Year (month 12 → 01) increments the year; this is not a backwards clock jump and does not start a new segment.
 
 ## Privacy and access policy
 
 Logs hold personal data: VINs, IMEI/serials, MAC addresses, GPS coordinates, phone numbers, account emails, Wi-Fi SSIDs. Many companies also restrict what may reach an AI model. The server supports this without knowing any company's rules:
 
-- **Redaction at index time**, so no tool can return the raw value. Rules are a YAML list of regexes with replacement tokens (`<VIN>`, `<GPS>`). Redacted values carry a keyed hash suffix (`<VIN#a3f1>`, HMAC with a per-installation secret) so the agent can see that two lines mention the same vehicle without the value being recoverable.
+- **Redaction at index time, before template extraction**, so no tool can return the raw value and the `templates` table never holds one. Redaction is always on, with default rules that an installation can extend; there is no raw mode. Rules are a YAML list of regexes with replacement tokens (`<VIN>`, `<GPS>`). Redacted values carry a keyed hash suffix (`<VIN#a3f1>`, HMAC with a per-installation secret) so the agent can see that two lines mention the same vehicle without the value being recoverable.
 - **Policy file**: blocked sources or ECUs, allowed tools, byte budget per session, output caps.
-- **Call log**: one JSONL line per tool call (case, tool, arguments, result size, duration), without log content, for audit and cost tracking.
+- **Call log**: one JSONL line per tool call (case, tool, arguments, result size, duration), without log content, for audit and cost tracking. Arguments are redacted with the same rules, because agents copy values from outputs into queries.
 - **CLI without an agent**: the same queries from the command line, for engineers or environments where no model may be used.
-- The original files are never modified or copied; engineers can still open them with their usual viewers.
+- The original files are never modified or copied; the case stores path and hash, and engineers can still open them with their usual viewers. If a file moves, `relink` points the source to the new path after checking the hash; `list_sources` flags sources whose original is missing.
 
 ## Transport and deployment
 

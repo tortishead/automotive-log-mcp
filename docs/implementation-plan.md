@@ -6,15 +6,15 @@ Nov 8, 2026 · @Xuan · draft · based on [design.md](design.md)
 
 Build an MCP server that lets any agent analyse a defect from automotive logs, with every finding cited to a log line or artifact.
 
-- **First release (M0–M4):** logcat, bugreport (including tombstones, ANRs, crash reports, dropbox, dumpsys), kernel logs and config-driven text logs; P0 and P1 tools; local stdio transport; redaction and policy file; call log; evaluation on closed defects.
-- **Second release (M5–M6):** DLT (via `dlt-core`), cross-source alignment, `timeline`, `diff`, `check_citations`, HTTP transport.
+- **First release (M0–M4):** logcat, bugreport (including tombstones, ANRs, Java crashes and dropbox), kernel logs and config-driven text logs; P0 and P1 tools including `check_citations`; local stdio transport; redaction and policy file; call log; evaluation on closed defects.
+- **Second release (M5–M6):** DLT (via `dlt-core`), cross-source alignment, `timeline`, `diff`, remaining artifact parsers (`dumpsys`, kernel panic, tombstone `.pb`), HTTP transport. Until then, DLT users can use dlt-mcp-server inside DLT Viewer.
 - **Out:** any UI, ticket-system integration, server-side model calls, multi-user operation, symbolization of native frames.
 
 Efforts are for one developer, in working days, including tests.
 
 ## Decisions
 
-Each decision is open for review; changing one changes the milestones that list it.
+Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision changes the milestones that list it.
 
 | # | Decision | Alternative | Affects |
 | --- | --- | --- | --- |
@@ -22,13 +22,14 @@ Each decision is open for review; changing one changes the milestones that list 
 | D2 | Official Python `mcp` SDK, stdio first, HTTP in M6 | Own JSON-RPC | M0, M6 |
 | D3 | Store: stdlib `sqlite3` with FTS5, one DB file per case, WAL | DuckDB, Tantivy | M1 |
 | D4 | Templates by regex masking (numbers, hex, UUIDs, paths) | Drain3 clustering | M1 |
-| D5 | Redaction at index time with keyed-hash suffix; raw value never stored | Redact at output time | M1 |
+| D5 | Redaction always on, at index time and before template extraction, with keyed-hash suffix; raw values never in records, templates or call log; no raw mode | Redact at output time; opt-in redaction | M1 |
 | D6 | Citations `log:<source>#<seq>` (seq 1-based per source) and `art:<id>[/section][:L<line>]` | Global row id | M3 |
-| D7 | Cases in `~/.automotive-log-mcp/cases/<case>.db`; original files are referenced, not copied | Copy into a case folder | M1 |
+| D7 | Cases in `~/.automotive-log-mcp/cases/<case>.db`; originals referenced by path and hash, not copied; `relink` for moved files | Copy into a case folder | M1 |
 | D8 | Default detector rules and regex connectors ship in the package; extra rule directories from config override by name | Rules only in the package | M4 |
 | D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`; Python reads JSON lines | PyO3 binding; DLT Viewer export; own parser | M5 |
 | D10 | Single process; background indexing in one worker thread per case | Worker processes | M1 |
 | D11 | Tool names and parameters follow semver; breaking changes only in a major version | No API stability promise | all |
+| D12 | First release without DLT; DLT and alignment in M5 | DLT before the first evaluation | M4, M5 |
 
 ## Repository layout
 
@@ -56,7 +57,7 @@ automotive-log-mcp/
       archive.py              # zip / tar / gz
       bugreport.py            # container
       logcat.py, kernel.py, regex_yaml.py
-      artifacts/              # tombstone, anr, java_crash, dropbox, dumpsys, kernel_panic; M5: dlt_file
+      artifacts/              # M2: tombstone, anr, java_crash, dropbox; M5: dumpsys, kernel_panic, tombstone .pb, dlt_file
       dlt.py                  # M5, drives dlt2jsonl
     detect/
       engine.py
@@ -79,14 +80,14 @@ automotive-log-mcp/
 | --- | --- | --- | --- |
 | M0 | Skeleton | Any MCP client lists the tools; `list_sources` answers on an empty case | 1–2 d |
 | M1 | Ingest core | A bugreport zip's log sections are indexed into a case DB; CLI can query them | 5–6 d |
-| M2 | Artifacts | Tombstones, ANRs, crash reports, dropbox, dumpsys and pstore from a bugreport are parsed and on the timeline | 3–4 d |
+| M2 | Artifacts | Tombstones, ANRs, Java crashes and dropbox entries from a bugreport are parsed and on the timeline | 2 d |
 | M3 | P0 tools | An agent finds and reads errors and crash artifacts in one bugreport, with citations | 4 d |
-| M4 | P1 tools + evaluation | `overview`, `detect`, `count`; agent instructions and prompt; eval on 5 defects | 4–5 d |
+| M4 | P1 tools + evaluation | `overview`, `detect`, `count`, `check_citations`; agent instructions and prompt; eval on 5 defects | 5–6 d |
 | — | **Checkpoint** | Go / adjust / stop, based on eval and call logs | — |
-| M5 | DLT + multi-source | DLT incl. file transfer, clock model, `align`, `timeline` | 7–9 d |
-| M6 | Finish | `diff`, `check_citations`, HTTP transport, eval on 10 defects, release | 3–4 d |
+| M5 | DLT + multi-source | DLT incl. file transfer, clock model, `align`, `timeline`, remaining artifact parsers | 8–10 d |
+| M6 | Finish | `diff`, HTTP transport, eval on 10 defects, release | 2–3 d |
 
-To checkpoint: about 17–21 days. To M6: about 27–34 days.
+To checkpoint: about 17–20 days. To M6: about 27–33 days.
 
 ## M0 Skeleton (1–2 days)
 
@@ -103,25 +104,26 @@ Done when: two different MCP clients list the tools, `list_sources` returns an e
 
 1. **Schema**: `sources`, `segments`, `records`, `templates`, `records_fts` (external content on `msg`, `tag`), `artifacts`, `artifact_sections`, `artifact_fts`, `meta` (schema version); indexes on `(source_id, seq)`, `(ts)`, `(source_id, ts_src)`, `tag`, `pid`, `template_id`, `level`; migration on open.
 2. **Batch writer**: 50k rows per transaction, WAL, `synchronous=NORMAL`, FTS in the same transaction.
-3. **Pipeline**: sniff → container → connector → levels → templates → redact → segments → writer; progress per source.
+3. **Pipeline**: sniff → container → connector → levels → redact → templates → segments → writer; redaction before templates so no raw value reaches the `templates` table; progress per source.
 4. **Registry**: highest `sniff()` score above 0.5 wins, else "unknown format" with the top 3 guesses.
 5. **Connectors**: `archive`; `logcat` (all formats and `-v` modifiers, buffer markers, multi-line); `kernel`; `bugreport` (sections, fingerprint, timezone, uptime, process list); `regex_yaml` (schema-validated).
-6. **Templates, redaction** (HMAC suffix, secret created on first run), **segments** (monotonic reset, backwards wall jump > 60 s, boot markers).
+6. **Templates, redaction** (HMAC suffix, secret created on first run; same rules applied to call-log arguments), **segments** (monotonic reset, backwards wall jump > 60 s, boot markers; in logs without a year, month 12 → 01 increments the year instead of starting a segment).
 7. **Background indexing** in one worker thread per case; queries read committed rows.
-8. **CLI**: `index <case> <path>`, `query <case> --search …`.
+8. **CLI**: `index <case> <path>`, `query <case> --search …`, `relink <case> <source> <path>` (checks the hash). `list_sources` flags sources whose original is missing; reindexing them fails with a clear error.
 9. Unparseable lines become records with `level=null` and the raw text, never a failed import.
+10. **Reuse by hash** (optional, cut if time is short): same file hash, connector version and redaction-rules hash in another case → copy rows instead of reparsing.
 
-Tests: one synthetic fixture per format variant with golden records; property tests for templates (idempotent masking, number-only differences share a template); redaction tests including no false positives on fingerprints and package names; performance on a generated 1 GB logcat (lines/s, DB size; target ≥ 100k lines/s and DB ≤ 1.5× input).
+Tests: one synthetic fixture per format variant with golden records; property tests for templates (idempotent masking, number-only differences share a template); redaction tests including no false positives on fingerprints and package names, and a check that after indexing no rule matches anything in `templates` or the call log; a threadtime fixture crossing New Year; performance on a generated 1 GB logcat (lines/s, DB size; target ≥ 100k lines/s and DB ≤ 1.5× input).
 
 Done when: a real bugreport indexes without errors, record counts match the input within multi-line merges, and the performance number is measured and accepted.
 
-## M2 Artifacts (3–4 days)
+## M2 Artifacts (2 days)
 
-1. Parsers: `tombstone` (text; `.pb` only when no text), `anr` (thread states, lock holders, binder peer), `java_crash` (crash buffer and dropbox), `dropbox` (by tag, delegating bodies), `dumpsys` (per service and heading), `dumpstate_section`, `kernel_panic` (pstore/last_kmsg, also as previous-boot kernel records).
+1. Parsers: `tombstone` (text), `anr` (thread states, lock holders, binder peer), `java_crash` (crash buffer and dropbox), `dropbox` (by tag, delegating bodies), `dumpstate_section` for metadata. `dumpsys`, `kernel_panic` and tombstone `.pb` move to M5, or earlier if an evaluation case needs one.
 2. Crash signatures; synthetic record per artifact in its origin source.
 3. Process list and properties feed pid → process and source metadata.
 
-Tests: at least two tombstone variants (signal, abort), one ANR with a lock holder, one dropbox crash, one `dumpsys car_service`; golden summaries and signatures.
+Tests: at least two tombstone variants (signal, abort), one ANR with a lock holder, one dropbox crash; golden summaries and signatures.
 
 Done when: every tombstone, ANR and dropbox entry in a real bugreport appears as an artifact with a correct summary and a time on the timeline.
 
@@ -137,20 +139,22 @@ Tests: golden outputs per tool; every tool under 8 KB on a 1 GB log with a broad
 
 Done when: in a real MCP client, on a real bugreport, an agent finds a known crash, reads its context and full stack trace, and cites lines that resolve correctly.
 
-## M4 P1 tools and evaluation (4–5 days)
+## M4 P1 tools and evaluation (5–6 days)
 
 1. `overview`: level counts, top tags/processes/templates, segments, gaps > 30 s, error bursts (E/F per 10 s above 5× median), up to 60 histogram buckets, detector hit counts.
 2. `count`: group by field, optional time buckets.
-3. `detect`: rule format (`match`, `level`, `tag`, `followed_by within`, `group_by pid`, `severity`, `note`); 8–10 default rules (Java crash, native crash, ANR, watchdog, LMK, SELinux denial, binder failure, VHAL error, service restart, boot not completed); rule directories from config.
-4. **Evaluation**, two levels:
+3. `check_citations`: validate every `log:` and `art:` citation in Markdown; warn on uncited paragraphs; errors on malformed ids. Used by the triage prompt before an answer is final, and by the evaluation.
+4. `detect`: rule format (`match`, `level`, `tag`, `followed_by within`, `group_by pid`, `severity`, `note`); 8–10 default rules (Java crash, native crash, ANR, watchdog, LMK, SELinux denial, binder failure, VHAL error, service restart, boot not completed); rule directories from config.
+5. **Docs:** how to use dlt-mcp-server in DLT Viewer for DLT until M5.
+6. **Evaluation**, two levels. Expected answers (component, root-cause citations) are written into `cases.yaml` before any run and judged against the fix commit.
    - **Evidence recall (no agent):** for each closed defect in `eval/cases.yaml`, check that `detect`, `list_artifacts` or a recorded query surfaces the known root-cause citations in the first page. Runs in CI on redacted or synthetic cases.
-   - **Agent runs:** the same cases with at least one MCP client; record correctness of the root-cause direction, citation validity, tool calls and bytes from the call log. Optional baseline: the same agent with only shell tools on the unpacked files, to show what the server adds.
+   - **Agent runs:** the same cases, run by hand in at least one interactive MCP client with a checklist; record correctness of the root-cause direction, citation validity, tool calls and bytes from the call log. Optional baseline: the same agent with only shell tools on the unpacked files, to show what the server adds. A non-interactive runner is built only if the checkpoint says go.
 
 Done when: both evaluations are run on 5 closed defects and written up.
 
 ## Checkpoint (after M4)
 
-- **Go** to M5 if at least 3 of 5 agent runs point to the right component, citations are valid, and the server beats the shell-only baseline on calls or bytes.
+- **Go** to M5 if at least 3 of 5 agent runs point to the right component, `check_citations` passes on every answer, and the server beats the shell-only baseline on calls or bytes (if the baseline was run). With five cases this shows a direction, not proof.
 - **Adjust** if agents spend many calls getting oriented (improve `overview`, rules, instructions) or evidence recall is low (parsers or rules miss things).
 - **Stop or rethink** if logs alone rarely explain the defects; the bottleneck is then elsewhere (code, ticket data, domain knowledge).
 
@@ -162,23 +166,23 @@ Done when: both evaluations are run on 5 closed defects and written up.
 4. **`dlt2jsonl`** (Rust, about 200–300 lines): reads DLT with `dlt-core` (`DltMessageReader`, optional `--fibex`), writes one JSON object per message (offset, storage time, ECU, ticks, session, app/ctx, type, level, verbose flag, arguments, payload text); static binaries for Linux, Windows and macOS from CI; Apache-2.0 notice shipped with the binary.
 5. **DLT connector**: runs `dlt2jsonl`, maps lines to records; control messages to `attrs`; FIBEX files via `options`; unmatched non-verbose messages keep message id and payload hex; split/rotated files as one source.
 6. **DLT file transfer** (`FLST/FLDA/FLFI`): reassembled from decoded arguments; known types parsed as artifacts, coredumps as metadata only.
-7. Benchmark on a real multi-GB DLT trace: time per stage (dlt-core, JSON decode, pipeline, SQLite), to decide whether more of the pipeline should move to Rust.
+7. **Remaining artifact parsers** (about 1 day): `dumpsys` (per service and heading), `kernel_panic` (pstore/last_kmsg, also as previous-boot kernel records), tombstone `.pb` when no text is present; fixture `dumpsys car_service`.
+8. Benchmark on a real multi-GB DLT trace: time per stage (dlt-core, JSON decode, pipeline, SQLite), to decide whether more of the pipeline should move to Rust.
 
 Tests: synthetic log pairs with known offset and drift (error < 10 ms for paired timestamps, < 500 ms for marker anchors); DLT fixtures per argument type; a non-verbose sample with FIBEX once available.
 
 Done when: a case with a bugreport and a DLT trace shows both on one timeline with confidence, and an agent orders a cross-source event pair correctly in one eval case.
 
-## M6 Finish (3–4 days)
+## M6 Finish (2–3 days)
 
 1. `diff`: template sets per source or segment, only-in-A, only-in-B, count ratios above a threshold.
-2. `check_citations`: validate every `log:` and `art:` citation in Markdown; warn on uncited paragraphs; errors on malformed ids.
-3. HTTP transport (streamable HTTP, token auth, server-side path policy for `add_source`).
-4. Eval on 10 defects; release 0.1.0 with README, `docs/connectors.md`, `docs/rules.md`, changelog.
+2. HTTP transport (streamable HTTP, token auth, server-side path policy for `add_source`).
+3. Eval on 10 defects; release 0.1.0 with README, `docs/connectors.md`, `docs/rules.md`, changelog.
 
 ## Cross-cutting
 
 - **Privacy:** no network calls in stdio mode; case DBs on the user's disk; call log without log content; only synthetic or fully redacted fixtures in the repo.
-- **Versioning:** connector version stored per source, a bump marks sources stale ("reindex recommended"); tool API per D11.
+- **Versioning:** connector version and redaction-rules hash stored per source; changing either marks sources stale ("reindex recommended"); tool API per D11.
 - **Licences:** repo MIT; `dlt-core` Apache-2.0 (compatible; keep its notice with `dlt2jsonl`); no code from MPL projects.
 - **Portability:** paths, file locking and subprocess handling tested on Windows, since many automotive engineers work there.
 
@@ -201,10 +205,13 @@ Done when: a case with a bugreport and a DLT trace shows both on one timeline wi
 - A DLT sample, and whether it is verbose or non-verbose with FIBEX.
 - Fields the default redaction rules must cover.
 
-## Review questions
+## Review outcome (Nov 8, 2026)
 
-1. Is Python ingest fast enough for the expected sizes, or should the core be Rust from the start (D1)?
-2. Should redaction be on by default, or opt-in per installation (D5)?
-3. Do agents need a raw-value mode for engineers when no model is involved (D5)?
-4. Is the checkpoint threshold right, and who judges the agent runs?
-5. Does DLT need to be in the first release, which would move M5 before M4?
+1. Python and SQLite FTS5 stay; ingest performance is measured in M1 (and per stage for DLT in M5), DuckDB or more Rust only if targets are missed (D1, D3).
+2. One DB per case; originals not copied; path and hash stored, `relink` for moved files (D7).
+3. No raw mode: redaction always on, at index time, before templates, and over call-log arguments (D5).
+4. Default rules ship in the package; configured rule directories override by name (D8).
+5. Checkpoint: 3 of 5 plus `check_citations` passing; expected answers written before the runs and judged against the fix commit.
+6. No DLT in the first release; dlt-mcp-server covers DLT-only work until M5 (D12).
+7. First artifact parsers: tombstone, ANR, Java crash, dropbox; `dumpsys`, kernel panic and tombstone `.pb` move to M5.
+8. Logcat without a year: New Year rollover increments the year, no new segment.
