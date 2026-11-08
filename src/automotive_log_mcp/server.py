@@ -1,8 +1,10 @@
 """MCP tools, server instructions and prompts.
 
-M0: every P0 tool is registered with its full parameter schema and annotations. ``list_sources``
-answers; the other tools fail with a clear "not implemented yet" error naming the milestone that
-brings them. Every call passes through the policy (byte budget) and is written to the call log.
+Every P0 tool is registered with its full parameter schema and annotations. From M1,
+``add_source`` indexes files into the case DB (in a background thread per case) and
+``list_sources`` reports what a case holds; the other tools fail with a clear "not implemented
+yet" error naming the milestone that brings them (M3). Every call passes through the policy
+(byte budget) and is written to the call log with redacted arguments (D5).
 """
 
 from __future__ import annotations
@@ -21,9 +23,12 @@ from mcp_types import CallToolResult, TextContent, ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import __version__
+from .app import App
 from .calllog import CallLog
-from .config import Config
+from .config import CASE_NAME_RE, Config
+from .core.ingest import AddResult, IngestError
 from .policy import ByteBudget, Policy
+from .store import query
 
 SERVER_NAME = "automotive-log-mcp"
 
@@ -46,7 +51,8 @@ says it was capped, narrow the query instead of paging through everything. Times
 outputs can be passed back as from/to unchanged.
 """
 
-CASE_RE = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+CASE_RE = CASE_NAME_RE
+ADD_WAIT_S = 10.0  # add_source waits this long for an import, then reports it as running
 LOG_CITATION_RE = r"^log:[A-Za-z0-9._-]+#[1-9][0-9]*$"
 ART_CITATION_RE = r"^art:[A-Za-z0-9._-]+(/[^:\s]+)?(:L[1-9][0-9]*)?$"
 
@@ -85,7 +91,9 @@ class Filter(BaseModel):
 
 class SourceInfo(BaseModel):
     id: str = Field(description="Source id used in citations log:<id>#<seq>.")
+    name: str = Field(description="file[!member][#section][:stream], e.g. a bugreport buffer.")
     format: str
+    status: str = Field(description="indexing | done | failed")
     path: str = Field(description="Path of the original file; originals are never copied or modified.")
     records: int
     ts_from: str | None = Field(None, description="First timestamp as printed in outputs.")
@@ -93,12 +101,49 @@ class SourceInfo(BaseModel):
     fingerprint: str | None = Field(None, description="Android build fingerprint, if known.")
     original_missing: bool = Field(False, description="The original file is no longer at its path.")
     stale: bool = Field(False, description="Indexed with an older connector or redaction rules.")
+    segments: int = Field(0, description="Stretches with one continuous clock (boots, clock jumps).")
+    error: str | None = None
 
 
 class ListSourcesResult(BaseModel):
     case: str
     exists: bool = Field(description="Whether the case DB exists yet.")
     sources: list[SourceInfo]
+
+
+def _source_info(s: query.SourceRow) -> SourceInfo:
+    t0, t1 = query.time_range(s)
+    return SourceInfo(
+        id=str(s.id),
+        name=s.name,
+        format=s.format,
+        status=s.status,
+        path=s.path,
+        records=s.records,
+        ts_from=t0,
+        ts_to=t1,
+        fingerprint=s.fingerprint,
+        original_missing=s.original_missing,
+        stale=s.stale,
+        segments=s.segments,
+        error=s.error,
+    )
+
+
+def _describe_add(result: AddResult) -> str:
+    lines = []
+    for f in result.files:
+        ids = ", ".join(map(str, f.source_ids)) or "none"
+        if f.existing:
+            lines.append(f"{f.path} is already in the case: sources {ids}.")
+        else:
+            lines.append(f"Indexed {f.path}: {f.records} records in sources {ids}.")
+        lines.extend(f"  note: {n}" for n in f.notes[:10])
+        if len(f.notes) > 10:
+            lines.append(f"  … {len(f.notes) - 10} more notes")
+    lines.extend(f"  skipped: {s}" for s in result.skipped[:10])
+    lines.append("Next: list_sources(case) for formats and time ranges.")
+    return "\n".join(lines)
 
 
 def _not_implemented(tool: str, milestone: str) -> ToolError:
@@ -146,8 +191,9 @@ class LogServer:
     def __init__(self, config: Config, policy: Policy, session: str | None = None) -> None:
         self.config = config
         self.policy = policy
+        self.app = App.create(config, policy)
         self.session = session or uuid.uuid4().hex[:12]
-        self.calllog = CallLog(config.call_log, self.session)
+        self.calllog = CallLog(config.call_log, self.session, redact=self.app.redactor.redact)
         self.budget = ByteBudget(policy.byte_budget)
         self.mcp: MCPServer = MCPServer(
             name=SERVER_NAME,
@@ -215,19 +261,51 @@ class LogServer:
             A bugreport zip expands into several sources (main, system, events, crash, kernel) and its
             tombstones, ANRs and crashes become artifacts. The original file is referenced, not copied.
             """
-            raise _not_implemented("add_source", "M1")
+            try:
+                self.app.ingestor.check(path, format)
+            except IngestError as e:
+                raise ToolError(str(e)) from None
+            future = self.app.workers.submit(case, config.case_db(case), path, format)
+            try:
+                result = future.result(timeout=ADD_WAIT_S)
+            except TimeoutError:
+                return _text(
+                    f"Indexing {path} into case '{case}' continues in the background. "
+                    "Call list_sources(case) to see progress; sources already show their committed records."
+                )
+            except (IngestError, ValueError) as e:
+                raise ToolError(str(e)) from None
+            return _text(_describe_add(result))
 
         def list_sources(case: Case) -> Annotated[CallToolResult, ListSourcesResult]:
             """List the sources of a case: format, record count, time range and build fingerprint."""
-            exists = config.case_db(case).exists()
-            sources: list[SourceInfo] = []  # the case schema arrives in M1
-            result = ListSourcesResult(case=case, exists=exists, sources=sources)
-            if not sources:
+            rows = self.app.list_sources(case)
+            exists = rows is not None
+            infos = [_source_info(s) for s in rows or []]
+            result = ListSourcesResult(case=case, exists=exists, sources=infos)
+            if not infos:
                 why = "" if exists else " (the case does not exist yet)"
                 return _text(
                     f"No sources in case '{case}'{why}. Add one with add_source(case, path).", result
                 )
-            return _text("\n".join(s.id for s in sources), result)  # pragma: no cover - M1
+            lines = []
+            for i in infos:
+                flags = [i.status] if i.status != "done" else []
+                if i.original_missing:
+                    flags.append("original missing: relink with the CLI")
+                if i.stale:
+                    flags.append("stale: reindex recommended")
+                span = f"{i.ts_from or '-'} .. {i.ts_to or '-'}"
+                lines.append(
+                    f"{i.id}  {i.format}  {i.records} records  {span}  {i.name}"
+                    + (f"  [{'; '.join(flags)}]" if flags else "")
+                )
+            fps = sorted({i.fingerprint for i in infos if i.fingerprint})
+            if fps:
+                lines.append("fingerprint: " + ", ".join(fps))
+            if self.app.workers.busy(case):
+                lines.append("An import is still running in this case.")
+            return _text("\n".join(lines), result)
 
         def search(
             case: Case,

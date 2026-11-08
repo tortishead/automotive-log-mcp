@@ -1,0 +1,13 @@
+# BSD syslog lines as written by rsyslog/syslog-ng and `journalctl -o short`, common on
+# Linux-based ECUs:  Oct 11 08:12:03 ivi-host hvacd[1234]: setProperty failed
+connector: syslog
+version: "1"
+description: BSD syslog / journalctl short output
+sniff:
+  filenames: ["syslog*", "messages*", "*.syslog", "journal*"]
+  min_fraction: 0.6
+line: '^(?P<ts>[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d(?:\.\d+)?) (?P<host>\S+) (?P<tag>[^\s\[:]+)(?:\[(?P<pid>\d+)\])?: ?(?P<msg>.*)$'
+continuation: '^\s'
+timestamp:
+  format: '%b %d %H:%M:%S'
+attrs: [host]

@@ -20,6 +20,9 @@ ENV_HOME = "AUTOMOTIVE_LOG_MCP_HOME"
 ENV_CONFIG = "AUTOMOTIVE_LOG_MCP_CONFIG"
 
 
+CASE_NAME_RE = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+
+
 class ConfigError(ValueError):
     """Raised for a missing, unreadable or invalid configuration or policy file."""
 

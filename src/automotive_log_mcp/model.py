@@ -1,0 +1,85 @@
+"""Data passed from connectors to the pipeline, and what the store keeps.
+
+Connectors produce :class:`RawRecord` (one log record, possibly merged from several physical
+lines). The pipeline normalizes, redacts, templates and segments them into stored records. The
+stored record model is the design's: ``source_id``, ``seq``, ``ts_raw``, ``ts``, ``level``,
+``tag``, ``pid``, ``tid``, ``msg``, ``template_id``, ``attrs``; plus ``ts_src`` (the timestamp in
+the source's own clock, e.g. kernel monotonic time) and ``seg`` (segment number).
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
+
+# Record ids pack the citation: id = source_id << SEQ_BITS | seq. A source holds up to 2^40 records.
+SEQ_BITS = 40
+SEQ_MASK = (1 << SEQ_BITS) - 1
+
+LEVELS = ("V", "D", "I", "W", "E", "F")
+
+
+def record_id(source_id: int, seq: int) -> int:
+    return (source_id << SEQ_BITS) | seq
+
+
+def split_record_id(rid: int) -> tuple[int, int]:
+    return rid >> SEQ_BITS, rid & SEQ_MASK
+
+
+def citation(source_id: int, seq: int) -> str:
+    return f"log:{source_id}#{seq}"
+
+
+@dataclass(slots=True)
+class RawRecord:
+    """One record as a connector parsed it, before redaction.
+
+    ``ts`` is wall-clock time in ns since the epoch as written in the log (no time-zone
+    conversion; the source's zone is kept in its metadata). ``ts_src`` is the timestamp in the
+    source's own clock: equal to ``ts`` for wall-clock logs, monotonic ns for kernel logs.
+    ``stream`` routes the record to a sub-source (e.g. logcat buffer 'main', 'crash'); ``None``
+    means the default stream of the member. ``boot`` marks a boot marker (new segment).
+    ``unparsed`` marks a line the connector could not parse; ``msg`` then holds the raw text.
+    """
+
+    msg: str
+    ts_raw: str | None = None
+    ts: int | None = None
+    ts_src: int | None = None
+    level: str | None = None
+    tag: str | None = None
+    pid: int | None = None
+    tid: int | None = None
+    attrs: dict[str, Any] | None = None
+    stream: str | None = None
+    lines: int = 1
+    boot: bool = False
+    unparsed: bool = False
+    monotonic: bool = False
+
+
+@dataclass(slots=True)
+class StreamMarker:
+    """Emitted by a connector when the following records belong to another stream (buffer)."""
+
+    stream: str
+
+
+@dataclass(slots=True)
+class SourceMeta:
+    """Metadata a container learns about its members (fingerprint, time zone, ...)."""
+
+    values: dict[str, Any] = field(default_factory=dict)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.values.get(key, default)
+
+
+@dataclass(slots=True)
+class ProcessInfo:
+    pid: int
+    name: str
+    tid: int | None = None
+    ppid: int | None = None
+    user: str | None = None
