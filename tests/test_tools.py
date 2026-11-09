@@ -479,3 +479,25 @@ def test_structured_content_matches_text(br: Tools) -> None:
     d = json.loads(json.dumps(out.data.model_dump(mode="json", exclude_none=True)))
     for h in d["hits"]:
         assert h["cite"] in out.text
+
+
+def test_broad_text_query_is_sampled(app: App, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Above AGG_ROWS text matches, collapse groups are estimated from a rowid sample (marked ≈);
+    without a filter the total stays exact. Pages are read through the time index then."""
+    from automotive_log_mcp import tools as tools_mod
+
+    log = tmp_path / "gen.log"
+    subprocess.run([sys.executable, str(GEN), str(log), "--mb", "1"], check=True)
+    app.ingestor.add(app.config.case_db("g"), str(log))
+    t = Tools(app)
+    exact = t.search("g", "com").data.model_dump()
+    plain = t.search("g", "com", collapse=False, limit=20).data.model_dump()
+    monkeypatch.setattr(tools_mod, "AGG_ROWS", 100)
+    monkeypatch.setattr(tools_mod, "TIME_INDEX_ROWS", 10)
+    out = t.search("g", "com")
+    d = out.data.model_dump()
+    assert d["exact"] is False and d["total"] == exact["total"]
+    assert "×≈" in out.text and "estimated from every" in out.text
+    assert t.search("g", "com", collapse=False, limit=20).data.model_dump()["hits"] == plain["hits"]
+    filtered = t.search("g", "com", filter=F(level="I"))
+    assert filtered.text.startswith("≈")

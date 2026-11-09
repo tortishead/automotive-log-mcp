@@ -31,6 +31,10 @@ from .store.query import ArtifactRow, Rec, RecordFilter
 Level = Literal["V", "D", "I", "W", "E", "F"]
 
 
+AGG_ROWS = 300_000  # text matches grouped exactly; above, groups are estimated from a sample
+TIME_INDEX_ROWS = 20_000  # text matches above which a page is read by walking the time index
+
+
 class ToolInputError(ValueError):
     """Invalid arguments, or ids that do not exist; the message says how to fix the call."""
 
@@ -101,7 +105,9 @@ class SearchResult(BaseModel):
     query: str = Field(description="The query as run (raw values redacted, as in the logs).")
     total: int = Field(description="Matches.")
     exact: bool = Field(
-        default=True, description="False when a regex scan stopped early: total is a lower bound."
+        default=True,
+        description="False when a regex scan stopped early (total is a lower bound) or when counts were "
+        "estimated from a sample of a very broad text query (≈).",
     )
     groups: int = Field(description="Distinct messages (source, template, tag, level) among the matches.")
     hits: list[RecordOut]
@@ -329,7 +335,7 @@ class Tools:
         return out
 
     @staticmethod
-    def line(o: RecordOut, short: str, last_short: str | None = None) -> str:
+    def line(o: RecordOut, short: str, last_short: str | None = None, approx: bool = False) -> str:
         """``log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  message``"""
         who = (
             f"{o.pid}/{o.tid}"
@@ -339,7 +345,7 @@ class Tools:
         head = " ".join(p for p in (o.level or "-", who, o.tag or "") if p)
         text = f"{o.cite}  {short}  {head}  {o.msg}"
         if o.count and o.count > 1:
-            text += f"  ×{o.count} until {last_short} ({o.last})"
+            text += f"  ×{'≈' if approx else ''}{o.count:,} until {last_short} ({o.last})"
         if o.art and not o.msg.startswith("[art:"):
             text += f"  → {o.art}"
         return text
@@ -598,10 +604,29 @@ class Tools:
                     where.insert(0, query.FTS_MATCH)
                     params.insert(0, lit_fts)
             exact = True
+            sample = 1
+            n_fts = 0
             scan: query.ScanResult | None = None
             try:
                 if rx is None:
-                    groups = query.aggregate(ctx.conn, where, params)
+                    n_fts = query.fts_count(ctx.conn, fts) if fts else 0
+                    if fts and n_fts > AGG_ROWS:
+                        # Looking up every match costs ~1.3 µs; above AGG_ROWS group a 1/k sample.
+                        sample = -(-n_fts // AGG_ROWS)
+                        swhere = [query.FTS_SAMPLE, *where[1:]]
+                        groups = query.aggregate(ctx.conn, swhere, [fts, sample, *params[1:]])
+                        for g in groups:
+                            g.count *= sample
+                            g.n_wall *= sample
+                        exact = False
+                        warnings.append(
+                            f"{n_fts:,} records contain the words: counts (≈) and groups are estimated from "
+                            f"every {sample}th of them, so rare messages may be missing and ×counts and "
+                            "first/last times are approximate; narrow with level, tags, from/to or a longer "
+                            "query for exact results"
+                        )
+                    else:
+                        groups = query.aggregate(ctx.conn, where, params)
                 else:
                     window = 0 if (collapse or count_only) else offset + limit_eff
                     scan = query.regex_scan(ctx.conn, where, params, rx, self.caps.regex_scan_rows, window)
@@ -609,6 +634,9 @@ class Tools:
             except sqlite3.OperationalError as e:
                 raise ToolInputError(_fts_error(q, e)) from None
             total = sum(g.count for g in groups)
+            if sample > 1 and not rf.parts():
+                total = n_fts  # nothing but the words: the FTS count is exact
+            approx = "at least " if (scan and not exact) else ("≈" if sample > 1 and rf.parts() else "")
             if total == 0:
                 reason = self._empty_reason(ctx, q, fts, rx, rf, warnings)
                 if busy:
@@ -631,7 +659,7 @@ class Tools:
                     by_level[g.level or "-"] += g.count
                 levels = ", ".join(f"{lvl} {n:,}" for lvl, n in sorted(by_level.items(), key=_level_order))
                 head = (
-                    f"{'at least ' if not exact else ''}{fmt.plural(total, 'match', 'matches')}, "
+                    f"{approx}{fmt.plural(total, 'match', 'matches')}, "
                     f"{fmt.plural(len(groups), 'distinct message', 'distinct messages')}"
                 )
                 lines = [f"{head} ({levels})"]
@@ -673,13 +701,21 @@ class Tools:
                     recs = scan.first[offset : offset + limit_eff]
                 else:
                     n_wall = sum(g.n_wall for g in groups)
-                    recs = query.select_ordered(ctx.conn, where, params, offset, limit_eff, n_wall)
+                    recs = query.select_ordered(
+                        ctx.conn,
+                        where,
+                        params,
+                        offset,
+                        limit_eff,
+                        n_wall,
+                        by_time_index=n_fts > TIME_INDEX_ROWS,
+                    )
                 hits = [(r, self._rec_out(r, ctx), fmt.short_ts(r.ts, r.ts_src), None) for r in recs]
                 n_items = total
             tmpl = query.template_texts(ctx.conn, [r.template_id for r, *_ in hits if r.template_id])
             shown: list[RecordOut] = []
             for r, o, short, last_short in hits:
-                if not page.add(self.line(o, short, last_short)):
+                if not page.add(self.line(o, short, last_short, sample > 1)):
                     break
                 t = tmpl.get(r.template_id) if r.template_id else None
                 o.template = t
@@ -689,7 +725,7 @@ class Tools:
             end = offset + len(shown)
             more = n_items - end
             header = (
-                f"{'at least ' if not exact else ''}{fmt.plural(total, 'match', 'matches')}"
+                f"{approx}{fmt.plural(total, 'match', 'matches')}"
                 + (
                     f", {fmt.plural(len(groups), 'distinct message', 'distinct messages')} (collapsed)"
                     if collapse
@@ -944,7 +980,7 @@ class Tools:
             not_shown: list[str] = []
             blocks: list[str] = []
             size = 0
-            budget = self.caps.max_bytes - 400
+            budget = self.caps.max_bytes - _reserve(self.caps.max_bytes, 700)
             seen: set[str] = set()
             for cite, rid in wanted:
                 if cite in seen:
@@ -984,10 +1020,10 @@ class Tools:
                 )
             lines = blocks
             if missing:
-                lines.append(f"not found: {', '.join(missing)}")
+                lines.append(f"not found: {_some(missing)}")
             if not_shown:
                 lines.append(
-                    f"not shown (output cap of {self.caps.max_bytes} bytes): {', '.join(not_shown)}; "
+                    f"not shown (output cap of {self.caps.max_bytes} bytes): {_some(not_shown)}; "
                     "ask again for them"
                 )
             return Output(
@@ -1144,7 +1180,12 @@ class Tools:
             a = query.artifact(ctx.conn, c.id)
             if a is None or a.source_id not in ctx.by_id:
                 raise ToolInputError(f"no artifact art:{c.id} in case '{case}' (see list_artifacts)")
-            same = _same_crash(a, query.artifacts(ctx.conn, a.type, [s.id for s in ctx.sources]))
+            near = (
+                query.artifacts_near(ctx.conn, a, SAME_CRASH_NS, [s.id for s in ctx.sources])
+                if a.pid is not None and a.ts is not None
+                else []
+            )
+            same = _same_crash(a, near)
             data = ReadArtifactResult(
                 cite=a.cite,
                 type=a.type,
@@ -1336,6 +1377,10 @@ _PART_NAMES = {
     "pid": "pid filter",
     "attrs": "attrs filter",
 }
+
+
+def _some(items: list[str], n: int = 10) -> str:
+    return ", ".join(items[:n]) + (f", … {len(items) - n} more" if len(items) > n else "")
 
 
 def _reserve(max_bytes: int, want: int) -> int:

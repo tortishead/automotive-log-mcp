@@ -345,6 +345,8 @@ def fts_query(text: str) -> str:
 
 
 FTS_MATCH = "r.id IN (SELECT rowid FROM records_fts WHERE records_fts MATCH ?)"
+# Every k-th FTS hit by rowid: collapse groups of very broad queries are estimated from a sample.
+FTS_SAMPLE = "r.id IN (SELECT rowid FROM records_fts WHERE records_fts MATCH ? AND rowid % ? = 0)"
 
 
 def fts_count(conn: sqlite3.Connection, fts: str) -> int:
@@ -389,18 +391,28 @@ def aggregate(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> 
 
 
 def select_ordered(
-    conn: sqlite3.Connection, where: list[str], params: list[Any], offset: int, limit: int, n_wall: int
+    conn: sqlite3.Connection,
+    where: list[str],
+    params: list[Any],
+    offset: int,
+    limit: int,
+    n_wall: int,
+    by_time_index: bool = False,
 ) -> list[Rec]:
     """Matching records in time order (``Rec.sort_key``), ``limit`` from ``offset``.
 
-    ``n_wall`` is the number of matches with a wall-clock time (they come first)."""
+    ``n_wall`` is the number of matches with a wall-clock time (they come first). With
+    ``by_time_index`` SQLite walks the ts index and checks each record (fast when matches are
+    common); otherwise it collects the matches and sorts them (fast when they are rare)."""
     out: list[Rec] = []
     cond = " AND ".join(where) if where else "1"
+    hint = " INDEXED BY records_ts" if by_time_index else ""
     if offset < n_wall:
         out = [
             _rec(row)
             for row in conn.execute(
-                f"SELECT {REC_COLS} FROM {REC_FROM} WHERE {cond} AND r.ts IS NOT NULL "
+                f"SELECT {REC_COLS} FROM records r{hint} LEFT JOIN tags t ON t.id = r.tag_id "
+                f"WHERE {cond} AND r.ts IS NOT NULL "
                 "ORDER BY r.ts, r.id LIMIT ? OFFSET ?",
                 [*params, limit, offset],
             )
@@ -861,6 +873,20 @@ def artifacts(
         sql += " WHERE " + " AND ".join(where)
     sql += " ORDER BY ts IS NULL, ts, id"
     return [_artifact(r) for r in conn.execute(sql, params)]
+
+
+def artifacts_near(
+    conn: sqlite3.Connection, a: ArtifactRow, window_ns: int, sources: list[int]
+) -> list[ArtifactRow]:
+    """Artifacts of the same type and pid within ``window_ns`` of ``a`` (uses the ts index)."""
+    assert a.ts is not None
+    rows = conn.execute(
+        f"SELECT {_ART_COLS} FROM artifacts WHERE ts BETWEEN ? AND ? AND type = ? AND pid = ? "
+        "ORDER BY ts, id",
+        (a.ts - window_ns, a.ts + window_ns, a.type, a.pid),
+    )
+    allowed = set(sources)
+    return [r for r in map(_artifact, rows) if r.source_id in allowed]
 
 
 def artifact(conn: sqlite3.Connection, art_id: int) -> ArtifactRow | None:
