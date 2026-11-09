@@ -17,7 +17,7 @@ from automotive_log_mcp.connectors.base import ConnectorError, Registry, build_r
 from automotive_log_mcp.core.ingest import IngestError
 from automotive_log_mcp.model import RawRecord
 from automotive_log_mcp.policy import Policy
-from automotive_log_mcp.store import db, query
+from automotive_log_mcp.store import db
 
 from .conftest import FIXTURES, copy_fixture
 from .test_golden import make_bugreport_zip
@@ -279,11 +279,12 @@ def test_cli_search_finds_redacted_value(app: App, tmp_path: Path) -> None:
     p = tmp_path / "v.log"
     p.write_text(LINE, encoding="utf-8")
     app.ingestor.add(app.config.case_db("c"), str(p))
-    rows = app.list_sources("c") or []
-    q = query.Query(text=app.redactor.redact("WVWZZZ1JZXW000001"), sources=[rows[0].id])
-    with db.opened(app.config.case_db("c")) as conn:
-        hits, total = query.search(conn, q, {rows[0].id: rows[0].ts_format})
-    assert total == 1 and hits[0].cite == "log:1#1" and hits[0].ts_raw == "10-11 08:12:03.412"
+    from automotive_log_mcp.tools import Filter, Tools
+
+    out = Tools(app).search("c", "WVWZZZ1JZXW000001", filter=Filter.model_validate({"sources": ["1"]}))
+    data = out.data.model_dump()
+    assert data["total"] == 1 and data["hits"][0]["cite"] == "log:1#1"
+    assert "log:1#1  10-11 08:12:03.412" in out.text and "WVWZZZ1JZXW000001" not in out.text
 
 
 # -- registry and YAML connectors --------------------------------------------------------------

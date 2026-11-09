@@ -41,18 +41,25 @@ def test_index_query_sources(
 
     code, out, _ = run(capsys, "query", "T-1", "--search", "NullPointerException")
     assert code == 0
-    assert out.splitlines()[0].startswith("log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL")
+    assert out.splitlines()[0] == "2 matches:"
+    assert out.splitlines()[1].startswith("log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL")
 
     code, out, _ = run(capsys, "query", "T-1", "--level", "E", "--count")
     assert out.strip() == "8"  # 3 log lines + the records of 5 artifacts (ANR E, crashes F)
     code, out, _ = run(capsys, "query", "T-1", "--tag", "Hvac*", "--limit", "1")
-    assert out.splitlines()[1].startswith("… 1 more")
+    assert out.splitlines()[1].startswith("log:1#1  12-31 23:59:58.100  I 1234/1250 HvacCtrl")
+    assert "… 1 more match; next page: cursor=" in out
     code, out, _ = run(capsys, "query", "T-1", "--regex", r"status=\w+_AVAIL")
     assert "log:1#2" in out
     code, out, _ = run(capsys, "query", "T-1", "--search", "3c:5a:b4:01:02:03")  # raw value -> token
     assert "log:5#3" in out and "<MAC:" in out
     code, out, _ = run(capsys, "query", "T-1", "--search", "nothing_like_this")
-    assert "No matches." in out
+    assert "No matches." in out and "no record contains 'nothing_like_this'" in out
+    code, out, _ = run(
+        capsys, "query", "T-1", "--level", "W", "--from=01-01 00:00:01", "--to=+2s", "--collapse"
+    )
+    assert code == 0 and out.splitlines()[0] == "3 matches, 3 distinct messages (collapsed):"
+    assert "log:2#1" in out and "log:1#2" not in out
 
 
 def test_errors(home: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

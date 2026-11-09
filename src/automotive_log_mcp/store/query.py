@@ -1,7 +1,8 @@
-"""Read side of a case DB: source listing, a basic search, record formatting, relink.
+"""Read side of a case DB: sources, the record filter as SQL, FTS and regex search, collapse
+groups, context neighbours, artifacts and citations, relink.
 
-M1 provides what the CLI ``query`` and the ``list_sources`` tool need. The full filter object,
-collapse, cursors and caps arrive with the P0 tools in M3.
+Everything here works on resolved values (ids, ns); parsing tool arguments, caps and formatting
+are in ``tools.py`` and ``core/format.py``.
 """
 
 from __future__ import annotations
@@ -15,8 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from ..core.levels import LEVEL_RANK
-from ..core.timeparse import NS, ts_raw_of
-from ..model import SEQ_BITS, citation
+from ..core.timeparse import NS
+from ..model import SEQ_BITS, SEQ_MASK, citation
 
 
 @dataclass
@@ -151,118 +152,591 @@ def time_range(s: SourceRow) -> tuple[str | None, str | None]:
     return fmt_ns(s.ts_src_min, True), fmt_ns(s.ts_src_max, True)
 
 
+# -- records: filter, search, context --------------------------------------------------------
+
+LOWER_BOUND = 0
+UPPER_BOUND = (1 << 63) - 1
+
+
 @dataclass
-class Hit:
-    source_id: int
-    seq: int
+class Rec:
+    """A stored record as the tools read it. ``ts_src`` is None when it equals ``ts``."""
+
+    id: int
+    ts: int | None
+    ts_src: int | None
     ts_raw: str | None
     level: str | None
     tag: str | None
     pid: int | None
     tid: int | None
     msg: str
-    attrs: dict[str, Any] = field(default_factory=dict)
+    template_id: int | None
+    seg: int | None
+    attrs_json: str | None
+
+    @property
+    def source_id(self) -> int:
+        return self.id >> SEQ_BITS
+
+    @property
+    def seq(self) -> int:
+        return self.id & SEQ_MASK
 
     @property
     def cite(self) -> str:
         return citation(self.source_id, self.seq)
 
+    @property
+    def attrs(self) -> dict[str, Any]:
+        return json.loads(self.attrs_json) if self.attrs_json else {}
+
+    @property
+    def sort_key(self) -> tuple[int, int, int]:
+        """Time order: wall-clock records by time, then records with only a monotonic clock."""
+        return (0, self.ts, self.id) if self.ts is not None else (1, 0, self.id)
+
+
+REC_COLS = (
+    "r.id, r.ts, r.ts_src, r.ts_raw, r.level, t.name, r.pid, r.tid, r.msg, r.template_id, r.seg, r.attrs"
+)
+REC_FROM = "records r LEFT JOIN tags t ON t.id = r.tag_id"
+
+
+def _rec(row: tuple[Any, ...]) -> Rec:
+    return Rec(*row)
+
 
 @dataclass
-class Query:
-    text: str | None = None
-    regex: str | None = None
-    min_level: str | None = None
-    tags: list[str] | None = None
+class RecordFilter:
+    """A resolved record filter (all parts AND). ``sources`` None means every source in the DB."""
+
     sources: list[int] | None = None
+    ts_from: int | None = None
+    ts_to: int | None = None
+    mono_from: int | None = None  # bounds on the monotonic clock (ts_src) of records without wall time
+    mono_to: int | None = None
+    min_level: str | None = None
+    tag_ids: list[int] | None = None
+    not_tag_ids: list[int] | None = None
     pid: int | None = None
-    limit: int = 50
+    attrs: dict[str, Any] | None = None
+
+    def where(self, skip: frozenset[str] = frozenset()) -> tuple[list[str], list[Any]]:
+        """SQL conditions on ``records r``; ``skip`` names parts to leave out (empty-result reasons)."""
+        where: list[str] = []
+        params: list[Any] = []
+        if self.sources is not None and "sources" not in skip:
+            if not self.sources:
+                where.append("0")
+            else:
+                where.append("(" + " OR ".join("r.id BETWEEN ? AND ?" for _ in self.sources) + ")")
+                for sid in self.sources:
+                    params.extend([sid << SEQ_BITS, ((sid + 1) << SEQ_BITS) - 1])
+        if "time" not in skip:
+            if self.ts_from is not None or self.ts_to is not None:
+                where.append("r.ts BETWEEN ? AND ?")
+                params.extend(
+                    [
+                        self.ts_from if self.ts_from is not None else -UPPER_BOUND,
+                        self.ts_to if self.ts_to is not None else UPPER_BOUND,
+                    ]
+                )
+            if self.mono_from is not None or self.mono_to is not None:
+                where.append("r.ts IS NULL AND r.ts_src BETWEEN ? AND ?")
+                params.extend(
+                    [
+                        self.mono_from if self.mono_from is not None else -UPPER_BOUND,
+                        self.mono_to if self.mono_to is not None else UPPER_BOUND,
+                    ]
+                )
+        if self.min_level and "level" not in skip:
+            levels = [lvl for lvl, rank in LEVEL_RANK.items() if rank >= LEVEL_RANK[self.min_level]]
+            where.append(f"r.level IN ({','.join('?' * len(levels))})")
+            params.extend(levels)
+        if self.tag_ids is not None and "tags" not in skip:
+            if not self.tag_ids:
+                where.append("0")
+            else:
+                where.append(f"r.tag_id IN ({','.join('?' * len(self.tag_ids))})")
+                params.extend(self.tag_ids)
+        if self.not_tag_ids and "not_tags" not in skip:
+            where.append(f"(r.tag_id IS NULL OR r.tag_id NOT IN ({','.join('?' * len(self.not_tag_ids))}))")
+            params.extend(self.not_tag_ids)
+        if self.pid is not None and "pid" not in skip:
+            where.append("r.pid = ?")
+            params.append(self.pid)
+        if self.attrs and "attrs" not in skip:
+            for key, value in self.attrs.items():
+                # Compare as text: attributes are stored as JSON (uid "1000", art 3, flags true).
+                where.append("CAST(json_extract(r.attrs, ?) AS TEXT) = ?")
+                params.extend([f'$."{key}"', _attr_text(value)])
+        return where, params
+
+    def parts(self) -> list[str]:
+        """Names of the parts that are set, as :meth:`where` accepts them in ``skip``."""
+        out = []
+        if self.sources is not None:
+            out.append("sources")
+        if any(x is not None for x in (self.ts_from, self.ts_to, self.mono_from, self.mono_to)):
+            out.append("time")
+        if self.min_level:
+            out.append("level")
+        if self.tag_ids is not None:
+            out.append("tags")
+        if self.not_tag_ids:
+            out.append("not_tags")
+        if self.pid is not None:
+            out.append("pid")
+        if self.attrs:
+            out.append("attrs")
+        return out
+
+
+def _attr_text(value: Any) -> str:
+    if isinstance(value, bool):
+        return "1" if value else "0"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    return str(value)
+
+
+def tag_ids(conn: sqlite3.Connection, globs: list[str]) -> tuple[list[int], list[str]]:
+    """Tag ids matching any glob (case-sensitive), and the globs that matched no tag."""
+    names = conn.execute("SELECT id, name FROM tags").fetchall()
+    ids: list[int] = []
+    unmatched: list[str] = []
+    for g in globs:
+        hit = [tid for tid, n in names if fnmatch.fnmatchcase(n, g)]
+        if not hit:
+            unmatched.append(g)
+        ids.extend(hit)
+    return sorted(set(ids)), unmatched
+
+
+def similar_tags(conn: sqlite3.Connection, glob: str, n: int = 5) -> list[str]:
+    """Tags close to a glob that matched nothing: case-insensitive matches first, then spelling."""
+    import difflib
+
+    names = [n for (n,) in conn.execute("SELECT name FROM tags")]
+    low = glob.lower()
+    ci = [x for x in names if fnmatch.fnmatchcase(x.lower(), low)]
+    if ci:
+        return ci[:n]
+    return difflib.get_close_matches(glob.strip("*?"), names, n=n, cutoff=0.6)
 
 
 _FTS_BARE = re.compile(r"^[\w\s]+$")
+_FTS_OPS = ('"', " AND ", " OR ", " NOT ", "NEAR(")
 
 
 def fts_query(text: str) -> str:
-    """Pass simple word queries through; quote anything else as one phrase per token."""
-    if _FTS_BARE.match(text) or any(op in text for op in ('"', " AND ", " OR ", " NOT ", "NEAR(")):
+    """Pass simple word queries and queries with FTS5 operators through; otherwise quote each
+    whitespace-separated token as a phrase (punctuation then only separates words). A trailing
+    ``*`` keeps its meaning as a prefix query."""
+    if _FTS_BARE.match(text) or any(op in text for op in _FTS_OPS):
         return text
-    return " ".join('"' + tok.replace('"', '""') + '"' for tok in text.split())
+    out = []
+    for tok in text.split():
+        star = tok.endswith("*") and len(tok) > 1
+        body = tok.rstrip("*") if star else tok
+        out.append('"' + body.replace('"', '""') + '"' + ("*" if star else ""))
+    return " ".join(out)
 
 
-def search(conn: sqlite3.Connection, q: Query, ts_formats: dict[int, str | None]) -> tuple[list[Hit], int]:
-    """Return up to ``q.limit`` hits (in source/seq order) and the total number of matches."""
-    where: list[str] = []
-    params: list[Any] = []
-    if q.text:
-        where.append("r.id IN (SELECT rowid FROM records_fts WHERE records_fts MATCH ?)")
-        params.append(fts_query(q.text))
-    if q.min_level:
-        levels = [lvl for lvl, rank in LEVEL_RANK.items() if rank >= LEVEL_RANK[q.min_level]]
-        where.append(f"r.level IN ({','.join('?' * len(levels))})")
-        params.extend(levels)
-        if LEVEL_RANK[q.min_level] >= LEVEL_RANK["W"]:
-            where.append("r.level IN ('W', 'E', 'F')")  # lets SQLite use the partial level index
-    if q.tags:
-        ids = [
-            tid
-            for (tid, n) in conn.execute("SELECT id, name FROM tags").fetchall()
-            if any(fnmatch.fnmatchcase(n, g) for g in q.tags)
-        ]
-        if not ids:
-            return [], 0
-        where.append(f"r.tag_id IN ({','.join('?' * len(ids))})")
-        params.extend(ids)
-    if q.sources:
-        where.append("(" + " OR ".join("r.id BETWEEN ? AND ?" for _ in q.sources) + ")")
-        for sid in q.sources:
-            params.extend([sid << SEQ_BITS, ((sid + 1) << SEQ_BITS) - 1])
-    if q.pid is not None:
-        where.append("r.pid = ?")
-        params.append(q.pid)
-    rx = re.compile(q.regex) if q.regex else None
+FTS_MATCH = "r.id IN (SELECT rowid FROM records_fts WHERE records_fts MATCH ?)"
+
+
+def fts_count(conn: sqlite3.Connection, fts: str) -> int:
+    return int(
+        conn.execute("SELECT count(*) FROM records_fts WHERE records_fts MATCH ?", (fts,)).fetchone()[0]
+    )
+
+
+@dataclass
+class Group:
+    """Matches sharing source, template, tag and level: one line when collapsed."""
+
+    source_id: int
+    template_id: int | None
+    tag_id: int | None
+    level: str | None
+    count: int
+    first_id: int
+    last_id: int
+    first_ts: int | None  # earliest wall-clock time in the group (ordering)
+    first_mono: int | None
+    n_wall: int = 0  # matches with a wall-clock time
+
+    @property
+    def sort_key(self) -> tuple[int, int, int]:
+        if self.first_ts is not None:
+            return (0, self.first_ts, self.first_id)
+        return (1, self.first_mono if self.first_mono is not None else 0, self.first_id)
+
+
+def aggregate(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> list[Group]:
+    """Matches grouped for collapse, in time order of their first occurrence."""
     sql = (
-        "SELECT r.id, r.ts, r.ts_src, r.ts_raw, r.level, t.name, r.pid, r.tid, r.msg, r.attrs "
-        "FROM records r LEFT JOIN tags t ON t.id = r.tag_id"
+        "SELECT r.id >> 40, r.template_id, r.tag_id, r.level, count(*), min(r.id), max(r.id), min(r.ts), "
+        "min(r.ts_src), count(r.ts) FROM records r"
         + (" WHERE " + " AND ".join(where) if where else "")
-        + " ORDER BY r.id"
+        + " GROUP BY r.id >> 40, r.template_id, r.tag_id, r.level"
     )
-    hits: list[Hit] = []
-    total = 0
-    for rid, ts, ts_src, ts_raw, level, tag, pid, tid, msg, attrs in conn.execute(sql, params):
-        if rx is not None and not (rx.search(msg) or (tag and rx.search(tag))):
-            continue
-        total += 1
-        if len(hits) < q.limit:
-            sid, seq = rid >> SEQ_BITS, rid & ((1 << SEQ_BITS) - 1)
-            hits.append(
-                Hit(
-                    sid,
-                    seq,
-                    ts_raw_of(ts_raw, ts, ts_src, ts_formats.get(sid)),
-                    level,
-                    tag,
-                    pid,
-                    tid,
-                    msg,
-                    json.loads(attrs) if attrs else {},
-                )
+    groups = [Group(*row) for row in conn.execute(sql, params)]
+    groups.sort(key=lambda g: g.sort_key)
+    return groups
+
+
+def select_ordered(
+    conn: sqlite3.Connection, where: list[str], params: list[Any], offset: int, limit: int, n_wall: int
+) -> list[Rec]:
+    """Matching records in time order (``Rec.sort_key``), ``limit`` from ``offset``.
+
+    ``n_wall`` is the number of matches with a wall-clock time (they come first)."""
+    out: list[Rec] = []
+    cond = " AND ".join(where) if where else "1"
+    if offset < n_wall:
+        out = [
+            _rec(row)
+            for row in conn.execute(
+                f"SELECT {REC_COLS} FROM {REC_FROM} WHERE {cond} AND r.ts IS NOT NULL "
+                "ORDER BY r.ts, r.id LIMIT ? OFFSET ?",
+                [*params, limit, offset],
             )
-    return hits, total
+        ]
+    if len(out) < limit:
+        out += [
+            _rec(row)
+            for row in conn.execute(
+                f"SELECT {REC_COLS} FROM {REC_FROM} WHERE {cond} AND r.ts IS NULL "
+                "ORDER BY r.id LIMIT ? OFFSET ?",
+                [*params, limit - len(out), max(0, offset - n_wall)],
+            )
+        ]
+    return out
 
 
-def format_hit(h: Hit, max_chars: int = 200) -> str:
-    """``log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  message`` (one line)."""
-    msg = h.msg.replace("\n", " ⏎ ")
-    if len(msg) > max_chars:
-        msg = msg[: max_chars - 1] + "…"
-    who = (
-        f"{h.pid}/{h.tid}"
-        if h.pid is not None and h.tid is not None
-        else (str(h.pid) if h.pid is not None else "")
+def records_by_id(conn: sqlite3.Connection, ids: list[int]) -> dict[int, Rec]:
+    out: dict[int, Rec] = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i : i + 500]
+        for row in conn.execute(
+            f"SELECT {REC_COLS} FROM {REC_FROM} WHERE r.id IN ({','.join('?' * len(chunk))})", chunk
+        ):
+            out[row[0]] = _rec(row)
+    return out
+
+
+def template_texts(conn: sqlite3.Connection, ids: list[int]) -> dict[int, str]:
+    ids = [i for i in set(ids) if i is not None]
+    out: dict[int, str] = {}
+    for i in range(0, len(ids), 500):
+        chunk = ids[i : i + 500]
+        out.update(
+            conn.execute(f"SELECT id, text FROM templates WHERE id IN ({','.join('?' * len(chunk))})", chunk)
+        )
+    return out
+
+
+def tag_names(conn: sqlite3.Connection, ids: list[int | None]) -> dict[int, str]:
+    wanted = [i for i in set(ids) if i is not None]
+    if not wanted:
+        return {}
+    return dict(
+        conn.execute(f"SELECT id, name FROM tags WHERE id IN ({','.join('?' * len(wanted))})", wanted)
     )
-    parts = [h.cite, h.ts_raw or "-", h.level or "-", who, h.tag or ""]
-    head = "  ".join(parts[:2]) + "  " + " ".join(p for p in parts[2:] if p)
-    return f"{head}  {msg}"
+
+
+# -- regex: SQL prefilter and capped scan -----------------------------------------------------
+
+_TOKEN_CHARS = re.compile(r"[0-9A-Za-z\u0080-\U0010ffff]+")
+_QUANT = re.compile(r"\{(\d*)(?:,(\d*))?\}")
+_CLASS_ESCAPES = set("dDwWsSbBAZzG")
+_CHAR_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "f": "\f", "v": "\v"}
+
+
+def required_literals(pattern: str) -> list[str]:
+    """Literal substrings every match of ``pattern`` must contain (conservative: [] when unsure).
+
+    Only top-level text outside groups and classes counts; a top-level ``|`` or inline flags
+    (``(?i)`` …) give no literals."""
+    if re.search(r"\(\?[a-zA-Z-]*[aiLmsux]", pattern):
+        return []
+    runs: list[str] = []
+    cur: list[str] = []
+    depth = 0
+    i, n = 0, len(pattern)
+
+    def flush() -> None:
+        if cur and depth == 0:
+            runs.append("".join(cur))
+        cur.clear()
+
+    while i < n:
+        c = pattern[i]
+        if c == "\\" and i + 1 < n:
+            e = pattern[i + 1]
+            i += 2
+            if e in _CLASS_ESCAPES or e.isdigit() or e in "xuUNp":
+                flush()
+                if e in "xuUNp":
+                    return [r for r in runs if len(r) >= 3]  # rare escapes: stop collecting here
+            elif depth == 0:
+                cur.append(_CHAR_ESCAPES.get(e, e))
+            continue
+        if c == "[":
+            flush()
+            j = i + 1
+            if j < n and pattern[j] == "^":
+                j += 1
+            if j < n and pattern[j] == "]":
+                j += 1
+            while j < n and pattern[j] != "]":
+                j += 2 if pattern[j] == "\\" else 1
+            i = j + 1
+            continue
+        if c == "|":
+            if depth == 0:
+                return []
+            i += 1
+            continue
+        if c == "(":
+            flush()
+            depth += 1
+            i += 1
+            continue
+        if c == ")":
+            depth = max(0, depth - 1)
+            i += 1
+            continue
+        if c in ".^$":
+            flush()
+            i += 1
+            continue
+        if c in "*?":
+            if cur:
+                cur.pop()
+            flush()
+            i += 1
+            continue
+        if c == "+":
+            flush()
+            i += 1
+            continue
+        if c == "{":
+            m = _QUANT.match(pattern, i)
+            if m:
+                if cur and (m.group(1) in ("", "0")):
+                    cur.pop()
+                flush()
+                i = m.end()
+                continue
+        if depth == 0:
+            cur.append(c)
+        i += 1
+    flush()
+    return [r for r in runs if len(r) >= 3]
+
+
+def literals_fts(literals: list[str]) -> str | None:
+    """An FTS5 query that every record containing all ``literals`` matches (a superset), or None.
+
+    Word pieces strictly inside a literal are whole tokens; a piece at its end can be a prefix."""
+    terms: list[str] = []
+    for lit in literals:
+        for m in _TOKEN_CHARS.finditer(lit):
+            if m.start() == 0:
+                continue  # may be the end of a longer token
+            tok = m.group().replace('"', "")
+            if m.end() < len(lit):
+                terms.append(f'"{tok}"')
+            elif len(tok) >= 2:
+                terms.append(f'"{tok}"*')
+    return " ".join(dict.fromkeys(terms)) or None
+
+
+@dataclass
+class ScanResult:
+    groups: list[Group]
+    first: list[Rec]  # the first matches in time order, up to the requested window
+    scanned: int
+    complete: bool
+    last_scanned: int | None  # record id where a capped scan stopped
+
+
+def regex_scan(
+    conn: sqlite3.Connection,
+    where: list[str],
+    params: list[Any],
+    rx: re.Pattern[str],
+    max_rows: int,
+    window: int,
+) -> ScanResult:
+    """Scan candidate records (``where``, in id order) with ``rx`` over message and tag.
+
+    Stops after ``max_rows`` candidates. Returns groups like :func:`aggregate` and the first
+    ``window`` matches in time order."""
+    import heapq
+
+    cond = " AND ".join(where) if where else "1"
+    sql = f"SELECT {REC_COLS}, r.tag_id FROM {REC_FROM} WHERE {cond} ORDER BY r.id LIMIT ?"
+    groups: dict[tuple[Any, ...], Group] = {}
+    heap: list[tuple[tuple[int, int, int], int, Rec]] = []  # max-heap by negated key
+    scanned = 0
+    last: int | None = None
+    search = rx.search
+    for row in conn.execute(sql, [*params, max_rows + 1]):
+        if scanned >= max_rows:
+            return ScanResult(_sorted(groups), _heap_sorted(heap), scanned, False, last)
+        scanned += 1
+        last = row[0]
+        msg, tag = row[8], row[5]
+        if not (search(msg) or (tag and search(tag))):
+            continue
+        rec = _rec(row[:12])
+        key = (rec.source_id, rec.template_id, row[12], rec.level)
+        g = groups.get(key)
+        if g is None:
+            groups[key] = Group(
+                rec.source_id,
+                rec.template_id,
+                row[12],
+                rec.level,
+                1,
+                rec.id,
+                rec.id,
+                rec.ts,
+                rec.ts_src if rec.ts is None else None,
+                1 if rec.ts is not None else 0,
+            )
+        else:
+            g.count += 1
+            g.last_id = rec.id
+            g.n_wall += rec.ts is not None
+            if rec.ts is not None and (g.first_ts is None or rec.ts < g.first_ts):
+                g.first_ts = rec.ts
+            if (
+                rec.ts is None
+                and rec.ts_src is not None
+                and (g.first_mono is None or rec.ts_src < g.first_mono)
+            ):
+                g.first_mono = rec.ts_src
+        sk = rec.sort_key
+        neg = (-sk[0], -sk[1], -sk[2])
+        if window <= 0:
+            continue
+        if len(heap) < window:
+            heapq.heappush(heap, (neg, rec.id, rec))
+        elif neg > heap[0][0]:
+            heapq.heapreplace(heap, (neg, rec.id, rec))
+    return ScanResult(_sorted(groups), _heap_sorted(heap), scanned, True, last)
+
+
+def _sorted(groups: dict[tuple[Any, ...], Group]) -> list[Group]:
+    return sorted(groups.values(), key=lambda g: g.sort_key)
+
+
+def _heap_sorted(heap: list[tuple[tuple[int, int, int], int, Rec]]) -> list[Rec]:
+    return sorted((r for _, _, r in heap), key=lambda r: r.sort_key)
+
+
+def count_candidates(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> int:
+    cond = " AND ".join(where) if where else "1"
+    return int(conn.execute(f"SELECT count(*) FROM records r WHERE {cond}", params).fetchone()[0])
+
+
+# -- context ----------------------------------------------------------------------------------
+
+
+def source_neighbours(conn: sqlite3.Connection, rid: int, before: int, after: int) -> list[Rec]:
+    """Records of the same source around ``rid`` (by seq), ``rid`` included."""
+    sid = rid >> SEQ_BITS
+    lo, hi = sid << SEQ_BITS, ((sid + 1) << SEQ_BITS) - 1
+    prev = conn.execute(
+        f"SELECT {REC_COLS} FROM {REC_FROM} WHERE r.id < ? AND r.id >= ? ORDER BY r.id DESC LIMIT ?",
+        (rid, lo, before),
+    ).fetchall()
+    nxt = conn.execute(
+        f"SELECT {REC_COLS} FROM {REC_FROM} WHERE r.id >= ? AND r.id <= ? ORDER BY r.id LIMIT ?",
+        (rid, hi, after + 1),
+    ).fetchall()
+    return [_rec(r) for r in reversed(prev)] + [_rec(r) for r in nxt]
+
+
+def _seq_at_time(conn: sqlite3.Connection, sid: int, ts: int, last_seq: int) -> int:
+    """Binary search for the first seq of a source whose time is >= ``ts`` (seq is roughly time
+    ordered within a source; records without a time are skipped by probing forward)."""
+    lo, hi = 1, last_seq + 1
+    base = sid << SEQ_BITS
+    while lo < hi:
+        mid = (lo + hi) // 2
+        row = conn.execute(
+            "SELECT id, ts FROM records WHERE id >= ? AND id < ? AND ts IS NOT NULL ORDER BY id LIMIT 1",
+            (base | mid, base | hi),
+        ).fetchone()
+        if row is None:
+            hi = mid
+            continue
+        if row[1] < ts:
+            lo = (row[0] & SEQ_MASK) + 1
+        else:
+            hi = mid
+    return lo
+
+
+def pid_neighbours(
+    conn: sqlite3.Connection,
+    anchor: Rec,
+    sources: list[tuple[int, int]],
+    before: int,
+    after: int,
+    seg_range: tuple[int, int] | None,
+) -> list[Rec]:
+    """Records of ``anchor.pid`` around the anchor, merged by time over ``sources``
+    ((source id, last seq) pairs; the anchor's own source included). ``seg_range`` limits the
+    anchor's source to the seqs of its segment (pids are reused after a reboot)."""
+    pid = anchor.pid
+    found: list[Rec] = []
+    for sid, last_seq in sources:
+        base = sid << SEQ_BITS
+        if sid == anchor.source_id:
+            pivot = anchor.id
+            lo_id, hi_id = (
+                (base | seg_range[0], base | seg_range[1]) if seg_range else (base, base | SEQ_MASK)
+            )
+        else:
+            if anchor.ts is None:
+                continue
+            pivot = base | _seq_at_time(conn, sid, anchor.ts, last_seq)
+            lo_id, hi_id = base, base | SEQ_MASK
+        prev = conn.execute(
+            f"SELECT {REC_COLS} FROM {REC_FROM} WHERE r.pid = ? AND r.id < ? AND r.id >= ? "
+            "ORDER BY r.id DESC LIMIT ?",
+            (pid, pivot, lo_id, before + 1),
+        ).fetchall()
+        nxt = conn.execute(
+            f"SELECT {REC_COLS} FROM {REC_FROM} WHERE r.pid = ? AND r.id >= ? AND r.id <= ? "
+            "ORDER BY r.id LIMIT ?",
+            (pid, pivot, hi_id, after + 1),
+        ).fetchall()
+        found += [_rec(r) for r in prev] + [_rec(r) for r in nxt]
+    found = list({r.id: r for r in found}.values())
+    if anchor.ts is None:
+        found = [r for r in found if r.source_id == anchor.source_id]
+        found.sort(key=lambda r: r.id)
+    else:
+        found.sort(key=lambda r: (r.ts if r.ts is not None else anchor.ts, r.id))
+    idx = next(i for i, r in enumerate(found) if r.id == anchor.id)
+    return found[max(0, idx - before) : idx + after + 1]
+
+
+def segment_of(conn: sqlite3.Connection, sid: int, seq: int) -> tuple[int, int] | None:
+    row = conn.execute(
+        "SELECT first_seq, last_seq FROM segments WHERE source_id = ? AND first_seq <= ? AND last_seq >= ?",
+        (sid, seq, seq),
+    ).fetchone()
+    return (row[0], row[1]) if row else None
 
 
 def relink(conn: sqlite3.Connection, source_id: int, new_path: Path, sha256_of: Any) -> list[int]:

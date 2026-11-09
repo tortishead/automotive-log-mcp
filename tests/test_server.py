@@ -63,14 +63,14 @@ def test_list_sources_on_empty_case(config: Config) -> None:
     assert "No sources" not in json.dumps(line)  # no tool output in the call log
 
 
-def test_stub_tools_fail_clearly_and_are_logged(config: Config) -> None:
+def test_tool_errors_are_clear_and_logged(config: Config) -> None:
     async def main() -> None:
         async with Client(build_server(config, Policy())) as client:
             result = await client.call_tool(
                 "search", {"case": "c1", "query": "crash", "filter": {"from": "-5m", "level": "E"}}
             )
             assert result.is_error
-            assert "M3" in result.content[0].text  # type: ignore[union-attr]
+            assert "case 'c1' does not exist" in result.content[0].text  # type: ignore[union-attr]
 
     run(main)
     (line,) = calllog_lines(config)

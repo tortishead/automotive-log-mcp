@@ -20,7 +20,7 @@ from typing import Annotated, Any, Literal, TypeVar
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from . import __version__
 from .app import App
@@ -29,6 +29,18 @@ from .config import CASE_NAME_RE, Config
 from .core.ingest import AddResult, IngestError
 from .policy import ByteBudget, Policy
 from .store import query
+from .store.db import StoreError
+from .tools import (
+    ContextResult,
+    Filter,
+    GetRecordsResult,
+    ListArtifactsResult,
+    Output,
+    ReadArtifactResult,
+    SearchResult,
+    ToolInputError,
+    Tools,
+)
 
 SERVER_NAME = "automotive-log-mcp"
 
@@ -37,24 +49,59 @@ Tools for analysing a defect from automotive logs (Android bugreport, logcat, ke
 The server parses, indexes and searches; it never interprets. Reasoning is your job.
 
 Analysis order:
-1. list_sources(case) to see what is in the case; add_source(case, path) if it is empty.
-2. list_artifacts(case) for tombstones, ANRs and crashes; read_artifact for the stack trace.
-3. search(case, query, filter) for errors around the defect; narrow with level, tags, from/to.
-4. context(case, at) to read the lines around a hit; get_records(case, ids) for full messages.
+1. list_sources(case): what is in the case (sources, time ranges, build fingerprint). If it is \
+empty, add_source(case, path) with the bugreport zip or log file.
+2. list_artifacts(case): tombstones (native crashes), ANRs, Java crashes and dropbox entries, \
+grouped by crash signature, in time order. Copies of one crash are marked 'same crash as'.
+3. read_artifact(case, id='art:<id>') for the summary and section list, then the section it \
+suggests (backtrace, exception, the main thread of an ANR) for the stack trace.
+4. context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before a crash; \
+scope='pid' follows one process across the buffers of a bugreport.
+5. search(case, query, filter) for errors around the defect: start with filter level 'W' or 'E' \
+and a time window (from/to), keep collapse on, narrow with tags or pid. Use mode='regex' only for \
+patterns; text mode matches whole words.
+6. get_records(case, ids) for full messages that other tools cut with '…'.
 
 Citation rule: every finding in your answer cites the line or artifact it comes from, exactly as \
 the tools print it: log:<source>#<seq> for a log line, art:<id>[/section][:L<line>] for an \
-artifact. A statement without a citation is a guess; say so.
+artifact line. A statement without a citation is a guess; say so.
 
 Outputs are capped (about 50 lines / 8 KB, messages cut at 200 characters with …). When a result \
 says it was capped, narrow the query instead of paging through everything. Timestamps printed in \
-outputs can be passed back as from/to unchanged.
+outputs can be passed back as from/to unchanged; from/to also take '-5m' (before the end of the \
+case), '+30s' (after from) and citations such as 'log:3#120-30s'. Values like MAC addresses and \
+VINs are redacted to tokens (<MAC:3fa2c1d0>); the same value always has the same token.
+"""
+
+TRIAGE_PROMPT = """\
+Triage the defect in case '{case}' with the automotive-log-mcp tools.
+
+{symptom}Work in this order and stop as soon as the evidence is clear:
+1. list_sources(case='{case}'). Note the build fingerprint and each source's time range. If the case \
+has no sources, ask for the log files and add them with add_source.
+2. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
+read_artifact the first artifact, then the section it suggests: the backtrace of a tombstone, the \
+exception of a Java crash, the main thread (and lock holder or binder peer) of an ANR.
+3. context(case='{case}', at='art:<id>', before=30, after=10) for what happened just before the \
+crash; scope='pid' to follow the crashing process across buffers.
+4. search(case='{case}', query=..., filter={{'level': 'W', 'from': ..., 'to': ...}}) for errors \
+and warnings in the minutes before the defect: start from the component or process in the \
+symptom, then widen. Keep collapse on; repeated messages show ×count.
+5. get_records for any message cut with '…' that matters.
+
+Answer with:
+- What failed (component, process) and when (timestamp as printed).
+- The chain of evidence, oldest first, each step with its citation (log:<source>#<seq> or \
+art:<id>/<section>:L<n>) exactly as the tools printed it.
+- The constant text from 'code search' for the lines a developer should look up in the code.
+- What the logs do not show, and what you are guessing (without a citation it is a guess).
 """
 
 CASE_RE = CASE_NAME_RE
 ADD_WAIT_S = 10.0  # add_source waits this long for an import, then reports it as running
-LOG_CITATION_RE = r"^log:[A-Za-z0-9._-]+#[1-9][0-9]*$"
-ART_CITATION_RE = r"^art:[A-Za-z0-9._-]+(/[^:\s]+)?(:L[1-9][0-9]*)?$"
+LOG_CITATION_RE = r"^log:[0-9]+#[1-9][0-9]*$"
+AT_RE = r"^(log:[0-9]+#[1-9][0-9]*|art:[0-9]+)$"
+ART_CITATION_RE = r"^art:[0-9]+(/[a-z0-9_.-]+)?(:L[1-9][0-9]*(-L?[1-9][0-9]*)?)?$"
 
 Level = Literal["V", "D", "I", "W", "E", "F"]
 
@@ -65,28 +112,6 @@ Case = Annotated[
         description="Case name, e.g. a ticket id. Letters, digits, '.', '_' and '-'; at most 64 characters.",
     ),
 ]
-
-
-class Filter(BaseModel):
-    """Record filter shared by search and later tools. All fields are optional and combine with AND."""
-
-    model_config = ConfigDict(populate_by_name=True, extra="forbid")
-
-    sources: list[str] | None = Field(None, description="Source ids to include, as list_sources prints them.")
-    from_: str | None = Field(
-        None,
-        alias="from",
-        description="Start time: a timestamp as printed in outputs, a relative time like '-5m' "
-        "(relative to the end of the case), or a citation log:<source>#<seq>.",
-    )
-    to: str | None = Field(None, description="End time, same forms as 'from'.")
-    level: Level | None = Field(None, description="Minimum level: V < D < I < W < E < F.")
-    tags: list[str] | None = Field(None, description="Tags to include; globs allowed, e.g. 'Car*'.")
-    not_tags: list[str] | None = Field(None, description="Tags to exclude; globs allowed.")
-    pid: int | None = Field(None, ge=0, description="Process id.")
-    attrs: dict[str, str | int | float | bool] | None = Field(
-        None, description="Format-specific attributes that must match exactly, e.g. {'buffer': 'crash'}."
-    )
 
 
 class SourceInfo(BaseModel):
@@ -146,14 +171,22 @@ def _describe_add(result: AddResult) -> str:
     return "\n".join(lines)
 
 
-def _not_implemented(tool: str, milestone: str) -> ToolError:
-    return ToolError(f"{tool} is not implemented yet in this version (planned for {milestone}).")
-
-
 def _text(text: str, structured: BaseModel | None = None) -> CallToolResult:
     return CallToolResult(
         content=[TextContent(type="text", text=text)],
         structured_content=structured.model_dump(mode="json", by_alias=True) if structured else None,
+    )
+
+
+def _output(run: Callable[[], Output]) -> CallToolResult:
+    """Run a read tool; invalid arguments and unknown ids become tool errors the agent can read."""
+    try:
+        out = run()
+    except (ToolInputError, StoreError) as e:
+        raise ToolError(str(e)) from None
+    return CallToolResult(
+        content=[TextContent(type="text", text=out.text)],
+        structured_content=out.data.model_dump(mode="json", by_alias=True, exclude_none=True),
     )
 
 
@@ -192,6 +225,7 @@ class LogServer:
         self.config = config
         self.policy = policy
         self.app = App.create(config, policy)
+        self.tools = Tools(self.app)
         self.session = session or uuid.uuid4().hex[:12]
         self.calllog = CallLog(config.call_log, self.session, redact=self.app.redactor.redact)
         self.budget = ByteBudget(policy.byte_budget)
@@ -247,6 +281,7 @@ class LogServer:
 
     def _register_tools(self) -> None:
         config = self.config
+        tools = self.tools
 
         def add_source(
             case: Case,
@@ -310,7 +345,13 @@ class LogServer:
         def search(
             case: Case,
             query: Annotated[
-                str, Field(min_length=1, description="FTS5 text query, or a regex if mode='regex'.")
+                str,
+                Field(
+                    min_length=1,
+                    description="Text: words that must all occur (case-insensitive, whole words), "
+                    "\"quoted phrases\", prefix*, upper-case AND/OR/NOT. Regex (mode='regex'): a Python "
+                    "regular expression over message and tag, case-sensitive.",
+                ),
             ],
             mode: Annotated[
                 Literal["text", "regex"], Field(description="'text' (FTS5 over msg and tag) or 'regex'.")
@@ -318,41 +359,75 @@ class LogServer:
             filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
             collapse: Annotated[
                 bool,
-                Field(description="Collapse repeated messages into one line with count and first/last time."),
+                Field(
+                    description="Collapse repeated messages (same source, template, tag and level) into "
+                    "one line with count and last time; lines are in time order of first occurrence."
+                ),
             ] = True,
-            count_only: Annotated[bool, Field(description="Return only the number of matches.")] = False,
+            count_only: Annotated[
+                bool, Field(description="Return only the number of matches, by level.")
+            ] = False,
             limit: Annotated[int, Field(ge=1, le=500, description="Maximum lines to return.")] = 50,
             cursor: Annotated[
                 str | None, Field(description="Cursor from a previous result's footer, to get the next page.")
             ] = None,
-        ) -> CallToolResult:
-            """Search log records by text or regex. Every hit is cited as log:<source>#<seq>."""
-            raise _not_implemented("search", "M3")
+        ) -> Annotated[CallToolResult, SearchResult]:
+            """Search log records by text or regex, in time order. Every hit is cited as log:<source>#<seq>.
+
+            Collapsed hits show ×count and the last occurrence. Hits that belong to a crash, tombstone or
+            ANR name their artifact (art:<id>). A footer says how many more there are and how to narrow;
+            an empty result says why. 'code search' lists the constant text of the messages' templates.
+            """
+            return _output(
+                lambda: tools.search(
+                    case,
+                    query,
+                    mode,
+                    filter,
+                    collapse,
+                    count_only,
+                    limit,
+                    cursor,
+                    self.app.workers.busy(case),
+                )
+            )
 
         def context(
             case: Case,
-            at: Annotated[str, Field(pattern=LOG_CITATION_RE, description="Citation log:<source>#<seq>.")],
+            at: Annotated[
+                str,
+                Field(
+                    pattern=AT_RE,
+                    description="Citation log:<source>#<seq>, or art:<id> for the record of an artifact.",
+                ),
+            ],
             before: Annotated[int, Field(ge=0, le=500, description="Lines before 'at'.")] = 20,
             after: Annotated[int, Field(ge=0, le=500, description="Lines after 'at'.")] = 20,
             scope: Annotated[
                 Literal["source", "pid"],
                 Field(
-                    description="'source': neighbouring lines of the same source; 'pid': of the same process."
+                    description="'source': neighbouring lines of the same source; 'pid': lines of the same "
+                    "process from all sources of the same file (e.g. main, system and crash buffers of a "
+                    "bugreport), merged by time."
                 ),
             ] = "source",
-        ) -> CallToolResult:
-            """Show the lines around a record."""
-            raise _not_implemented("context", "M3")
+        ) -> Annotated[CallToolResult, ContextResult]:
+            """Show the lines around a record; the record itself is marked with '>'."""
+            return _output(lambda: tools.context(case, at, before, after, scope))
 
         def list_artifacts(
             case: Case,
             type: Annotated[
-                str | None,
-                Field(description="Artifact type, e.g. 'tombstone', 'anr', 'java_crash', 'dropbox'."),
+                Literal["tombstone", "anr", "java_crash", "dropbox"] | None,
+                Field(description="Artifact type: 'tombstone', 'anr', 'java_crash' or 'dropbox'."),
             ] = None,
-        ) -> CallToolResult:
-            """List tombstones, ANRs, Java crashes and dropbox entries, grouped by crash signature."""
-            raise _not_implemented("list_artifacts", "M3")
+        ) -> Annotated[CallToolResult, ListArtifactsResult]:
+            """List tombstones, ANRs, Java crashes and dropbox entries, grouped by crash signature.
+
+            Groups are in time order of their first artifact. Copies of one crash (crash buffer and dropbox,
+            an ANR file and the bugreport section) are marked 'same crash as art:<id>'.
+            """
+            return _output(lambda: tools.list_artifacts(case, type))
 
         def read_artifact(
             case: Case,
@@ -360,7 +435,7 @@ class LogServer:
                 str,
                 Field(
                     pattern=ART_CITATION_RE,
-                    description="Artifact citation art:<id>[/section][:L<line>] as printed.",
+                    description="Artifact citation art:<id>[/section][:L<n>[-L<m>]] as printed.",
                 ),
             ],
             section: Annotated[
@@ -368,14 +443,18 @@ class LogServer:
                 Field(description="Section to read, as listed in the summary; omit for the summary."),
             ] = None,
             start_line: Annotated[
-                int | None, Field(ge=1, description="First line of the section to read.")
+                int | None,
+                Field(
+                    ge=1, description="First line to read (L<n>: line numbers count over the whole artifact)."
+                ),
             ] = None,
-            end_line: Annotated[
-                int | None, Field(ge=1, description="Last line of the section to read.")
-            ] = None,
-        ) -> CallToolResult:
-            """Read an artifact: summary and section list first, then sections or line ranges."""
-            raise _not_implemented("read_artifact", "M3")
+            end_line: Annotated[int | None, Field(ge=1, description="Last line to read (L<n>).")] = None,
+        ) -> Annotated[CallToolResult, ReadArtifactResult]:
+            """Read an artifact: summary and section list first, then sections or line ranges.
+
+            Lines are numbered L<n> over the whole artifact; cite them as art:<id>/<section>:L<n>.
+            """
+            return _output(lambda: tools.read_artifact(case, id, section, start_line, end_line))
 
         def get_records(
             case: Case,
@@ -383,9 +462,10 @@ class LogServer:
                 list[Annotated[str, Field(pattern=LOG_CITATION_RE)]],
                 Field(min_length=1, max_length=100, description="Citations log:<source>#<seq>."),
             ],
-        ) -> CallToolResult:
-            """Get full records, with messages not truncated and all attributes."""
-            raise _not_implemented("get_records", "M3")
+        ) -> Annotated[CallToolResult, GetRecordsResult]:
+            """Get full records: messages not truncated (multi-line stack traces included), the timestamp
+            as written, all attributes and the template's constant text for a code search."""
+            return _output(lambda: tools.get_records(case, ids))
 
         self._tool(add_source, WRITES_CASE, "Add a log source")
         self._tool(list_sources, READ_ONLY, "List sources")
@@ -404,14 +484,10 @@ class LogServer:
             symptom: Annotated[str, Field(description="What went wrong, as the defect report says it.")] = "",
         ) -> str:
             """Analyse a defect from the logs of a case, citing every finding."""
-            # The P0 workflow is filled in with M3; the checks before answering with M4.
             if not re.fullmatch(CASE_RE, case):
                 raise ValueError(f"invalid case name {case!r}")
-            symptom_line = f"\nReported symptom: {symptom}\n" if symptom else ""
-            return (
-                f"Triage the defect in case '{case}' using the automotive-log-mcp tools.{symptom_line}\n"
-                "Follow the analysis order and the citation rule from the server instructions."
-            )
+            symptom_line = f"Reported symptom: {symptom}\n\n" if symptom else ""
+            return TRIAGE_PROMPT.format(case=case, symptom=symptom_line)
 
 
 TOOL_NAMES = (

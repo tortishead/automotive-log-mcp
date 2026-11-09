@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import sqlite3
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -24,8 +23,9 @@ from .connectors.base import ConnectorError
 from .core.ingest import IngestError
 from .core.levels import LEVEL_RANK
 from .policy import load_policy
-from .store import db, query
+from .store import query
 from .store.db import StoreError, check_fts5
+from .tools import Filter, ToolInputError, Tools
 
 
 def _case(value: str) -> str:
@@ -60,8 +60,15 @@ def _parser() -> argparse.ArgumentParser:
     qu.add_argument("--level", "-l", choices=list(LEVEL_RANK), help="minimum level")
     qu.add_argument("--tag", "-t", action="append", help="tag (glob); repeatable")
     qu.add_argument("--source", type=int, action="append", help="source id; repeatable")
+    qu.add_argument("--not-tag", action="append", help="tag to exclude (glob); repeatable")
     qu.add_argument("--pid", type=int)
+    qu.add_argument(
+        "--from", dest="from_", metavar="TIME", help="start time, as printed, relative or a citation"
+    )
+    qu.add_argument("--to", metavar="TIME", help="end time (inclusive)")
+    qu.add_argument("--collapse", "-c", action="store_true", help="one line per repeated message")
     qu.add_argument("--limit", "-n", type=int, default=50)
+    qu.add_argument("--cursor", help="next page, as a previous result printed it")
     qu.add_argument("--count", action="store_true", help="print only the number of matches")
 
     ar = sub.add_parser("artifacts", help="list artifacts (tombstones, ANRs, crashes, dropbox) or show one")
@@ -153,6 +160,41 @@ def _show_artifact(app: App, case: str, cite: str) -> int:
     return 0
 
 
+def _query(app: App, args: argparse.Namespace) -> int:
+    if args.search and args.regex:
+        _err("give --search or --regex, not both")
+        return 2
+    flt = {
+        "sources": [str(x) for x in args.source] if args.source else None,
+        "from": args.from_,
+        "to": args.to,
+        "level": args.level,
+        "tags": args.tag,
+        "not_tags": args.not_tag,
+        "pid": args.pid,
+    }
+    tools = Tools(app)
+    try:
+        out = tools.search(
+            args.case,
+            args.regex or args.search,
+            mode="regex" if args.regex else "text",
+            filter=Filter.model_validate({k: v for k, v in flt.items() if v is not None}),
+            collapse=args.collapse,
+            count_only=args.count,
+            limit=args.limit,
+            cursor=args.cursor,
+        )
+    except ToolInputError as e:
+        _err(str(e))
+        return 1 if "does not exist" in str(e) else 2
+    if args.count:
+        print(out.data.total)  # type: ignore[attr-defined]
+    else:
+        print(out.text)
+    return 0
+
+
 def _run(app: App, args: argparse.Namespace) -> int:
     if args.command == "index":
         if not args.quiet:
@@ -191,49 +233,7 @@ def _run(app: App, args: argparse.Namespace) -> int:
         print(f"reindexed: sources {', '.join(map(str, result.source_ids))}")
         return 0
     if args.command == "query":
-        rows = app.list_sources(args.case)
-        if rows is None:
-            _err(f"case '{args.case}' does not exist")
-            return 1
-        visible = {s.id: s.ts_format for s in rows}
-        wanted = args.source or list(visible)
-        unknown = [s for s in wanted if s not in visible]
-        if unknown:
-            _err(f"unknown source ids: {', '.join(map(str, unknown))}")
-            return 2
-        q = query.Query(
-            text=args.search,
-            regex=args.regex,
-            min_level=args.level,
-            tags=args.tag,
-            sources=wanted,
-            pid=args.pid,
-            limit=args.limit,
-        )
-        if q.regex:
-            try:
-                re.compile(q.regex)
-            except re.error as e:
-                _err(f"invalid regex: {e}")
-                return 2
-        if q.text:
-            q.text = app.redactor.redact(q.text)  # raw values are stored as tokens
-        with db.opened(app.config.case_db(args.case)) as conn:
-            try:
-                hits, total = query.search(conn, q, visible)
-            except sqlite3.OperationalError as e:
-                _err(f"invalid search query: {e}")
-                return 2
-        if args.count:
-            print(total)
-            return 0
-        for h in hits:
-            print(query.format_hit(h, app.config.caps.max_msg_chars))
-        if total > len(hits):
-            print(f"… {total - len(hits)} more; narrow with --level, --tag, --source or a longer query")
-        elif total == 0:
-            print("No matches.")
-        return 0
+        return _query(app, args)
     raise AssertionError(args.command)
 
 

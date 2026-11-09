@@ -34,6 +34,7 @@ class Caps:
     max_lines: int = 50
     max_bytes: int = 8192
     max_msg_chars: int = 200
+    regex_scan_rows: int = 1_000_000  # candidate records a regex search scans before it stops
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ def default_home() -> Path:
 
 
 _TOP_KEYS = {"cases_dir", "policy_file", "call_log", "caps", "rule_dirs"}
-_CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars"}
+_CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars", "regex_scan_rows"}
 
 
 def _path(value: Any, key: str, base: Path) -> Path:
