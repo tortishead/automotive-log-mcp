@@ -1,0 +1,238 @@
+{
+ "all": {
+  "args": {},
+  "structured": {
+   "case": "br",
+   "groups": [
+    {
+     "artifacts": [
+      {
+       "cite": "art:1",
+       "headline": "Java crash in com.example.hvac (pid 1234, thread main): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+       "lines": 4,
+       "pid": 1234,
+       "process": "com.example.hvac",
+       "record": "log:3#1",
+       "ts": "2026-01-01 00:00:01.000",
+       "type": "java_crash"
+      },
+      {
+       "cite": "art:4",
+       "headline": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+       "lines": 23,
+       "pid": 1234,
+       "process": "com.example.hvac",
+       "record": "log:9#1",
+       "same_as": "art:1",
+       "ts": "2026-01-01 00:00:01.000",
+       "type": "java_crash"
+      }
+     ],
+     "count": 2,
+     "more": 0,
+     "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update < com.example.hvac.MainActivity.onFanClicked",
+     "type": "java_crash"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:6",
+       "headline": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+       "lines": 50,
+       "pid": 812,
+       "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+       "record": "log:11#1",
+       "ts": "2026-01-01 00:00:05.123",
+       "type": "tombstone"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+     "type": "tombstone"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:7",
+       "headline": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open",
+       "lines": 24,
+       "pid": 900,
+       "process": "/vendor/bin/hw/vendor.example.audio-service",
+       "record": "log:12#1",
+       "ts": "2026-01-01 00:02:30.250",
+       "type": "tombstone"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+     "type": "tombstone"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:5",
+       "headline": "dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+       "lines": 8,
+       "process": "system_server",
+       "record": "log:10#1",
+       "ts": "2026-01-01 00:03:20.000",
+       "type": "dropbox"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "system_server_wtf android.util.Log$TerribleFailure system_server: android.util.Log.wtf < com.android.car.power.CarPowerManagementService.onApPowerStateChange < com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage",
+     "type": "dropbox"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:2",
+       "headline": "ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"RadioWorker\" (Native), in binder call ICarProperty.se…",
+       "lines": 28,
+       "pid": 1500,
+       "process": "com.example.radio",
+       "record": "log:6#1",
+       "ts": "2026-01-01 00:05:00.000",
+       "type": "anr"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "ANR Blocked com.example.radio: com.example.radio.Tuner.tune < com.example.radio.TuneReceiver.onReceive",
+     "type": "anr"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:3",
+       "headline": "Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130)",
+       "lines": 10,
+       "pid": 1600,
+       "process": "com.android.car.settings",
+       "record": "log:7#1",
+       "ts": "2026-01-01 00:06:00.000",
+       "type": "java_crash"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "java.lang.IllegalStateException com.android.car.settings: com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick < androidx.preference.Preference.performClick",
+     "type": "java_crash"
+    }
+   ],
+   "more_groups": 0,
+   "total": 7
+  },
+  "text": [
+   "7 artifacts in 6 groups (same crash signature), by first time:",
+   "java_crash ×2 (1 duplicate)  java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update < com.example.hvac.MainActivity.onFanClicked",
+   "  art:1  01-01 00:00:01.000  pid 1234  log:3#1  4 lines  Java crash in com.example.hvac (pid 1234, thread main): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controll…",
+   "  art:4  01-01 00:00:01.000  pid 1234  log:9#1  23 lines  same crash as art:1 (data_app_crash@1767222001000.txt)",
+   "tombstone ×1  SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "  art:6  01-01 00:00:05.123  pid 812  log:11#1  50 lines  Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at…",
+   "tombstone ×1  SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+   "  art:7  01-01 00:02:30.250  pid 900  log:12#1  24 lines  Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehi…",
+   "dropbox ×1  system_server_wtf android.util.Log$TerribleFailure system_server: android.util.Log.wtf < com.android.car.power.CarPowerManagementService.onApPowerStateChange < com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage",
+   "  art:5  01-01 00:03:20.000  pid -  log:10#1  8 lines  dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+   "anr ×1  ANR Blocked com.example.radio: com.example.radio.Tuner.tune < com.example.radio.TuneReceiver.onReceive",
+   "  art:2  01-01 00:05:00.000  pid 1500  log:6#1  28 lines  ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.…",
+   "java_crash ×1  java.lang.IllegalStateException com.android.car.settings: com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick < androidx.preference.Preference.performClick",
+   "  art:3  01-01 00:06:00.000  pid 1600  log:7#1  10 lines  Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.an…",
+   "read one: read_artifact(id='art:<id>') for its summary and sections; context(at='art:<id>') for the lines around its record"
+  ]
+ },
+ "type": {
+  "args": {
+   "type": "tombstone"
+  },
+  "structured": {
+   "case": "br",
+   "groups": [
+    {
+     "artifacts": [
+      {
+       "cite": "art:6",
+       "headline": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+       "lines": 50,
+       "pid": 812,
+       "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+       "record": "log:11#1",
+       "ts": "2026-01-01 00:00:05.123",
+       "type": "tombstone"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+     "type": "tombstone"
+    },
+    {
+     "artifacts": [
+      {
+       "cite": "art:7",
+       "headline": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open",
+       "lines": 24,
+       "pid": 900,
+       "process": "/vendor/bin/hw/vendor.example.audio-service",
+       "record": "log:12#1",
+       "ts": "2026-01-01 00:02:30.250",
+       "type": "tombstone"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+     "type": "tombstone"
+    }
+   ],
+   "more_groups": 0,
+   "total": 2
+  },
+  "text": [
+   "2 artifacts in 2 groups (same crash signature), by first time:",
+   "tombstone ×1  SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "  art:6  01-01 00:00:05.123  pid 812  log:11#1  50 lines  Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at…",
+   "tombstone ×1  SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+   "  art:7  01-01 00:02:30.250  pid 900  log:12#1  24 lines  Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehi…",
+   "read one: read_artifact(id='art:<id>') for its summary and sections; context(at='art:<id>') for the lines around its record"
+  ]
+ },
+ "type dropbox": {
+  "args": {
+   "type": "dropbox"
+  },
+  "structured": {
+   "case": "br",
+   "groups": [
+    {
+     "artifacts": [
+      {
+       "cite": "art:5",
+       "headline": "dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+       "lines": 8,
+       "process": "system_server",
+       "record": "log:10#1",
+       "ts": "2026-01-01 00:03:20.000",
+       "type": "dropbox"
+      }
+     ],
+     "count": 1,
+     "more": 0,
+     "signature": "system_server_wtf android.util.Log$TerribleFailure system_server: android.util.Log.wtf < com.android.car.power.CarPowerManagementService.onApPowerStateChange < com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage",
+     "type": "dropbox"
+    }
+   ],
+   "more_groups": 0,
+   "total": 1
+  },
+  "text": [
+   "1 artifact in 1 group (same crash signature), by first time:",
+   "dropbox ×1  system_server_wtf android.util.Log$TerribleFailure system_server: android.util.Log.wtf < com.android.car.power.CarPowerManagementService.onApPowerStateChange < com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage",
+   "  art:5  01-01 00:03:20.000  pid -  log:10#1  8 lines  dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+   "read one: read_artifact(id='art:<id>') for its summary and sections; context(at='art:<id>') for the lines around its record"
+  ]
+ }
+}

@@ -1,0 +1,142 @@
+{
+ "artifact record, pid scope": {
+  "args": {
+   "at": "art:1",
+   "scope": "pid"
+  },
+  "structured": {
+   "at": "log:3#1",
+   "case": "br",
+   "records": [
+    {
+     "cite": "log:1#1",
+     "level": "I",
+     "msg": "setTemp 21.5 for zone 1",
+     "pid": 1234,
+     "tag": "HvacCtrl",
+     "tid": 1250,
+     "ts": "2025-12-31 23:59:58.100"
+    },
+    {
+     "cite": "log:1#2",
+     "level": "E",
+     "msg": "setProperty failed, status=NOT_AVAILABLE",
+     "pid": 1234,
+     "tag": "HvacCtrl",
+     "tid": 1250,
+     "ts": "2025-12-31 23:59:59.412"
+    },
+    {
+     "art": "art:1",
+     "cite": "log:3#1",
+     "level": "E",
+     "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "AndroidRuntime",
+     "tid": 1250,
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "art": "art:4",
+     "cite": "log:9#1",
+     "level": "F",
+     "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "java_crash",
+     "ts": "2026-01-01 00:00:01.000"
+    }
+   ],
+   "scope": "pid"
+  },
+  "text": [
+   "pid 1234 around log:3#1, sources 1, 3, 9 by time:",
+   "  log:1#1  12-31 23:59:58.100  I 1234/1250 HvacCtrl  setTemp 21.5 for zone 1",
+   "  log:1#2  12-31 23:59:59.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE",
+   "> log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "  log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "log:3#1 is the record of art:1: read_artifact(id='art:1')"
+  ]
+ },
+ "kernel": {
+  "args": {
+   "after": 1,
+   "at": "log:5#2",
+   "before": 1
+  },
+  "structured": {
+   "at": "log:5#2",
+   "case": "br",
+   "records": [
+    {
+     "cite": "log:5#1",
+     "level": "I",
+     "msg": "Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
+     "ts": "0.000000"
+    },
+    {
+     "cite": "log:5#2",
+     "level": "E",
+     "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+     "tag": "init",
+     "ts": "123.456789"
+    },
+    {
+     "cite": "log:5#3",
+     "level": "I",
+     "msg": "wlan0: associated with <MAC:abcce245>",
+     "tag": "wlan0",
+     "ts": "124.000000"
+    }
+   ],
+   "scope": "source"
+  },
+  "text": [
+   "source 5 around log:5#2:",
+   "  log:5#1  0.000000  I  Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
+   "> log:5#2  123.456789  E init  init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "  log:5#3  124.000000  I wlan0  wlan0: associated with <MAC:abcce245>",
+   "(start of source)",
+   "(end of source)"
+  ]
+ },
+ "source": {
+  "args": {
+   "after": 2,
+   "at": "log:1#2",
+   "before": 2
+  },
+  "structured": {
+   "at": "log:1#2",
+   "case": "br",
+   "records": [
+    {
+     "cite": "log:1#1",
+     "level": "I",
+     "msg": "setTemp 21.5 for zone 1",
+     "pid": 1234,
+     "tag": "HvacCtrl",
+     "tid": 1250,
+     "ts": "2025-12-31 23:59:58.100"
+    },
+    {
+     "cite": "log:1#2",
+     "level": "E",
+     "msg": "setProperty failed, status=NOT_AVAILABLE",
+     "pid": 1234,
+     "tag": "HvacCtrl",
+     "tid": 1250,
+     "ts": "2025-12-31 23:59:59.412"
+    }
+   ],
+   "scope": "source"
+  },
+  "text": [
+   "source 1 around log:1#2:",
+   "  log:1#1  12-31 23:59:58.100  I 1234/1250 HvacCtrl  setTemp 21.5 for zone 1",
+   "> log:1#2  12-31 23:59:59.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE",
+   "(start of source)",
+   "(end of source)",
+   "few lines in source 1; context(at='log:1#2', scope='pid') shows pid 1234 in the other sources of the same file"
+  ]
+ }
+}

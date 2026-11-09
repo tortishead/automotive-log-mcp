@@ -380,8 +380,8 @@ class Tools:
             mono_only = [s.id for s in selected if s.ts_min is None and s.records]
             if mono_only:
                 warnings.append(
-                    f"{_sources_word(mono_only)} only a monotonic clock (seconds since boot) and "
-                    "are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
+                    f"records of {_sources_word(mono_only)} only a monotonic clock (seconds since boot) "
+                    "and are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
                 )
         elif clock == "mono":
             rf.mono_from = lo.ns if lo else None
@@ -649,7 +649,9 @@ class Tools:
                 )
                 return Output(_join([*lines, *_warn_lines(warnings)]), data)
 
-            page = fmt.Page(self.caps.max_lines, self.caps.max_bytes, reserve=1400)
+            page = fmt.Page(
+                self.caps.max_lines, self.caps.max_bytes, reserve=_reserve(self.caps.max_bytes, 1400)
+            )
             # (record, output, short time, short time of the last match)
             hits: list[tuple[Rec, RecordOut, str, str | None]] = []
             if collapse:
@@ -688,7 +690,11 @@ class Tools:
             more = n_items - end
             header = (
                 f"{'at least ' if not exact else ''}{fmt.plural(total, 'match', 'matches')}"
-                + (f", {len(groups):,} distinct messages (collapsed)" if collapse else "")
+                + (
+                    f", {fmt.plural(len(groups), 'distinct message', 'distinct messages')} (collapsed)"
+                    if collapse
+                    else ""
+                )
                 + (f"; showing {offset + 1}-{end}" if offset or more > 0 else "")
                 + ":"
             )
@@ -1031,7 +1037,9 @@ class Tools:
                 data = ListArtifactsResult(case=case, total=0, groups=[], empty_reason=reason)
                 return Output(reason, data)
             groups = group_artifacts(rows)
-            page = fmt.Page(self.caps.max_lines, self.caps.max_bytes, reserve=500)
+            page = fmt.Page(
+                self.caps.max_lines, self.caps.max_bytes, reserve=_reserve(self.caps.max_bytes, 500)
+            )
             outs: list[ArtifactGroupOut] = []
             per_group = 3
             for g in groups:
@@ -1061,6 +1069,9 @@ class Tools:
                     ):
                         break
                     go.artifacts.append(ao)
+                if not go.artifacts:
+                    page.pop()  # no room for any of its artifacts: leave the group out
+                    break
                 rest = len(g.items) - len(go.artifacts)
                 if rest and not page.full:
                     last = g.items[-1].row
@@ -1170,7 +1181,7 @@ class Tools:
                 raise ToolInputError(str(e)) from None
             single = len(lines) == 1
             cap = self.caps.max_lines * 2
-            page = fmt.Page(cap, self.caps.max_bytes, reserve=500)
+            page = fmt.Page(cap, self.caps.max_bytes, reserve=_reserve(self.caps.max_bytes, 500))
             width = len(str(lines[-1][0])) if lines else 1
             shown: list[LineOut] = []
             for n, text in lines:
@@ -1179,17 +1190,19 @@ class Tools:
                     break
                 shown.append(LineOut(n=n, text=t))
             where = f"{a.cite}/{c.section}" if c.section else a.cite
-            rng = f"L{shown[0].n}-L{shown[-1].n}" if shown else "-"
+            rng = (
+                (f"L{shown[0].n}" + (f"-L{shown[-1].n}" if shown[-1].n != shown[0].n else ""))
+                if shown
+                else "-"
+            )
             header = f"{where} {rng} ({a.type}, {fmt.clip(a.headline, 100)[0]}):"
             out = [header, *page.lines]
             if shown and shown[-1].n < last:
                 nxt_first = shown[-1].n + 1
-                nxt = f"{a.cite}{'/' + c.section if c.section else ''}:L{nxt_first}-L{last}"
+                rng_next = f"L{nxt_first}" + (f"-L{last}" if last > nxt_first else "")
+                nxt = f"{a.cite}{'/' + c.section if c.section else ''}:{rng_next}"
                 data.next = nxt
-                out.append(
-                    f"… L{nxt_first}-L{last} not shown ({fmt.cap_note(page)}); "
-                    f"next: read_artifact(id='{nxt}')"
-                )
+                out.append(f"… {rng_next} not shown ({fmt.cap_note(page)}); next: read_artifact(id='{nxt}')")
             if not single and any(len(t) > self.caps.max_msg_chars for _, t in lines[: len(shown)]):
                 out.append(
                     "lines cut with … are complete when read one at a time: read_artifact(id='art:<id>:L<n>')"
@@ -1325,6 +1338,11 @@ _PART_NAMES = {
 }
 
 
+def _reserve(max_bytes: int, want: int) -> int:
+    """Bytes kept free for headers and footers: ``want``, but at most a quarter of the cap."""
+    return min(want, max_bytes // 4)
+
+
 def _dash(v: int | None) -> str:
     return "-" if v is None else str(v)
 
@@ -1338,7 +1356,7 @@ def _part_value(rf: RecordFilter, part: str) -> str:
 
 
 def _sources_word(ids: list[int]) -> str:
-    return f"source {ids[0]} has" if len(ids) == 1 else f"sources {_id_ranges(ids)} have"
+    return f"source {ids[0]} have" if len(ids) == 1 else f"sources {_id_ranges(ids)} have"
 
 
 def _span(rows: list[query.SourceRow]) -> Span:

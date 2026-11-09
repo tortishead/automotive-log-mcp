@@ -122,6 +122,11 @@ class Page:
         self.size += n
         return True
 
+    def pop(self) -> None:
+        line = self.lines.pop()
+        self.size -= utf8_len(line) + 1
+        self.counted -= 1
+
     def force(self, line: str) -> None:
         """Add a line regardless of caps (headers and footers, which ``reserve`` makes room for)."""
         self.lines.append(line)

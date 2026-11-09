@@ -1,0 +1,460 @@
+{
+ "one line": {
+  "args": {
+   "id": "art:6/backtrace:L17"
+  },
+  "structured": {
+   "cite": "art:6",
+   "lines": [
+    {
+     "n": 17,
+     "text": "      #00 pc 000000000004a2b0  /vendor/lib64/libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48) (BuildId: 8f2c1d0e4b3a29171615141312111009)"
+    }
+   ],
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "pid": 812,
+   "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+   "record": "log:11#1",
+   "same_crash": [],
+   "sections": [
+    {
+     "cite": "art:6/header",
+     "first": 1,
+     "last": 11,
+     "name": "header"
+    },
+    {
+     "cite": "art:6/registers",
+     "first": 12,
+     "last": 15,
+     "name": "registers"
+    },
+    {
+     "cite": "art:6/backtrace",
+     "first": 16,
+     "last": 22,
+     "name": "backtrace"
+    },
+    {
+     "cite": "art:6/memory",
+     "first": 23,
+     "last": 29,
+     "name": "memory"
+    },
+    {
+     "cite": "art:6/memory_map",
+     "first": 30,
+     "last": 34,
+     "name": "memory_map"
+    },
+    {
+     "cite": "art:6/threads",
+     "first": 35,
+     "last": 43,
+     "name": "threads"
+    },
+    {
+     "cite": "art:6/open_files",
+     "first": 44,
+     "last": 47,
+     "name": "open_files"
+    },
+    {
+     "cite": "art:6/log",
+     "first": 48,
+     "last": 50,
+     "name": "log"
+    }
+   ],
+   "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100",
+   "type": "tombstone"
+  },
+  "text": [
+   "art:6/backtrace L17 (tombstone, Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"V…):",
+   "L17        #00 pc 000000000004a2b0  /vendor/lib64/libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48) (BuildId: 8f2c1d0e4b3a29171615141312111009)",
+   "cite lines as art:6/backtrace:L<n>"
+  ]
+ },
+ "range": {
+  "args": {
+   "id": "art:2:L8-L10"
+  },
+  "structured": {
+   "cite": "art:2",
+   "lines": [
+    {
+     "n": 8,
+     "text": "\"main\" prio=5 tid=1 Blocked"
+    },
+    {
+     "n": 9,
+     "text": "  | group=\"main\" sCount=1 ucsCount=0 flags=1 obj=0x72a0b8a0 self=0x7b5e0c0000"
+    },
+    {
+     "n": 10,
+     "text": "  | sysTid=1500 nice=-10 cgrp=top-app sched=0/0 handle=0x7b5f2a54f8"
+    }
+   ],
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR",
+   "pid": 1500,
+   "process": "com.example.radio",
+   "record": "log:6#1",
+   "same_crash": [],
+   "sections": [
+    {
+     "cite": "art:2/header",
+     "first": 1,
+     "last": 2,
+     "name": "header"
+    },
+    {
+     "cite": "art:2/p1500",
+     "first": 3,
+     "last": 7,
+     "name": "p1500"
+    },
+    {
+     "cite": "art:2/p1500.t1.main",
+     "first": 8,
+     "last": 14,
+     "name": "p1500.t1.main"
+    },
+    {
+     "cite": "art:2/p1500.t12.radioworker",
+     "first": 15,
+     "last": 28,
+     "name": "p1500.t12.radioworker"
+    }
+   ],
+   "signature": "ANR Blocked com.example.radio: com.example.radio.Tuner.tune < com.example.radio.TuneReceiver.onReceive",
+   "ts": "2026-01-01 00:05:00.000",
+   "ts_raw": "2026-01-01 00:05:00.000000000+0100",
+   "type": "anr"
+  },
+  "text": [
+   "art:2 L8-L10 (anr, ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE…):",
+   "L8   \"main\" prio=5 tid=1 Blocked",
+   "L9     | group=\"main\" sCount=1 ucsCount=0 flags=1 obj=0x72a0b8a0 self=0x7b5e0c0000",
+   "L10    | sysTid=1500 nice=-10 cgrp=top-app sched=0/0 handle=0x7b5f2a54f8",
+   "cite lines as art:2:L<n>"
+  ]
+ },
+ "section": {
+  "args": {
+   "id": "art:6/backtrace"
+  },
+  "structured": {
+   "cite": "art:6",
+   "lines": [
+    {
+     "n": 16,
+     "text": "backtrace:"
+    },
+    {
+     "n": 17,
+     "text": "      #00 pc 000000000004a2b0  /vendor/lib64/libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48) (BuildId: 8f2c1d0e4b3a29171615141312111009)"
+    },
+    {
+     "n": 18,
+     "text": "      #01 pc 0000000000049e10  /vendor/lib64/libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112) (BuildId: 8f2c1d0e4b3a29171615141312111009)"
+    },
+    {
+     "n": 19,
+     "text": "      #02 pc 0000000000061a3c  /system/lib64/libbinder_ndk.so (AIBinder_Class_onTransact+92) (BuildId: 0a0b0c0d)"
+    },
+    {
+     "n": 20,
+     "text": "      #03 pc 000000000005c2f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256) (BuildId: 1a2b3c4d)"
+    },
+    {
+     "n": 21,
+     "text": "      #04 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 5e6f7a8b)"
+    },
+    {
+     "n": 22,
+     "text": ""
+    }
+   ],
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "pid": 812,
+   "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+   "record": "log:11#1",
+   "same_crash": [],
+   "sections": [
+    {
+     "cite": "art:6/header",
+     "first": 1,
+     "last": 11,
+     "name": "header"
+    },
+    {
+     "cite": "art:6/registers",
+     "first": 12,
+     "last": 15,
+     "name": "registers"
+    },
+    {
+     "cite": "art:6/backtrace",
+     "first": 16,
+     "last": 22,
+     "name": "backtrace"
+    },
+    {
+     "cite": "art:6/memory",
+     "first": 23,
+     "last": 29,
+     "name": "memory"
+    },
+    {
+     "cite": "art:6/memory_map",
+     "first": 30,
+     "last": 34,
+     "name": "memory_map"
+    },
+    {
+     "cite": "art:6/threads",
+     "first": 35,
+     "last": 43,
+     "name": "threads"
+    },
+    {
+     "cite": "art:6/open_files",
+     "first": 44,
+     "last": 47,
+     "name": "open_files"
+    },
+    {
+     "cite": "art:6/log",
+     "first": 48,
+     "last": 50,
+     "name": "log"
+    }
+   ],
+   "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100",
+   "type": "tombstone"
+  },
+  "text": [
+   "art:6/backtrace L16-L22 (tombstone, Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"V…):",
+   "L16  backtrace:",
+   "L17        #00 pc 000000000004a2b0  /vendor/lib64/libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48) (BuildId: 8f2c1d0e4b3a29171615141312111009)",
+   "L18        #01 pc 0000000000049e10  /vendor/lib64/libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112) (BuildId: 8f2c1d0e4b3a29171615141312111009)",
+   "L19        #02 pc 0000000000061a3c  /system/lib64/libbinder_ndk.so (AIBinder_Class_onTransact+92) (BuildId: 0a0b0c0d)",
+   "L20        #03 pc 000000000005c2f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256) (BuildId: 1a2b3c4d)",
+   "L21        #04 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 5e6f7a8b)",
+   "L22  ",
+   "cite lines as art:6/backtrace:L<n>"
+  ]
+ },
+ "section and lines": {
+  "args": {
+   "end_line": 14,
+   "id": "art:4",
+   "section": "exception",
+   "start_line": 12
+  },
+  "structured": {
+   "cite": "art:4",
+   "lines": [
+    {
+     "n": 12,
+     "text": "java.lang.IllegalStateException: Could not execute method for android:onClick"
+    },
+    {
+     "n": 13,
+     "text": "\tat androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)"
+    },
+    {
+     "n": 14,
+     "text": "\tat android.view.View.performClick(View.java:7448)"
+    }
+   ],
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/system/dropbox/data_app_crash@1767222001000.txt.gz!data_app_crash@1767222001000.txt",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:9#1",
+   "same_crash": [
+    "art:1"
+   ],
+   "sections": [
+    {
+     "cite": "art:4/dropbox_header",
+     "first": 1,
+     "last": 11,
+     "name": "dropbox_header"
+    },
+    {
+     "cite": "art:4/exception",
+     "first": 12,
+     "last": 23,
+     "name": "exception"
+    }
+   ],
+   "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update < com.example.hvac.MainActivity.onFanClicked",
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
+  },
+  "text": [
+   "art:4/exception L12-L14 (java_crash, Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac…):",
+   "L12  java.lang.IllegalStateException: Could not execute method for android:onClick",
+   "L13  \tat androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)",
+   "L14  \tat android.view.View.performClick(View.java:7448)",
+   "cite lines as art:4/exception:L<n>"
+  ]
+ },
+ "summary crash-buffer crash with dropbox copy": {
+  "args": {
+   "id": "art:1"
+  },
+  "structured": {
+   "cite": "art:1",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:crash",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:3#1",
+   "same_crash": [
+    "art:4"
+   ],
+   "sections": [
+    {
+     "cite": "art:1/header",
+     "first": 1,
+     "last": 2,
+     "name": "header"
+    },
+    {
+     "cite": "art:1/exception",
+     "first": 3,
+     "last": 4,
+     "name": "exception"
+    }
+   ],
+   "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update",
+   "summary": "Java crash in com.example.hvac (pid 1234, thread main) at 2026-01-01 00:00:01.000\njava.lang.NullPointerException: boom\n  at com.example.hvac.Controller.update(Controller.java:42)",
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
+  },
+  "text": [
+   "art:1  java_crash  record log:3#1  (4 lines)",
+   "name: bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:crash",
+   "time: 2026-01-01 00:00:01.000",
+   "process: com.example.hvac  pid 1234  tid 1250",
+   "signature: java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update",
+   "same crash, other copies: art:4 (23 lines, data_app_crash@1767222001000.txt)",
+   "",
+   "Java crash in com.example.hvac (pid 1234, thread main) at 2026-01-01 00:00:01.000",
+   "java.lang.NullPointerException: boom",
+   "  at com.example.hvac.Controller.update(Controller.java:42)",
+   "",
+   "sections (cite lines as art:1/<section>:L<n>):",
+   "  art:1/header     L1-L2",
+   "  art:1/exception  L3-L4",
+   "next: read_artifact(id='art:1/exception')"
+  ]
+ },
+ "summary tombstone": {
+  "args": {
+   "id": "art:6"
+  },
+  "structured": {
+   "cite": "art:6",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "pid": 812,
+   "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+   "record": "log:11#1",
+   "same_crash": [],
+   "sections": [
+    {
+     "cite": "art:6/header",
+     "first": 1,
+     "last": 11,
+     "name": "header"
+    },
+    {
+     "cite": "art:6/registers",
+     "first": 12,
+     "last": 15,
+     "name": "registers"
+    },
+    {
+     "cite": "art:6/backtrace",
+     "first": 16,
+     "last": 22,
+     "name": "backtrace"
+    },
+    {
+     "cite": "art:6/memory",
+     "first": 23,
+     "last": 29,
+     "name": "memory"
+    },
+    {
+     "cite": "art:6/memory_map",
+     "first": 30,
+     "last": 34,
+     "name": "memory_map"
+    },
+    {
+     "cite": "art:6/threads",
+     "first": 35,
+     "last": 43,
+     "name": "threads"
+    },
+    {
+     "cite": "art:6/open_files",
+     "first": 44,
+     "last": 47,
+     "name": "open_files"
+    },
+    {
+     "cite": "art:6/log",
+     "first": 48,
+     "last": 50,
+     "name": "log"
+    }
+   ],
+   "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "summary": "Native crash in /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\") at 2026-01-01 00:00:05.123\nsignal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000010\nCause: null pointer dereference\nbacktrace:\n  #00 libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48)\n  #01 libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112)\n  #02 libbinder_ndk.so (AIBinder_Class_onTransact+92)\n  #03 libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256)\n  #04 libc.so (__start_thread+64)\nother threads: 1",
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100",
+   "type": "tombstone"
+  },
+  "text": [
+   "art:6  tombstone  record log:11#1  (50 lines)",
+   "name: bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "time: 2026-01-01 00:00:05.123  (as written: 2026-01-01 00:00:05.123456789+0100)",
+   "process: /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service  pid 812  tid 830",
+   "signature: SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "",
+   "Native crash in /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\") at 2026-01-01 00:00:05.123",
+   "signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000010",
+   "Cause: null pointer dereference",
+   "backtrace:",
+   "  #00 libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48)",
+   "  #01 libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112)",
+   "  #02 libbinder_ndk.so (AIBinder_Class_onTransact+92)",
+   "  #03 libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256)",
+   "  #04 libc.so (__start_thread+64)",
+   "other threads: 1",
+   "",
+   "sections (cite lines as art:6/<section>:L<n>):",
+   "  art:6/header      L1-L11",
+   "  art:6/registers   L12-L15",
+   "  art:6/backtrace   L16-L22",
+   "  art:6/memory      L23-L29",
+   "  art:6/memory_map  L30-L34",
+   "  art:6/threads     L35-L43",
+   "  art:6/open_files  L44-L47",
+   "  art:6/log         L48-L50",
+   "next: read_artifact(id='art:6/backtrace')"
+  ]
+ }
+}

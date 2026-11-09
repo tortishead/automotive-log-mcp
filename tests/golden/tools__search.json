@@ -1,0 +1,498 @@
+{
+ "count only": {
+  "args": {
+   "count_only": true,
+   "text": "com"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 6,
+   "hits": [],
+   "mode": "text",
+   "query": "com",
+   "total": 6,
+   "warnings": []
+  },
+  "text": [
+   "6 matches, 6 distinct messages (F 2, E 2, W 1, I 1)"
+  ]
+ },
+ "empty: filtered out": {
+  "args": {
+   "filter": {
+    "level": "F",
+    "pid": 1234
+   },
+   "text": "setProperty"
+  },
+  "structured": {
+   "case": "br",
+   "empty_reason": "1 match in the case, none with the filter: 1 without the level filter (level F).",
+   "exact": true,
+   "groups": 0,
+   "hits": [],
+   "mode": "text",
+   "query": "setProperty",
+   "total": 0,
+   "warnings": []
+  },
+  "text": [
+   "No matches. 1 match in the case, none with the filter: 1 without the level filter (level F)."
+  ]
+ },
+ "empty: word not in the case": {
+  "args": {
+   "text": "nothing_like_this"
+  },
+  "structured": {
+   "case": "br",
+   "empty_reason": "In the whole case no record contains 'nothing_like_this'. Text search matches whole words (case-insensitive): use 'word*' for a prefix, or mode='regex' for substrings and patterns.",
+   "exact": true,
+   "groups": 0,
+   "hits": [],
+   "mode": "text",
+   "query": "nothing_like_this",
+   "total": 0,
+   "warnings": []
+  },
+  "text": [
+   "No matches. In the whole case no record contains 'nothing_like_this'. Text search matches whole words (case-insensitive): use 'word*' for a prefix, or mode='regex' for substrings and patterns."
+  ]
+ },
+ "kernel, monotonic clock": {
+  "args": {
+   "filter": {
+    "from": "120.0"
+   },
+   "text": "init OR wlan0"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 2,
+   "hits": [
+    {
+     "cite": "log:5#2",
+     "level": "E",
+     "literal": "init: Service 'vendor.hvac' (pid",
+     "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+     "tag": "init",
+     "template": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>",
+     "ts": "123.456789"
+    },
+    {
+     "cite": "log:5#3",
+     "level": "I",
+     "literal": "wlan0: associated with",
+     "msg": "wlan0: associated with <MAC:abcce245>",
+     "tag": "wlan0",
+     "template": "wlan0: associated with <MAC>",
+     "ts": "124.000000"
+    }
+   ],
+   "mode": "text",
+   "query": "init OR wlan0",
+   "total": 2,
+   "warnings": []
+  },
+  "text": [
+   "2 matches, 2 distinct messages (collapsed):",
+   "log:5#2  123.456789  E init  init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "log:5#3  124.000000  I wlan0  wlan0: associated with <MAC:abcce245>",
+   "code search (constant text of the templates):",
+   "  \"init: Service 'vendor.hvac' (pid\"  log:5#2",
+   "  \"wlan0: associated with\"  log:5#3"
+  ]
+ },
+ "level W, collapsed": {
+  "args": {
+   "filter": {
+    "level": "W"
+   },
+   "text": "pid"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 8,
+   "hits": [
+    {
+     "art": "art:1",
+     "cite": "log:3#1",
+     "level": "E",
+     "literal": "FATAL EXCEPTION: main",
+     "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "AndroidRuntime",
+     "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:<*>)",
+     "tid": 1250,
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "art": "art:4",
+     "cite": "log:9#1",
+     "level": "F",
+     "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "java_crash",
+     "template": "[art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>)",
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "cite": "log:2#1",
+     "level": "W",
+     "literal": "Process com.example.hvac (pid",
+     "msg": "Process com.example.hvac (pid 1234) has died",
+     "pid": 1000,
+     "tag": "ActivityManager",
+     "template": "Process com.example.hvac (pid <*>) has died",
+     "tid": 1100,
+     "ts": "2026-01-01 00:00:02.000"
+    },
+    {
+     "art": "art:6",
+     "cite": "log:11#1",
+     "level": "F",
+     "msg": "[art:6] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+     "pid": 812,
+     "tag": "tombstone",
+     "template": "[art:<*>] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+     "tid": 830,
+     "ts": "2026-01-01 00:00:05.123"
+    },
+    {
+     "art": "art:7",
+     "cite": "log:12#1",
+     "cut": true,
+     "level": "F",
+     "msg": "[art:7] Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example…",
+     "pid": 900,
+     "tag": "tombstone",
+     "template": "[art:<*>] Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN>, zone <*>) ' at libaudiohal_example.so!AudioStream::open",
+     "tid": 915,
+     "ts": "2026-01-01 00:02:30.250"
+    },
+    {
+     "art": "art:2",
+     "cite": "log:6#1",
+     "cut": true,
+     "level": "E",
+     "msg": "[art:2] ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"Radio…",
+     "pid": 1500,
+     "tag": "anr",
+     "template": "[art:<*>] ANR in com.example.radio (pid <*>): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=<*> cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid <*> \"RadioWorker\" (Native), in binder call ICarProperty.se…",
+     "ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "art": "art:3",
+     "cite": "log:7#1",
+     "cut": true,
+     "level": "F",
+     "msg": "[art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+     "pid": 1600,
+     "tag": "java_crash",
+     "template": "[art:<*>] Java crash in com.android.car.settings (pid <*>): java.lang.IllegalStateException: Bluetooth device <MAC> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:<*>)",
+     "ts": "2026-01-01 00:06:00.000"
+    },
+    {
+     "cite": "log:5#2",
+     "level": "E",
+     "literal": "init: Service 'vendor.hvac' (pid",
+     "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+     "tag": "init",
+     "template": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>",
+     "ts": "123.456789"
+    }
+   ],
+   "mode": "text",
+   "query": "pid",
+   "total": 8,
+   "warnings": []
+  },
+  "text": [
+   "8 matches, 8 distinct messages (collapsed):",
+   "log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "log:2#1  01-01 00:00:02.000  W 1000/1100 ActivityManager  Process com.example.hvac (pid 1234) has died",
+   "log:11#1  01-01 00:00:05.123  F 812/830 tombstone  [art:6] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+   "log:12#1  01-01 00:02:30.250  F 900/915 tombstone  [art:7] Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example…",
+   "log:6#1  01-01 00:05:00.000  E 1500 anr  [art:2] ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"Radio…",
+   "log:7#1  01-01 00:06:00.000  F 1600 java_crash  [art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+   "log:5#2  123.456789  E init  init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "code search (constant text of the templates):",
+   "  \"FATAL EXCEPTION: main\"  log:3#1",
+   "  \"init: Service 'vendor.hvac' (pid\"  log:5#2",
+   "  \"Process com.example.hvac (pid\"  log:2#1"
+  ]
+ },
+ "not collapsed, page 1": {
+  "args": {
+   "collapse": false,
+   "limit": 3,
+   "text": "pid"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 8,
+   "hits": [
+    {
+     "art": "art:1",
+     "cite": "log:3#1",
+     "level": "E",
+     "literal": "FATAL EXCEPTION: main",
+     "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "AndroidRuntime",
+     "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:<*>)",
+     "tid": 1250,
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "art": "art:4",
+     "cite": "log:9#1",
+     "level": "F",
+     "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "java_crash",
+     "template": "[art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>)",
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "cite": "log:2#1",
+     "level": "W",
+     "literal": "Process com.example.hvac (pid",
+     "msg": "Process com.example.hvac (pid 1234) has died",
+     "pid": 1000,
+     "tag": "ActivityManager",
+     "template": "Process com.example.hvac (pid <*>) has died",
+     "tid": 1100,
+     "ts": "2026-01-01 00:00:02.000"
+    }
+   ],
+   "mode": "text",
+   "next_cursor": "eyJvIjozLCJrIjoiZjQ3YTNmYzJhMSJ9",
+   "query": "pid",
+   "total": 8,
+   "warnings": []
+  },
+  "text": [
+   "8 matches; showing 1-3:",
+   "log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "log:2#1  01-01 00:00:02.000  W 1000/1100 ActivityManager  Process com.example.hvac (pid 1234) has died",
+   "code search (constant text of the templates):",
+   "  \"FATAL EXCEPTION: main\"  log:3#1",
+   "  \"Process com.example.hvac (pid\"  log:2#1",
+   "… 5 more matches; next page: cursor=\"eyJvIjozLCJrIjoiZjQ3YTNmYzJhMSJ9\"; or narrow by level (F 4, E 3, W 1), tags (java_crash 2, tombstone 2, AndroidRuntime 1, ActivityManager 1, …), from/to (first match 01-01 00:00:01.000), a longer query"
+  ]
+ },
+ "raw value redacted": {
+  "args": {
+   "text": "3c:5a:b4:01:02:03"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 2,
+   "hits": [
+    {
+     "art": "art:3",
+     "cite": "log:7#1",
+     "cut": true,
+     "level": "F",
+     "msg": "[art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+     "pid": 1600,
+     "tag": "java_crash",
+     "template": "[art:<*>] Java crash in com.android.car.settings (pid <*>): java.lang.IllegalStateException: Bluetooth device <MAC> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:<*>)",
+     "ts": "2026-01-01 00:06:00.000"
+    },
+    {
+     "cite": "log:5#3",
+     "level": "I",
+     "literal": "wlan0: associated with",
+     "msg": "wlan0: associated with <MAC:abcce245>",
+     "tag": "wlan0",
+     "template": "wlan0: associated with <MAC>",
+     "ts": "124.000000"
+    }
+   ],
+   "mode": "text",
+   "query": "<MAC:abcce245>",
+   "total": 2,
+   "warnings": [
+    "raw values in the query were redacted to tokens like <MAC:…>, as in the logs"
+   ]
+  },
+  "text": [
+   "2 matches, 2 distinct messages (collapsed):",
+   "log:7#1  01-01 00:06:00.000  F 1600 java_crash  [art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+   "log:5#3  124.000000  I wlan0  wlan0: associated with <MAC:abcce245>",
+   "code search (constant text of the templates):",
+   "  \"wlan0: associated with\"  log:5#3",
+   "warning: raw values in the query were redacted to tokens like <MAC:…>, as in the logs"
+  ]
+ },
+ "regex": {
+  "args": {
+   "mode": "regex",
+   "text": "status=\\w+_AVAIL"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 1,
+   "hits": [
+    {
+     "cite": "log:1#2",
+     "level": "E",
+     "literal": "setProperty failed, status=NOT_AVAILABLE",
+     "msg": "setProperty failed, status=NOT_AVAILABLE",
+     "pid": 1234,
+     "tag": "HvacCtrl",
+     "template": "setProperty failed, status=NOT_AVAILABLE",
+     "tid": 1250,
+     "ts": "2025-12-31 23:59:59.412"
+    }
+   ],
+   "mode": "regex",
+   "query": "status=\\w+_AVAIL",
+   "total": 1,
+   "warnings": []
+  },
+  "text": [
+   "1 match, 1 distinct message (collapsed):",
+   "log:1#2  12-31 23:59:59.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE",
+   "code search (constant text of the templates):",
+   "  \"setProperty failed, status=NOT_AVAILABLE\"  log:1#2"
+  ]
+ },
+ "regex-looking text query": {
+  "args": {
+   "text": "status=\\w+"
+  },
+  "structured": {
+   "case": "br",
+   "empty_reason": "In the whole case no record contains 'status=\\\\w+'. Text search matches whole words (case-insensitive): use 'word*' for a prefix, or mode='regex' for substrings and patterns.",
+   "exact": true,
+   "groups": 0,
+   "hits": [],
+   "mode": "text",
+   "query": "status=\\w+",
+   "total": 0,
+   "warnings": [
+    "the query looks like a regular expression, but mode='text' matches words (FTS5); pass mode='regex' to match it as one"
+   ]
+  },
+  "text": [
+   "No matches. In the whole case no record contains 'status=\\\\w+'. Text search matches whole words (case-insensitive): use 'word*' for a prefix, or mode='regex' for substrings and patterns.",
+   "warning: the query looks like a regular expression, but mode='text' matches words (FTS5); pass mode='regex' to match it as one"
+  ]
+ },
+ "time window from a citation": {
+  "args": {
+   "filter": {
+    "from": "log:3#1-1s",
+    "to": "+2s"
+   },
+   "text": "com"
+  },
+  "structured": {
+   "case": "br",
+   "exact": true,
+   "groups": 4,
+   "hits": [
+    {
+     "art": "art:1",
+     "cite": "log:3#1",
+     "level": "E",
+     "literal": "FATAL EXCEPTION: main",
+     "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "AndroidRuntime",
+     "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:<*>)",
+     "tid": 1250,
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "art": "art:4",
+     "cite": "log:9#1",
+     "level": "F",
+     "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "tag": "java_crash",
+     "template": "[art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>)",
+     "ts": "2026-01-01 00:00:01.000"
+    },
+    {
+     "cite": "log:2#1",
+     "level": "W",
+     "literal": "Process com.example.hvac (pid",
+     "msg": "Process com.example.hvac (pid 1234) has died",
+     "pid": 1000,
+     "tag": "ActivityManager",
+     "template": "Process com.example.hvac (pid <*>) has died",
+     "tid": 1100,
+     "ts": "2026-01-01 00:00:02.000"
+    },
+    {
+     "cite": "log:4#2",
+     "level": "I",
+     "literal": "com.example.hvac,",
+     "msg": "[0,1234,com.example.hvac,900,2]",
+     "pid": 1000,
+     "tag": "am_proc_died",
+     "template": "[<*>,<*>,com.example.hvac,<*>,<*>]",
+     "tid": 1100,
+     "ts": "2026-01-01 00:00:02.000"
+    }
+   ],
+   "mode": "text",
+   "query": "com",
+   "total": 4,
+   "warnings": [
+    "records of source 5 have only a monotonic clock (seconds since boot) and are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
+   ]
+  },
+  "text": [
+   "4 matches, 4 distinct messages (collapsed):",
+   "log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "log:2#1  01-01 00:00:02.000  W 1000/1100 ActivityManager  Process com.example.hvac (pid 1234) has died",
+   "log:4#2  01-01 00:00:02.000  I 1000/1100 am_proc_died  [0,1234,com.example.hvac,900,2]",
+   "code search (constant text of the templates):",
+   "  \"FATAL EXCEPTION: main\"  log:3#1",
+   "  \"Process com.example.hvac (pid\"  log:2#1",
+   "  \"com.example.hvac,\"  log:4#2",
+   "warning: records of source 5 have only a monotonic clock (seconds since boot) and are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
+  ]
+ },
+ "unknown tag glob": {
+  "args": {
+   "filter": {
+    "tags": [
+     "hvac*"
+    ]
+   },
+   "text": "setProperty"
+  },
+  "structured": {
+   "case": "br",
+   "empty_reason": "1 match in the case, none with the filter: 1 without the tags filter.",
+   "exact": true,
+   "groups": 0,
+   "hits": [],
+   "mode": "text",
+   "query": "setProperty",
+   "total": 0,
+   "warnings": [
+    "tag 'hvac*' matches no tag in the case (tags are case-sensitive); similar: HvacCtrl"
+   ]
+  },
+  "text": [
+   "No matches. 1 match in the case, none with the filter: 1 without the tags filter.",
+   "warning: tag 'hvac*' matches no tag in the case (tags are case-sensitive); similar: HvacCtrl"
+  ]
+ }
+}

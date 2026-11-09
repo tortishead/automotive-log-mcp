@@ -1,0 +1,61 @@
+{
+ "crash and one missing": {
+  "args": {
+   "ids": [
+    "log:3#1",
+    "log:5#3",
+    "log:99#1"
+   ]
+  },
+  "structured": {
+   "case": "br",
+   "missing": [
+    "log:99#1"
+   ],
+   "not_shown": [],
+   "records": [
+    {
+     "art": "art:1",
+     "attrs": {
+      "art": 1,
+      "uid": "u0_a42"
+     },
+     "cite": "log:3#1",
+     "level": "E",
+     "literal": "FATAL EXCEPTION: main",
+     "msg": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: 1234\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:42)",
+     "pid": 1234,
+     "source": "3",
+     "tag": "AndroidRuntime",
+     "template": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: <*>\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:<*>)",
+     "tid": 1250,
+     "ts": "2026-01-01 00:00:01.000",
+     "ts_raw": "01-01 00:00:01.000"
+    },
+    {
+     "cite": "log:5#3",
+     "level": "I",
+     "literal": "wlan0: associated with",
+     "msg": "wlan0: associated with <MAC:abcce245>",
+     "source": "5",
+     "tag": "wlan0",
+     "template": "wlan0: associated with <MAC>",
+     "ts": "124.000000",
+     "ts_raw": "124.000000"
+    }
+   ]
+  },
+  "text": [
+   "log:3#1  2026-01-01 00:00:01.000  E  pid 1234 tid 1250  AndroidRuntime",
+   "  as written: 01-01 00:00:01.000 · attrs: art=1, uid=u0_a42 · artifact: art:1 · code search: \"FATAL EXCEPTION: main\"",
+   "  FATAL EXCEPTION: main",
+   "  Process: com.example.hvac, PID: 1234",
+   "  java.lang.NullPointerException: boom",
+   "  \tat com.example.hvac.Controller.update(Controller.java:42)",
+   "log:5#3  124.000000  I  wlan0",
+   "  code search: \"wlan0: associated with\"",
+   "  wlan0: associated with <MAC:abcce245>",
+   "not found: log:99#1"
+  ]
+ }
+}
