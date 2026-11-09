@@ -7,6 +7,8 @@ from importlib import resources
 from pathlib import Path
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from automotive_log_mcp.app import App
 from automotive_log_mcp.connectors.artifacts import anr, dropbox, java_crash, tombstone
@@ -334,3 +336,38 @@ def test_v1_case_db_is_migrated(app: App, tmp_path: Path) -> None:
         assert c.execute("SELECT text FROM templates").fetchall() == [("kept",)]
         cols = {r[1] for r in c.execute("PRAGMA table_info(artifact_sections)")}
         assert {"first_line", "lines"} <= cols
+
+
+# Fragments of real layouts, shuffled with arbitrary text: parsers must never raise.
+FRAGMENTS = [
+    tombstone.BANNER,
+    "pid: 1, tid: 2, name: a  >>> b <<<",
+    "signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------",
+    "backtrace:",
+    "      #00 pc 0000000000001a2c  /system/lib64/libfoo.so (f(int)+4)",
+    "--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---",
+    "----- pid 3 at 2026-13-45 99:99:99 -----",
+    "----- end 3 -----",
+    '"main" prio=5 tid=1 Blocked',
+    "  - waiting to lock <0x1> (a X) held by thread 9",
+    "  - locked <0x1> (a X)",
+    "  at a.B.c(B.java:1)",
+    "Caused by: java.lang.Error",
+    "========================================",
+    "2026-01-01 00:00:00 data_app_crash (text, 1 bytes)",
+    "Process: x",
+    "",
+]
+
+
+@settings(max_examples=150, deadline=None)
+@given(st.lists(st.one_of(st.sampled_from(FRAGMENTS), st.text(max_size=40)), max_size=30))
+def test_parsers_never_raise(text: list[str]) -> None:
+    text = [t.replace("\n", " ").replace("\r", " ") for t in text]
+    # Sections cover the text exactly, so art:<id>:L<n> is line n of the input.
+    assert tombstone.from_lines(text).line_count == len(text)
+    assert anr.from_lines(text).line_count == len(text)
+    java_crash.from_record(RawRecord(msg="FATAL EXCEPTION: main\n" + "\n".join(text)))
+    for tag in ("data_app_crash", "system_app_anr", "data_app_native_crash", "other"):
+        dropbox.parse_entry(tag, text, None, None)
+    list(dropbox.DropboxConnector().parse_lines(iter(text), SourceContext("s", "s", 2026)))
