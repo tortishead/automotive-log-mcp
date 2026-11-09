@@ -1,0 +1,166 @@
+{
+ "artifacts": [
+  {
+   "cite": "art:1",
+   "fields": {
+    "abi": "x86_64",
+    "abort_message": "Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ",
+    "cmdline": "/vendor/bin/hw/vendor.example.audio-service",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "frames": [
+     {
+      "build_id": "5e6f7a8b",
+      "func": "abort",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 0,
+      "offset": 164,
+      "pc": "00000000000ee4c8"
+     },
+     {
+      "build_id": "77665544",
+      "func": "android::base::DefaultAborter(char const*)",
+      "map": "/system/lib64/libbase.so",
+      "n": 1,
+      "offset": 12,
+      "pc": "0000000000017a2c"
+     },
+     {
+      "build_id": "77665544",
+      "func": "android::base::LogMessage::~LogMessage()",
+      "map": "/system/lib64/libbase.so",
+      "n": 2,
+      "offset": 352,
+      "pc": "0000000000018b40"
+     },
+     {
+      "build_id": "3344aabb",
+      "func": "AudioStream::open(int)",
+      "map": "/vendor/lib64/libaudiohal_example.so",
+      "n": 3,
+      "offset": 120,
+      "pc": "0000000000031c08"
+     },
+     {
+      "build_id": "3344aabb",
+      "func": "AudioHal::startZone(int)",
+      "map": "/vendor/lib64/libaudiohal_example.so",
+      "n": 4,
+      "offset": 40,
+      "pc": "0000000000030a10"
+     },
+     {
+      "build_id": "5e6f7a8b",
+      "func": "__start_thread",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 5,
+      "offset": 64,
+      "pc": "00000000000a1f40"
+     }
+    ],
+    "other_threads": 0,
+    "process": "/vendor/bin/hw/vendor.example.audio-service",
+    "process_uptime": "440s",
+    "signal": {
+     "code": -1,
+     "code_name": "SI_QUEUE",
+     "name": "SIGABRT",
+     "number": 6
+    },
+    "thread": "AudioStream",
+    "uid": "1041",
+    "utc_offset": "+0100"
+   },
+   "headline": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open",
+   "lines": 24,
+   "name": "tombstone_01",
+   "pid": 900,
+   "process": "/vendor/bin/hw/vendor.example.audio-service",
+   "record": "log:1#1",
+   "sections": [
+    [
+     "header",
+     1,
+     11
+    ],
+    [
+     "registers",
+     12,
+     3
+    ],
+    [
+     "backtrace",
+     15,
+     8
+    ],
+    [
+     "memory_map",
+     23,
+     2
+    ]
+   ],
+   "signature": "SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+   "summary": [
+    "Native crash in /vendor/bin/hw/vendor.example.audio-service (pid 900, tid 915 \"AudioStream\") at 2026-01-01 00:02:30.250",
+    "signal 6 (SIGABRT), code -1 (SI_QUEUE)",
+    "Abort message: 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) '",
+    "backtrace:",
+    "  #00 libc.so (abort+164)",
+    "  #01 libbase.so (android::base::DefaultAborter(char const*)+12)",
+    "  #02 libbase.so (android::base::LogMessage::~LogMessage()+352)",
+    "  #03 libaudiohal_example.so (AudioStream::open(int)+120)",
+    "  #04 libaudiohal_example.so (AudioHal::startZone(int)+40)",
+    "  #05 libc.so (__start_thread+64)"
+   ],
+   "tid": 915,
+   "ts": "2026-01-01 00:02:30.250",
+   "ts_raw": "2026-01-01 00:02:30.250000000+0100",
+   "type": "tombstone"
+  }
+ ],
+ "records": [
+  {
+   "attrs": {
+    "art": 1
+   },
+   "cite": "log:1#1",
+   "level": "F",
+   "msg": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open [art:1]",
+   "pid": 900,
+   "seg": 1,
+   "tag": "tombstone",
+   "template": "Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN>, zone <*>) ' at libaudiohal_example.so!AudioStream::open [art:<*>]",
+   "tid": 915,
+   "ts": "2026-01-01 00:02:30.250",
+   "ts_raw": "2026-01-01 00:02:30.250000000+0100"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "tombstone",
+   "id": 1,
+   "lines": 24,
+   "meta": {},
+   "name": "tombstone_01",
+   "range": [
+    "2026-01-01 00:02:30.250",
+    "2026-01-01 00:02:30.250"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

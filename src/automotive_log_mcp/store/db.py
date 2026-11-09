@@ -17,7 +17,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 BATCH_ROWS = 50_000
 
 
@@ -44,8 +44,13 @@ def check_fts5() -> None:
         conn.close()
 
 
-def _schema_sql() -> str:
-    return resources.files("automotive_log_mcp.store").joinpath("schema.sql").read_text(encoding="utf-8")
+def _schema_sql(name: str = "schema.sql") -> str:
+    return resources.files("automotive_log_mcp.store").joinpath(name).read_text(encoding="utf-8")
+
+
+# Steps from version n-1 to n, in order. Version 1 is schema.sql; later steps never edit it, so a
+# case DB of any older version opens and is brought up to date.
+MIGRATIONS: dict[int, str] = {1: "schema.sql", 2: "schema_v2.sql"}
 
 
 def _migrate(conn: sqlite3.Connection, path: Path) -> None:
@@ -61,11 +66,12 @@ def _migrate(conn: sqlite3.Connection, path: Path) -> None:
         )
     if version == SCHEMA_VERSION:
         return
-    # Version 0 -> 1: create everything. Later versions add steps here, in order.
-    with conn:
-        conn.executescript(_schema_sql())
-        conn.execute(
-            "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)", (str(SCHEMA_VERSION),)
+    for step in range(version + 1, SCHEMA_VERSION + 1):
+        # executescript commits first; each step and its version bump are one transaction.
+        conn.executescript(
+            "BEGIN;\n"
+            + _schema_sql(MIGRATIONS[step])
+            + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{step}');\nCOMMIT;"
         )
 
 
@@ -226,5 +232,44 @@ def delete_sources(conn: sqlite3.Connection, source_ids: list[int]) -> None:
             conn.executemany("UPDATE templates SET count = count - ? WHERE id = ?", [(n, t) for t, n in rows])
             conn.execute("DELETE FROM records WHERE id BETWEEN ? AND ?", (lo, hi))
             conn.execute("DELETE FROM segments WHERE source_id = ?", (sid,))
+            delete_artifacts(conn, "source_id = ?", (sid,))
             conn.execute("DELETE FROM sources WHERE id = ?", (sid,))
         conn.execute("DELETE FROM templates WHERE count <= 0")
+
+
+ARTIFACT_COLS = (
+    "id, source_id, record_id, type, name, path, sha256, member, ts, ts_raw, pid, tid, process, "
+    "signature, headline, summary, fields, lines"
+)
+
+
+def insert_artifacts(
+    conn: sqlite3.Connection,
+    rows: list[tuple[Any, ...]],
+    sections: list[tuple[int, int, str, int, int, str]],
+) -> None:
+    """Artifact rows (``ARTIFACT_COLS``) and their sections ``(artifact_id, idx, name, first_line,
+    lines, text)``, with FTS rows; the caller holds the transaction."""
+    conn.executemany(
+        f"INSERT INTO artifacts({ARTIFACT_COLS}) VALUES ({','.join('?' * len(ARTIFACT_COLS.split(',')))})",
+        rows,
+    )
+    for sec in sections:
+        cur = conn.execute(
+            "INSERT INTO artifact_sections(artifact_id, idx, name, first_line, lines, text) "
+            "VALUES (?,?,?,?,?,?)",
+            sec,
+        )
+        conn.execute("INSERT INTO artifact_fts(rowid, text) VALUES (?, ?)", (cur.lastrowid, sec[5]))
+
+
+def delete_artifacts(conn: sqlite3.Connection, where: str, params: tuple[Any, ...]) -> None:
+    """Remove artifacts matching ``where`` (on table artifacts) with sections and FTS rows."""
+    ids = f"SELECT id FROM artifacts WHERE {where}"
+    conn.execute(
+        "INSERT INTO artifact_fts(artifact_fts, rowid, text) "
+        f"SELECT 'delete', id, text FROM artifact_sections WHERE artifact_id IN ({ids})",
+        params,
+    )
+    conn.execute(f"DELETE FROM artifact_sections WHERE artifact_id IN ({ids})", params)
+    conn.execute(f"DELETE FROM artifacts WHERE {where}", params)

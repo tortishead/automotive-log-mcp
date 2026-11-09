@@ -115,7 +115,7 @@ def test_bugreport_processes_and_meta(app: App, tmp_path: Path) -> None:
         (1234, 1250, 500, "u0_a42", "hvac worker"),
     ]
     rows = app.list_sources("br") or []
-    streams = {s.stream for s in rows if "#" in s.name}
+    streams = {s.stream for s in rows if "#" in s.name and s.format in ("logcat", "kernel")}
     assert streams == {"main", "system", "crash", "events", "kernel"}
     meta = next(s.meta for s in rows if s.stream == "kernel")
     assert meta["timezone"] == "Europe/Berlin"

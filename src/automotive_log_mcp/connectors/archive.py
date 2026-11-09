@@ -1,7 +1,8 @@
 """Archives: zip, tar (plain, gz, bz2, xz) and single-file gzip.
 
 Each archive member becomes a member to sniff; nested archives are expanded up to a depth of 4.
-Members are read in archive order and streamed, never extracted to disk.
+Members are read in name order (a bugreport zip's main entry first) and streamed, never
+extracted to disk.
 """
 
 from __future__ import annotations
@@ -35,6 +36,19 @@ class _OwningGzip(gzip.GzipFile):
 
 def _is_tar(head: bytes) -> bool:
     return len(head) >= 262 and head[257:262] == b"ustar"
+
+
+def _main_entry_first(zf: zipfile.ZipFile, infos: list[zipfile.ZipInfo]) -> list[zipfile.ZipInfo]:
+    """A bugreport zip names its main text in ``main_entry.txt``; read that first, so the metadata
+    it gives (fingerprint, time zone, process list) applies when the other members are parsed."""
+    entry = next((i for i in infos if i.filename == "main_entry.txt"), None)
+    if entry is None or entry.file_size > 4096:
+        return infos
+    name = zf.read(entry).decode("utf-8", errors="replace").strip()
+    main = next((i for i in infos if i.filename == name), None)
+    if main is None:
+        return infos
+    return [main, *(i for i in infos if i is not main)]
 
 
 class ArchiveContainer:
@@ -81,6 +95,7 @@ class ArchiveContainer:
         assert member.open is not None
         with member.open() as f, zipfile.ZipFile(f) as zf:
             infos = sorted((i for i in zf.infolist() if not i.is_dir()), key=lambda i: i.filename)
+            infos = _main_entry_first(zf, infos)
             for info in infos:
                 year, month = info.date_time[0], info.date_time[1]
 

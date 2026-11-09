@@ -96,7 +96,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS records_fts USING fts5(
     msg, tag, content='records_v', content_rowid='id', columnsize=0
 );
 
--- Artifacts (filled from M2): tombstones, ANR traces, Java crashes, dropbox entries.
+-- Artifacts: placeholders in version 1 (never written); schema_v2.sql recreates them.
 CREATE TABLE IF NOT EXISTS artifacts (
     id          INTEGER PRIMARY KEY,
     source_id   INTEGER,                      -- origin source of its synthetic record

@@ -1,0 +1,166 @@
+{
+ "artifacts": [
+  {
+   "cite": "art:1",
+   "fields": {
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "lock_chain": [
+     {
+      "frames": [
+       "java.lang.Thread.sleep(Native method)",
+       "java.lang.Thread.sleep(Thread.java:450)",
+       "com.example.media.Library.rescan(Library.java:201)",
+       "com.example.media.Scanner.run(Scanner.java:55)"
+      ],
+      "lock": "0x0e3f5a21",
+      "lock_class": "com.example.media.Library",
+      "name": "MediaScanner",
+      "state": "Sleeping",
+      "sys_tid": 2370,
+      "tid": 15
+     }
+    ],
+    "main": {
+     "frames": [
+      "com.example.media.Library.currentTrack(Library.java:118)",
+      "com.example.media.PlayerActivity.onTouch(PlayerActivity.java:77)",
+      "android.view.View.dispatchTouchEvent(View.java:15050)"
+     ],
+     "name": "main",
+     "state": "Blocked",
+     "sys_tid": 2345,
+     "tid": 1,
+     "waiting": {
+      "class": "com.example.media.Library",
+      "holder_tid": 15,
+      "lock": "0x0e3f5a21"
+     }
+    },
+    "other_processes": [
+     {
+      "pid": 812,
+      "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service"
+     }
+    ],
+    "pids": {
+     "2345": "com.example.media",
+     "812": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service"
+    },
+    "subject": "Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent)",
+    "threads": 3,
+    "utc_offset": "+0100"
+   },
+   "headline": "ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping)",
+   "lines": 48,
+   "name": "anr_2026-01-01-00-04-10-500",
+   "pid": 2345,
+   "process": "com.example.media",
+   "record": "log:1#1",
+   "sections": [
+    [
+     "header",
+     1,
+     2
+    ],
+    [
+     "p2345",
+     3,
+     7
+    ],
+    [
+     "p2345.t1.main",
+     10,
+     9
+    ],
+    [
+     "p2345.t4.signal-catcher",
+     19,
+     6
+    ],
+    [
+     "p2345.t15.mediascanner",
+     25,
+     12
+    ],
+    [
+     "p812",
+     37,
+     4
+    ],
+    [
+     "p812.t812.android.hardwar",
+     41,
+     4
+    ],
+    [
+     "p812.t830.vehiclehal",
+     45,
+     4
+    ]
+   ],
+   "signature": "ANR Blocked com.example.media: com.example.media.Library.currentTrack < com.example.media.PlayerActivity.onTouch < android.view.View.dispatchTouchEvent",
+   "summary": [
+    "ANR in com.example.media (pid 2345) at 2026-01-01 00:04:10.500",
+    "Subject: Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent)",
+    "main thread (tid 1 \"main\" (Blocked)):",
+    "  at com.example.media.Library.currentTrack(Library.java:118)",
+    "  at com.example.media.PlayerActivity.onTouch(PlayerActivity.java:77)",
+    "  at android.view.View.dispatchTouchEvent(View.java:15050)",
+    "waiting to lock <0x0e3f5a21> (a com.example.media.Library) held by tid 15 \"MediaScanner\" (Sleeping)",
+    "  at java.lang.Thread.sleep(Native method)",
+    "  at java.lang.Thread.sleep(Thread.java:450)",
+    "  at com.example.media.Library.rescan(Library.java:201)",
+    "  at com.example.media.Scanner.run(Scanner.java:55)",
+    "threads in com.example.media: 3; also dumped: /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service (812)"
+   ],
+   "ts": "2026-01-01 00:04:10.500",
+   "ts_raw": "2026-01-01 00:04:10.500123456+0100",
+   "type": "anr"
+  }
+ ],
+ "records": [
+  {
+   "attrs": {
+    "art": 1
+   },
+   "cite": "log:1#1",
+   "level": "E",
+   "msg": "ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping) [art:1]",
+   "pid": 2345,
+   "seg": 1,
+   "tag": "anr",
+   "template": "ANR in com.example.media (pid <*>): Input dispatching timed out (com.example.media/.PlayerActivity, Waited <*>ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid <*> \"MediaScanner\" (Sleeping) [art:<*>]",
+   "ts": "2026-01-01 00:04:10.500",
+   "ts_raw": "2026-01-01 00:04:10.500123456+0100"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "anr",
+   "id": 1,
+   "lines": 48,
+   "meta": {},
+   "name": "anr_2026-01-01-00-04-10-500",
+   "range": [
+    "2026-01-01 00:04:10.500",
+    "2026-01-01 00:04:10.500"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

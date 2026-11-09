@@ -1,0 +1,50 @@
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+Build fingerprint: 'google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys'
+Revision: '0'
+ABI: 'x86_64'
+Timestamp: 2026-01-01 00:00:05.123456789+0100
+Process uptime: 290s
+Cmdline: /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service
+pid: 812, tid: 830, name: VehicleHal  >>> /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service <<<
+uid: 1000
+signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000010
+Cause: null pointer dereference
+    rax 0000000000000000  rbx 00007ffc4a2e1b40  rcx 0000000000000001  rdx 0000000000000010
+    r8  0000000000000000  r9  0000000000000000  r10 00007ffc4a2e1a00  r11 0000000000000246
+    rip 00007f3a1c04a2b0  rbp 00007ffc4a2e1b60  rsp 00007ffc4a2e1b20  eflags 0000000000010246
+
+backtrace:
+      #00 pc 000000000004a2b0  /vendor/lib64/libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48) (BuildId: 8f2c1d0e4b3a29171615141312111009)
+      #01 pc 0000000000049e10  /vendor/lib64/libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112) (BuildId: 8f2c1d0e4b3a29171615141312111009)
+      #02 pc 0000000000061a3c  /system/lib64/libbinder_ndk.so (AIBinder_Class_onTransact+92) (BuildId: 0a0b0c0d)
+      #03 pc 000000000005c2f0  /system/lib64/libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256) (BuildId: 1a2b3c4d)
+      #04 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 5e6f7a8b)
+
+stack:
+         00007ffc4a2e1ae0  0000000000000000
+         00007ffc4a2e1ae8  00007f3a1c049e10  /vendor/lib64/libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112)
+
+memory near rbx:
+    00007ffc4a2e1b30 0000000000000000 0000000000000000  ................
+
+memory map (3 entries):
+    00005a1c00000000-00005a1c00012fff r--         0     13000  /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service
+    00007f3a1c000000-00007f3a1c07ffff r-x         0     80000  /vendor/lib64/libvhal_example.so (BuildId: 8f2c1d0e4b3a29171615141312111009)
+--->Fault address falls at 00000000'00000010 before any mapped regions
+
+--- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---
+pid: 812, tid: 812, name: android.hardwar  >>> /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service <<<
+uid: 1000
+    rax fffffffffffffe00  rbx 00007ffc4a2e0000  rcx 00007f3a1c0a1f40  rdx 0000000000000010
+
+backtrace:
+      #00 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__epoll_pwait+8) (BuildId: 5e6f7a8b)
+      #01 pc 0000000000012345  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+220) (BuildId: 9c9d9e9f)
+
+open files:
+    fd 0: /dev/null (unowned)
+    fd 3: socket:[12345] (owned by unique_fd 0x7f3a1c2e0010)
+
+--------- tail end of log main
+01-01 00:00:05.100   812   830 I VehicleHal: setValues: 1 value(s), property 0x15400500
+01-01 00:00:05.101   812   830 W VehicleHal: area config for 0x15400500 missing

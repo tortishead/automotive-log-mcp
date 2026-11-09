@@ -39,7 +39,7 @@ def test_add_and_list_bugreport(config: Config, tmp_path: Path, fixed_secret: No
             r = await client.call_tool("add_source", {"case": "T-1", "path": str(z)})
             assert not r.is_error, r.content
             text = r.content[0].text  # type: ignore[union-attr]
-            assert "Indexed" in text and "sources 1, 2, 3, 4, 5, 6" in text
+            assert "Indexed" in text and "sources 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12" in text
             again = await client.call_tool("add_source", {"case": "T-1", "path": str(z)})
             assert "already in the case" in again.content[0].text  # type: ignore[union-attr]
 

@@ -53,6 +53,66 @@ u:r:init:s0                    root             1     1     0 10943400 12345 0  
 u:r:system_server:s0           system        1000  1000   500 15000000 300000 0                  0 S  18  -2     -   0   fg 00:00:30 system_server
 u:r:untrusted_app:s0           u0_a42        1234  1250   500 14000000 100000 0                  0 S  10  10     -   0   bg 00:00:02 hvac worker
 ------ 0.050s was the duration of 'PROCESSES AND THREADS' ------
+------ VM TRACES AT LAST ANR (/data/anr/anr_2026-01-01-00-05-00-000: 2026-01-01 00:05:00) ------
+Subject: Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com.example.radio/.TuneReceiver }
+
+----- pid 1500 at 2026-01-01 00:05:00.000000000+0100 -----
+Cmd line: com.example.radio
+ABI: 'x86_64'
+
+DALVIK THREADS (2):
+"main" prio=5 tid=1 Blocked
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x72a0b8a0 self=0x7b5e0c0000
+  | sysTid=1500 nice=-10 cgrp=top-app sched=0/0 handle=0x7b5f2a54f8
+  at com.example.radio.Tuner.tune(Tuner.java:61)
+  - waiting to lock <0x0a1b2c3d> (a com.example.radio.Tuner) held by thread 12
+  at com.example.radio.TuneReceiver.onReceive(TuneReceiver.java:25)
+
+"RadioWorker" prio=5 tid=12 Native
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x12c81000 self=0x7b5e0d1000
+  | sysTid=1530 nice=0 cgrp=top-app sched=0/0 handle=0x7a0e1ffcb0
+  native: #00 pc 000000000009e4f8  /apex/com.android.runtime/lib64/bionic/libc.so (__ioctl+8) (BuildId: 5e6f7a8b)
+  native: #01 pc 0000000000051d2c  /system/lib64/libbinder.so (android::IPCThreadState::talkWithDriver(bool)+284) (BuildId: 1a2b3c4d)
+  native: #02 pc 0000000000052f10  /system/lib64/libbinder.so (android::IPCThreadState::waitForResponse(android::Parcel*, int*)+60) (BuildId: 1a2b3c4d)
+  at android.os.BinderProxy.transactNative(Native method)
+  at android.os.BinderProxy.transact(BinderProxy.java:571)
+  at android.car.hardware.property.ICarProperty$Stub$Proxy.setProperty(ICarProperty.java:500)
+  at com.example.radio.Tuner.applyBand(Tuner.java:90)
+  - locked <0x0a1b2c3d> (a com.example.radio.Tuner)
+  at com.example.radio.Tuner$Worker.run(Tuner.java:140)
+
+----- end 1500 -----
+------ 0.031s was the duration of 'VM TRACES AT LAST ANR' ------
+------ BINDER TRANSACTIONS (/sys/kernel/debug/binder/transactions) ------
+binder transactions:
+proc 1500
+context binder
+  thread 1530: l 10 need_return 0 tr 0
+    outgoing transaction 48211: 0000000000000000 from 1500:1530 to 1000:1100 code 7 flags 10 pri 0:120 r1
+proc 1000
+context binder
+  thread 1100: l 01 need_return 0 tr 0
+    incoming transaction 48211: 0000000000000000 from 1500:1530 to 1000:1100 code 7 flags 10 pri 0:120 r1 node 4021 size 96:0 data 0000000000000000
+------ 0.002s was the duration of 'BINDER TRANSACTIONS' ------
+------ DROPBOX SYSTEM APP CRASHES (/system/bin/dumpsys -T 30000 dropbox -p system_app_crash) ------
+Drop box contents: 3 entries
+Max entries: 1000
+
+Searching for: system_app_crash
+
+========================================
+2026-01-01 00:06:00 system_app_crash (text, 611 bytes)
+Process: com.android.car.settings
+PID: 1600
+Flags: 0x38c8be45
+Package: com.android.car.settings v34 (14)
+Foreground: Yes
+
+java.lang.IllegalStateException: Bluetooth device 3c:5a:b4:01:02:03 is not bonded
+	at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130)
+	at androidx.preference.Preference.performClick(Preference.java:1210)
+
+------ 0.040s was the duration of 'DROPBOX SYSTEM APP CRASHES' ------
 ------ DUMPSYS (/system/bin/dumpsys) ------
 -------------------------------------------------------------------------------
 DUMP OF SERVICE car_service:

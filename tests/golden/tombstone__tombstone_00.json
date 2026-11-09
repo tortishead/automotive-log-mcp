@@ -1,0 +1,182 @@
+{
+ "artifacts": [
+  {
+   "cite": "art:1",
+   "fields": {
+    "abi": "x86_64",
+    "cause": "null pointer dereference",
+    "cmdline": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "frames": [
+     {
+      "build_id": "8f2c1d0e4b3a29171615141312111009",
+      "func": "VehicleHal::setValue(VehiclePropValue const&)",
+      "map": "/vendor/lib64/libvhal_example.so",
+      "n": 0,
+      "offset": 48,
+      "pc": "000000000004a2b0"
+     },
+     {
+      "build_id": "8f2c1d0e4b3a29171615141312111009",
+      "func": "VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)",
+      "map": "/vendor/lib64/libvhal_example.so",
+      "n": 1,
+      "offset": 112,
+      "pc": "0000000000049e10"
+     },
+     {
+      "build_id": "0a0b0c0d",
+      "func": "AIBinder_Class_onTransact",
+      "map": "/system/lib64/libbinder_ndk.so",
+      "n": 2,
+      "offset": 92,
+      "pc": "0000000000061a3c"
+     },
+     {
+      "build_id": "1a2b3c4d",
+      "func": "android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)",
+      "map": "/system/lib64/libbinder.so",
+      "n": 3,
+      "offset": 256,
+      "pc": "000000000005c2f0"
+     },
+     {
+      "build_id": "5e6f7a8b",
+      "func": "__start_thread",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 4,
+      "offset": 64,
+      "pc": "00000000000a1f40"
+     }
+    ],
+    "log_buffers": [
+     "main"
+    ],
+    "other_threads": 1,
+    "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+    "process_uptime": "290s",
+    "signal": {
+     "code": 1,
+     "code_name": "SEGV_MAPERR",
+     "fault_addr": "0x0000000000000010",
+     "name": "SIGSEGV",
+     "number": 11
+    },
+    "thread": "VehicleHal",
+    "uid": "1000",
+    "utc_offset": "+0100"
+   },
+   "headline": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+   "lines": 50,
+   "name": "tombstone_00",
+   "pid": 812,
+   "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+   "record": "log:1#1",
+   "sections": [
+    [
+     "header",
+     1,
+     11
+    ],
+    [
+     "registers",
+     12,
+     4
+    ],
+    [
+     "backtrace",
+     16,
+     7
+    ],
+    [
+     "memory",
+     23,
+     7
+    ],
+    [
+     "memory_map",
+     30,
+     5
+    ],
+    [
+     "threads",
+     35,
+     9
+    ],
+    [
+     "open_files",
+     44,
+     4
+    ],
+    [
+     "log",
+     48,
+     3
+    ]
+   ],
+   "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "summary": [
+    "Native crash in /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\") at 2026-01-01 00:00:05.123",
+    "signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000010",
+    "Cause: null pointer dereference",
+    "backtrace:",
+    "  #00 libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48)",
+    "  #01 libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112)",
+    "  #02 libbinder_ndk.so (AIBinder_Class_onTransact+92)",
+    "  #03 libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256)",
+    "  #04 libc.so (__start_thread+64)",
+    "other threads: 1"
+   ],
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100",
+   "type": "tombstone"
+  }
+ ],
+ "records": [
+  {
+   "attrs": {
+    "art": 1
+   },
+   "cite": "log:1#1",
+   "level": "F",
+   "msg": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:1]",
+   "pid": 812,
+   "seg": 1,
+   "tag": "tombstone",
+   "template": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:<*>]",
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "tombstone",
+   "id": 1,
+   "lines": 50,
+   "meta": {},
+   "name": "tombstone_00",
+   "range": [
+    "2026-01-01 00:00:05.123",
+    "2026-01-01 00:00:05.123"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

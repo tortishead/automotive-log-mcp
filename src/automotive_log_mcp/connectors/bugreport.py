@@ -11,9 +11,13 @@ next section) are handled by command:
 - ``SYSTEM PROPERTIES`` gives the fingerprint (if the header had none) and the time zone.
 - ``PROCESSES ...`` / ``ps`` sections give the process list.
 - ``UPTIME`` gives the uptime when the header has none.
+- ``VM TRACES AT LAST ANR``, ``TOMBSTONE ...`` and ``DROPBOX ...`` (``dumpsys dropbox -p``)
+  sections go to the artifact parsers (``anr``, ``tombstone``, ``dropbox``).
+- ``BINDER TRANSACTIONS`` gives outgoing binder calls at capture time (``ContainerContext.facts``),
+  used for the binder peer of an ANR.
 
-Other sections are skipped in M1. Tombstones, ANR traces and dropbox entries are handed to
-artifact parsers in M2.
+Section headers that name a dumped file (``(path: mtime)``) give the source metadata
+``section_file``/``section_time``. Other sections are not indexed; the import notes how many.
 """
 
 from __future__ import annotations
@@ -23,74 +27,12 @@ from collections.abc import Iterator
 from typing import Any
 
 from ..core.timeparse import NS, wall_ns
-from ..model import ProcessInfo
+from .artifacts import dumpstate_section as ds
 from .base import ContainerContext, Member, head_lines, iter_text_lines
 
 DUMPSTATE = re.compile(r"== dumpstate: (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)")
-SECTION = re.compile(r"------ (.*?)(?: \((.*)\))? ------$")
-SECTION_END = re.compile(r"------ [\d.]+s was the duration of '(.*)' ------$")
-PROP = re.compile(r"\[([^\]]+)\]: \[(.*)\]$")
-UPTIME_WORDS = re.compile(
-    r"up (\d+) weeks?, (\d+) days?, (\d+) hours?, (\d+) minutes?(?:, (\d+) seconds?)?", re.IGNORECASE
-)
-UPTIME_TOYBOX = re.compile(r"up (?:(\d+) days?,\s+)?(?:(\d+):(\d\d)|(\d+) min)", re.IGNORECASE)
-LOGCAT_BUFFER = re.compile(r"-b\s+(\w+)")
-
-KEEP_PROPS = (
-    "ro.build.fingerprint",
-    "ro.product.model",
-    "ro.product.device",
-    "ro.build.version.release",
-    "ro.build.version.sdk",
-    "ro.build.type",
-    "persist.sys.timezone",
-)
-
-
-def _uptime_seconds(line: str) -> int | None:
-    m = UPTIME_WORDS.search(line)
-    if m:
-        w, dd, hh, mm, ss = (int(x) if x else 0 for x in m.groups())
-        return (((w * 7 + dd) * 24 + hh) * 60 + mm) * 60 + ss
-    m = UPTIME_TOYBOX.search(line)
-    if m:
-        d, h, mi, only_min = m.groups()
-        days = int(d) if d else 0
-        if only_min:
-            return days * 86400 + int(only_min) * 60
-        return days * 86400 + int(h) * 3600 + int(mi) * 60
-    return None
-
-
-def _parse_ps(lines: list[str]) -> list[ProcessInfo]:
-    """Parse ``ps`` output by its header (``USER PID [TID] PPID ... NAME|CMD``)."""
-    out: list[ProcessInfo] = []
-    header: list[str] | None = None
-    for line in lines:
-        if not line.strip():
-            continue
-        cols = line.split()
-        if header is None:
-            if "PID" in cols:
-                header = cols
-            continue
-        if len(cols) < len(header):
-            continue
-        # The last column (NAME/CMD) may contain spaces.
-        row = line.split(None, len(header) - 1)
-        rec = dict(zip(header, row, strict=False))
-        try:
-            pid = int(rec["PID"])
-        except (KeyError, ValueError):
-            continue
-        name = row[-1].strip()
-
-        def num(key: str, rec: dict[str, str] = rec) -> int | None:
-            v = rec.get(key)
-            return int(v) if v is not None and v.isdigit() else None
-
-        out.append(ProcessInfo(pid=pid, name=name, tid=num("TID"), ppid=num("PPID"), user=rec.get("USER")))
-    return out
+SECTION = ds.SECTION
+SECTION_END = ds.SECTION_END
 
 
 class BugreportContainer:
@@ -131,7 +73,7 @@ class BugreportContainer:
             elif line.startswith("Kernel:"):
                 meta["kernel"] = line.split(":", 1)[1].strip()
             elif line.startswith("Uptime:"):
-                up = _uptime_seconds(line)
+                up = ds.uptime_seconds(line)
                 if up is not None:
                     meta["uptime_s"] = up
             elif line.startswith("Bugreport format version:"):
@@ -140,26 +82,27 @@ class BugreportContainer:
 
         skipped: list[str] = []
         while header_line is not None:
-            m = SECTION.match(header_line)
-            assert m is not None
-            title, command = m.group(1), m.group(2) or ""
+            h = ds.header(header_line)
+            assert h is not None
             state: dict[str, Any] = {"next": None}
-            body = self._section(lines, title, state)
-            sub = self._member_for(member, title, command, body, ctx)
+            body = self._section(lines, h.title, state)
+            sub = self._member_for(member, h, body, ctx)
             if sub is not None:
                 yield sub
-            elif title.startswith("PROCESSES") or command.startswith("ps "):
-                ctx.processes.extend(_parse_ps(list(body)))
-            elif title == "SYSTEM PROPERTIES" or command == "getprop":
-                self._props(body, meta)
-            elif title == "UPTIME":
+            elif ds.is_processes(h):
+                ctx.processes.extend(ds.parse_ps(body))
+            elif ds.is_properties(h):
+                ds.parse_props(body, meta)
+            elif ds.is_binder_transactions(h):
+                ctx.facts.setdefault("binder_outgoing", []).extend(ds.parse_binder_transactions(body))
+            elif h.title == "UPTIME":
                 for line in body:
-                    up = _uptime_seconds(line)
+                    up = ds.uptime_seconds(line)
                     if up is not None and "uptime_s" not in meta:
                         meta["uptime_s"] = up
                         self._boot_estimate(meta)
             else:
-                skipped.append(title)
+                skipped.append(h.title)
             for _ in body:  # drain whatever the consumer left
                 pass
             header_line = state["next"]
@@ -195,41 +138,19 @@ class BugreportContainer:
 
     @staticmethod
     def _member_for(
-        parent: Member, title: str, command: str, body: Iterator[str], ctx: ContainerContext
+        parent: Member, h: ds.Header, body: Iterator[str], ctx: ContainerContext
     ) -> Member | None:
-        cmd = command.strip()
-        fmt: str | None = None
-        stream: str | None = None
-        if cmd.startswith("logcat"):
-            fmt = "logcat"
-            buffers = LOGCAT_BUFFER.findall(cmd)
-            if len(buffers) == 1 and buffers[0] != "all":
-                stream = buffers[0]
-            elif title == "SYSTEM LOG":
-                stream = "main"
-        elif cmd.startswith("dmesg") or title in ("KERNEL LOG", "LAST KMSG") or "kmsg" in cmd:
-            fmt = "kernel"
-            stream = "last_kmsg" if title == "LAST KMSG" else "kernel"
-        if fmt is None:
+        target = ds.format_for(h)
+        if target is None:
             return None
+        fmt, stream = target
         return Member(
-            name=f"{parent.name}#{title}",
+            name=f"{parent.name}#{h.title}",
             lines=body,
             format=fmt,
             stream=stream,
+            meta=h.meta(),
             ref_year=ctx.ref_year,
             ref_month=ctx.ref_month,
             optional=False,
         )
-
-    @staticmethod
-    def _props(body: Iterator[str], meta: dict[str, Any]) -> None:
-        props = meta.setdefault("props", {})
-        for line in body:
-            m = PROP.match(line)
-            if m and m.group(1) in KEEP_PROPS:
-                props[m.group(1)] = m.group(2)
-        if "fingerprint" not in meta and "ro.build.fingerprint" in props:
-            meta["fingerprint"] = props["ro.build.fingerprint"]
-        if "persist.sys.timezone" in props:
-            meta["timezone"] = props["persist.sys.timezone"]

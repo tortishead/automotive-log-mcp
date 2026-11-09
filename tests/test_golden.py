@@ -6,6 +6,7 @@ review the diff.
 
 from __future__ import annotations
 
+import gzip
 import zipfile
 from pathlib import Path
 
@@ -30,6 +31,19 @@ def test_fixture_golden(app: App, tmp_path: Path, rel: str) -> None:
     check_golden(rel.replace("/", "__"), dump_case(app, "g"))
 
 
+PROTO_TOMBSTONE = b"\x0a\x1b\x08\x84\x07\x10\x93\x07\x1a\x0bAudioStream\x00\x01\x02"  # not parsed (M5)
+WTF = """\
+Process: system_server
+Subsystem: CarService
+Build: google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys
+
+android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7
+\tat android.util.Log.wtf(Log.java:338)
+\tat com.android.car.power.CarPowerManagementService.onApPowerStateChange(CarPowerManagementService.java:812)
+\tat com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage(CarPowerManagementService.java:1990)
+"""
+
+
 def make_bugreport_zip(tmp_path: Path) -> Path:
     src = next((FIXTURES / "bugreport").glob("bugreport-*.txt"))
     zpath = tmp_path / (src.stem + ".zip")
@@ -37,10 +51,18 @@ def make_bugreport_zip(tmp_path: Path) -> Path:
         zf.writestr(zipfile.ZipInfo("version.txt", (2026, 1, 1, 0, 10, 0)), "2.0")
         zf.writestr(zipfile.ZipInfo("main_entry.txt", (2026, 1, 1, 0, 10, 0)), src.name)
         zf.write(src, src.name)
+        when = (2026, 1, 1, 0, 10, 0)
+        for name in ("tombstone_00", "tombstone_01"):
+            zf.write(FIXTURES / "tombstone" / name, f"FS/data/tombstones/{name}")
+        zf.writestr(zipfile.ZipInfo("FS/data/tombstones/tombstone_01.pb", when), PROTO_TOMBSTONE)
+        # Dropbox: the crash of com.example.hvac (also in the crash buffer), compressed as on a
+        # device, and a wtf from system_server. Times in the names are UTC (device: Europe/Berlin).
+        crash = (FIXTURES / "dropbox" / "data_app_crash@1767222001000.txt").read_bytes()
         zf.writestr(
-            zipfile.ZipInfo("FS/data/tombstones/tombstone_00", (2026, 1, 1, 0, 10, 0)),
-            "*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***\n",
+            zipfile.ZipInfo("FS/data/system/dropbox/data_app_crash@1767222001000.txt.gz", when),
+            gzip.compress(crash, mtime=0),
         )
+        zf.writestr(zipfile.ZipInfo("FS/data/system/dropbox/system_server_wtf@1767222200000.txt", when), WTF)
         zf.writestr(
             zipfile.ZipInfo("FS/data/misc/logd/logcat.01", (2026, 1, 1, 0, 10, 0)),
             "12-31 23:50:00.000  1000  1100 I PersistLog: older line\n",
@@ -52,5 +74,5 @@ def test_bugreport_zip_golden(app: App, tmp_path: Path) -> None:
     zpath = make_bugreport_zip(tmp_path)
     result = app.ingestor.add(app.config.case_db("br"), str(zpath))
     f = result.files[0]
-    assert any("tombstone_00" in n and "unknown format" in n for n in f.notes)
+    assert any("tombstone_01.pb" in n and "unknown format" in n for n in f.notes)
     check_golden("bugreport_zip", dump_case(app, "br"))

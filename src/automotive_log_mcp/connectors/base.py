@@ -25,7 +25,7 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any, BinaryIO, Protocol, runtime_checkable
 
-from ..model import ProcessInfo, RawRecord, StreamMarker
+from ..model import ProcessInfo, RawArtifact, RawRecord, StreamMarker
 
 SNIFF_BYTES = 64 * 1024
 MIN_SCORE = 0.5
@@ -48,7 +48,8 @@ class SourceContext:
     options: dict[str, Any] = field(default_factory=dict)
 
 
-ParseItem = RawRecord | StreamMarker
+# A connector yields records, stream switches and artifacts (tombstones, ANR traces, ...).
+ParseItem = RawRecord | StreamMarker | RawArtifact
 
 
 @runtime_checkable
@@ -123,7 +124,9 @@ class ContainerContext:
     """Shared state of one container expansion.
 
     A container fills ``meta`` (applied to every source from this file, also from sections that
-    come later in the file, e.g. properties after logs) and ``processes``.
+    come later in the file, e.g. properties after logs, and to sources from later members of the
+    enclosing archive), ``processes`` and ``facts``: data that completes artifacts at the end of
+    the import but is not source metadata (e.g. ``binder_outgoing``, outgoing binder calls).
     """
 
     name: str
@@ -133,6 +136,7 @@ class ContainerContext:
     meta: dict[str, Any] = field(default_factory=dict)
     processes: list[ProcessInfo] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    facts: dict[str, list[Any]] = field(default_factory=dict)
 
 
 @runtime_checkable
@@ -226,6 +230,7 @@ def load_entry_points(registry: Registry) -> None:
 def build_registry(rule_dirs: Iterable[Path] = (), allow_code_connectors: bool = False) -> Registry:
     """Built-in connectors, then YAML connectors, then (if allowed) entry points."""
     from . import archive, bugreport, kernel, logcat, regex_yaml
+    from .artifacts import anr, dropbox, tombstone
 
     reg = Registry()
     for plugin in (
@@ -233,6 +238,9 @@ def build_registry(rule_dirs: Iterable[Path] = (), allow_code_connectors: bool =
         bugreport.BugreportContainer(),
         logcat.LogcatConnector(),
         kernel.KernelConnector(),
+        tombstone.TombstoneConnector(),
+        anr.AnrConnector(),
+        dropbox.DropboxConnector(),
     ):
         reg.add(plugin)
     regex_yaml.load_dirs(reg, [regex_yaml.BUILTIN_DIR, *rule_dirs])

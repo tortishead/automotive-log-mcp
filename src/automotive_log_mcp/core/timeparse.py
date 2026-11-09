@@ -93,3 +93,14 @@ def ts_raw_of(ts_raw: str | None, ts: int | None, ts_src: int | None, ts_format:
     fmt, field = TS_FORMATS[ts_format]
     value = ts if field == "ts" else (ts_src if ts_src is not None else ts)
     return fmt(value) if value is not None else None
+
+
+def fmt_wall(ns: int, digits: int = 3) -> str:
+    """'YYYY-MM-DD hh:mm:ss.fff' for a wall-clock ns value (as written, no zone)."""
+    secs, frac = divmod(ns, NS)
+    days, rem = divmod(secs, 86400)
+    d = _dt.date(1970, 1, 1) + _dt.timedelta(days=days)
+    out = f"{d.isoformat()} {rem // 3600:02d}:{rem // 60 % 60:02d}:{rem % 60:02d}"
+    if digits:
+        out += "." + f"{frac:09d}"[:digits]
+    return out

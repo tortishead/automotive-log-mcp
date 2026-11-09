@@ -1,0 +1,122 @@
+{
+ "artifacts": [
+  {
+   "cite": "art:1",
+   "fields": {
+    "causes": [
+     "java.lang.reflect.InvocationTargetException",
+     "java.lang.NullPointerException"
+    ],
+    "dropbox_header": {
+     "Build": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "Dropped-Count": "0",
+     "Flags": "0x38c8be44",
+     "Foreground": "Yes",
+     "Loading-Progress": "1.0",
+     "PID": "1234",
+     "Package": "com.example.hvac v12 (1.2)",
+     "Process": "com.example.hvac",
+     "Process-Runtime": "4012",
+     "UID": "10042"
+    },
+    "dropbox_tag": "data_app_crash",
+    "epoch_ms": 1767222001000,
+    "exception": {
+     "class": "java.lang.IllegalStateException",
+     "message": "Could not execute method for android:onClick"
+    },
+    "frames": [
+     "androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)",
+     "android.view.View.performClick(View.java:7448)",
+     "android.view.View.performClickInternal(View.java:7425)"
+    ],
+    "root_cause": {
+     "class": "java.lang.NullPointerException",
+     "message": "boom"
+    },
+    "root_frames": [
+     "com.example.hvac.Controller.update(Controller.java:42)",
+     "com.example.hvac.MainActivity.onFanClicked(MainActivity.java:88)"
+    ],
+    "ts_zone": "UTC"
+   },
+   "headline": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "lines": 23,
+   "name": "<EMAIL:f13bc729>",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:1#1",
+   "sections": [
+    [
+     "dropbox_header",
+     1,
+     11
+    ],
+    [
+     "exception",
+     12,
+     12
+    ]
+   ],
+   "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update < com.example.hvac.MainActivity.onFanClicked",
+   "summary": [
+    "Java crash in com.example.hvac (pid 1234) at 2025-12-31 23:00:01.000",
+    "java.lang.IllegalStateException: Could not execute method for android:onClick",
+    "  at androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)",
+    "  at android.view.View.performClick(View.java:7448)",
+    "  at android.view.View.performClickInternal(View.java:7425)",
+    "Caused by: java.lang.NullPointerException: boom (root cause)",
+    "  at com.example.hvac.Controller.update(Controller.java:42)",
+    "  at com.example.hvac.MainActivity.onFanClicked(MainActivity.java:88)"
+   ],
+   "ts": "2025-12-31 23:00:01.000",
+   "ts_raw": "2025-12-31 23:00:01.000",
+   "type": "java_crash"
+  }
+ ],
+ "records": [
+  {
+   "attrs": {
+    "art": 1
+   },
+   "cite": "log:1#1",
+   "level": "F",
+   "msg": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42) [art:1]",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "java_crash",
+   "template": "Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>) [art:<*>]",
+   "ts": "2025-12-31 23:00:01.000",
+   "ts_raw": "2025-12-31 23:00:01.000"
+  }
+ ],
+ "segments": [
+  [
+   1,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ]
+ ],
+ "sources": [
+  {
+   "fingerprint": null,
+   "format": "dropbox",
+   "id": 1,
+   "lines": 23,
+   "meta": {},
+   "name": "data_app_crash@1767222001000.txt",
+   "range": [
+    "2025-12-31 23:00:01.000",
+    "2025-12-31 23:00:01.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  }
+ ]
+}

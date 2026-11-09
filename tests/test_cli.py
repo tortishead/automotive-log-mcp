@@ -28,8 +28,9 @@ def test_index_query_sources(
     z = make_bugreport_zip(tmp_path)
     code, out, err = run(capsys, "index", "T-1", str(z))
     assert code == 0, err
-    assert "sources 1, 2, 3, 4, 5, 6" in out and "lines/s" in out
-    assert "note:" in out and "tombstone_00" in out
+    # The zip's main entry (the bugreport text) is read first: its sources get the first ids.
+    assert "sources 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12\n" in out and "lines/s" in out
+    assert "note:" in out and "tombstone_01.pb" in out
     assert "hashing" in err  # progress on stderr
 
     code, out, _ = run(capsys, "index", "T-1", str(z), "-q")
@@ -40,16 +41,16 @@ def test_index_query_sources(
 
     code, out, _ = run(capsys, "query", "T-1", "--search", "NullPointerException")
     assert code == 0
-    assert out.splitlines()[0].startswith("log:4#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL")
+    assert out.splitlines()[0].startswith("log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL")
 
     code, out, _ = run(capsys, "query", "T-1", "--level", "E", "--count")
-    assert out.strip() == "3"
+    assert out.strip() == "8"  # 3 log lines + the records of 5 artifacts (ANR E, crashes F)
     code, out, _ = run(capsys, "query", "T-1", "--tag", "Hvac*", "--limit", "1")
     assert out.splitlines()[1].startswith("… 1 more")
     code, out, _ = run(capsys, "query", "T-1", "--regex", r"status=\w+_AVAIL")
-    assert "log:2#2" in out
+    assert "log:1#2" in out
     code, out, _ = run(capsys, "query", "T-1", "--search", "3c:5a:b4:01:02:03")  # raw value -> token
-    assert "log:6#3" in out and "<MAC:" in out
+    assert "log:5#3" in out and "<MAC:" in out
     code, out, _ = run(capsys, "query", "T-1", "--search", "nothing_like_this")
     assert "No matches." in out
 

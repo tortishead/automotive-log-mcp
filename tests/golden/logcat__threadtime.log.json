@@ -1,4 +1,85 @@
 {
+ "artifacts": [
+  {
+   "cite": "art:1",
+   "fields": {
+    "causes": [
+     "java.lang.IllegalStateException"
+    ],
+    "exception": {
+     "class": "java.lang.NullPointerException",
+     "message": "Attempt to read from null"
+    },
+    "frames": [
+     "com.example.hvac.Controller.update(Controller.java:42)"
+    ],
+    "origin": "logcat",
+    "root_cause": {
+     "class": "java.lang.IllegalStateException",
+     "message": "not bound"
+    },
+    "root_frames": [],
+    "thread": "main"
+   },
+   "headline": "Java crash in com.example.hvac (pid 1234, thread main): java.lang.IllegalStateException: not bound",
+   "lines": 6,
+   "name": "threadtime.log:main",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:1#4",
+   "sections": [
+    [
+     "header",
+     1,
+     2
+    ],
+    [
+     "exception",
+     3,
+     4
+    ]
+   ],
+   "signature": "java.lang.IllegalStateException com.example.hvac: com.example.hvac.Controller.update",
+   "summary": [
+    "Java crash in com.example.hvac (pid 1234, thread main) at 2026-01-01 00:00:01.000",
+    "java.lang.NullPointerException: Attempt to read from null",
+    "  at com.example.hvac.Controller.update(Controller.java:42)",
+    "Caused by: java.lang.IllegalStateException: not bound"
+   ],
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
+  },
+  {
+   "cite": "art:2",
+   "fields": {
+    "origin": "logcat",
+    "process_from": "process list",
+    "thread": "main"
+   },
+   "headline": "Java crash in unknown process (pid 1234, thread main)",
+   "lines": 1,
+   "name": "threadtime.log:crash",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:3#1",
+   "sections": [
+    [
+     "header",
+     1,
+     1
+    ]
+   ],
+   "signature": "java_crash com.example.hvac",
+   "summary": [
+    "Java crash in com.example.hvac (pid 1234, thread main) at 2026-01-01 00:00:01.000",
+    "(no stack trace found)"
+   ],
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
+  }
+ ],
  "records": [
   {
    "cite": "log:1#1",
@@ -37,6 +118,9 @@
    "ts_raw": "12-31 23:59:59.413"
   },
   {
+   "attrs": {
+    "art": 1
+   },
    "cite": "log:1#4",
    "level": "E",
    "msg": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: 1234\njava.lang.NullPointerException: Attempt to read from null\n\tat com.example.hvac.Controller.update(Controller.java:42)\nCaused by: java.lang.IllegalStateException: not bound\n\t... 3 more",
@@ -163,6 +247,9 @@
    "ts_raw": "01-01 00:00:02.600"
   },
   {
+   "attrs": {
+    "art": 2
+   },
    "cite": "log:3#1",
    "level": "E",
    "msg": "FATAL EXCEPTION: main",

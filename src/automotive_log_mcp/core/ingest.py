@@ -7,6 +7,12 @@ is already in the case is a no-op that returns the existing sources; ``force`` r
 Redaction runs before templating, so no raw value reaches ``records`` or ``templates`` (D5).
 Unparseable lines become records with ``level=None`` and the raw (redacted) text.
 
+Artifacts (tombstones, ANR traces, Java crashes, dropbox entries) get their record on the
+timeline while their member is parsed: a synthetic record ``<headline> [art:<id>]`` in the current
+source, or the record they were parsed from (``attrs.art``). The artifact rows themselves are
+written at the end of the file, after :func:`connectors.artifacts.complete` has added what only
+the whole bugreport knows (process names, binder peers); everything they store is redacted.
+
 :class:`CaseWorkers` runs imports in one background thread per case (D10); queries use their own
 connections and see the committed prefix of a running import.
 """
@@ -26,6 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from ..config import Config
+from ..connectors import artifacts as artifact_parsers
+from ..connectors.artifacts.common import slug
 from ..connectors.base import (
     SNIFF_BYTES,
     Connector,
@@ -38,12 +46,13 @@ from ..connectors.base import (
     TextConnector,
     is_container,
 )
-from ..model import RawRecord, StreamMarker, record_id
+from ..model import RawArtifact, RawRecord, StreamMarker, record_id
 from ..policy import Policy
 from ..store import db
 from .redact import Redactor
 from .segments import SegmentTracker
 from .templates import mask
+from .timeparse import fmt_wall
 
 Progress = Callable[[str], None]
 
@@ -126,6 +135,16 @@ class _Source:
 
 
 @dataclass
+class _Art:
+    id: int
+    source_id: int
+    record_id: int
+    name: str
+    member: str | None
+    art: RawArtifact
+
+
+@dataclass
 class _Origin:
     path: Path
     sha256: str
@@ -133,8 +152,19 @@ class _Origin:
     created: list[tuple[int, dict[str, Any], list[dict[str, Any]]]] = field(default_factory=list)
     processes: list[Any] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    facts: dict[str, list[Any]] = field(default_factory=dict)
+    artifacts: list[_Art] = field(default_factory=list)
+    next_artifact: int = 1
     records: int = 0
     lines: int = 0
+
+    def add_artifact(self, art: RawArtifact, st: _Source, rid: int) -> int:
+        aid = self.next_artifact
+        self.next_artifact += 1
+        k = sum(1 for a in self.artifacts if a.source_id == st.id)
+        name = st.name if k == 0 else f"{st.name}@{k + 1}"
+        self.artifacts.append(_Art(aid, st.id, rid, name, st.meta.get("_member"), art))
+        return aid
 
 
 class Ingestor:
@@ -230,6 +260,8 @@ class Ingestor:
                     conn.execute("DELETE FROM processes WHERE sha256 = ?", (sha,))
 
             origin = _Origin(path, sha, size)
+            row = conn.execute("SELECT max(id) FROM artifacts").fetchone()
+            origin.next_artifact = (row[0] or 0) + 1
             mtime = datetime.fromtimestamp(path.stat().st_mtime)
             root = Member(
                 name=path.name,
@@ -300,6 +332,7 @@ class Ingestor:
                     "UPDATE sources SET meta = ?, fingerprint = ? WHERE id = ?",
                     (db.dumps(merged), merged.get("fingerprint"), sid),
                 )
+            self._write_artifacts(conn, origin)
             if origin.processes:
                 conn.executemany(
                     "INSERT INTO processes(sha256, pid, tid, ppid, user, name) VALUES (?,?,?,?,?,?)",
@@ -308,6 +341,52 @@ class Ingestor:
                         for p in origin.processes
                     ],
                 )
+
+    def _write_artifacts(self, conn: Any, origin: _Origin) -> None:
+        """Complete, redact and write the artifacts of one file (inside the caller's transaction)."""
+        if not origin.artifacts:
+            return
+        artifact_parsers.complete([a.art for a in origin.artifacts], origin.processes, origin.facts)
+        redact = self.redactor.redact
+        rows: list[tuple[Any, ...]] = []
+        sections: list[tuple[int, int, str, int, int, str]] = []
+        for a in origin.artifacts:
+            art = a.art
+            first = 1
+            names: set[str] = set()
+            for idx, sec in enumerate(art.sections):
+                # Thread names end up in section names: redact them too (and keep them citable).
+                name = slug(redact(sec.name), 64)
+                base, n = name, 2
+                while name in names:
+                    name, n = f"{base}-{n}", n + 1
+                names.add(name)
+                text = "\n".join(redact(line) for line in sec.lines)
+                sections.append((a.id, idx, name, first, len(sec.lines), text))
+                first += len(sec.lines)
+            rows.append(
+                (
+                    a.id,
+                    a.source_id,
+                    a.record_id,
+                    art.type,
+                    redact(a.name),
+                    str(origin.path),
+                    origin.sha256,
+                    a.member,
+                    art.ts,
+                    art.ts_raw,
+                    art.pid,
+                    art.tid,
+                    redact(art.process) if art.process else None,
+                    redact(art.signature) if art.signature else None,
+                    redact(art.headline),
+                    "\n".join(redact(line) for line in art.summary.split("\n")),
+                    db.dumps(self._redact_value(art.fields)),
+                    first - 1,
+                )
+            )
+        db.insert_artifacts(conn, rows, sections)
 
     def _redact_value(self, value: Any) -> Any:
         if isinstance(value, str):
@@ -374,6 +453,13 @@ class Ingestor:
                 self._process(conn, writer, origin, sub, [*chain, cctx.meta])
             origin.processes.extend(cctx.processes)
             origin.notes.extend(cctx.notes)
+            for key, values in cctx.facts.items():
+                origin.facts.setdefault(key, []).extend(values)
+            if chain:
+                # What a nested container learned (a bugreport in its zip: fingerprint, time zone)
+                # applies to the members of the enclosing archive read after it.
+                for key, value in cctx.meta.items():
+                    chain[-1].setdefault(key, value)
             return
         assert isinstance(plugin, Connector)
         self._parse(conn, writer, origin, member, plugin, chain, filename)
@@ -396,8 +482,10 @@ class Ingestor:
             filename=filename,
             ref_year=member.ref_year or datetime.now().year,
             ref_month=member.ref_month or 12,
-            meta={k: v for k, v in container_meta.items() if k in ("boot_time_ns",)},
+            meta={k: v for k, v in container_meta.items() if k in ("boot_time_ns", "timezone")},
         )
+        # A section that dumps a file (bugreport 'path: mtime' header): source metadata.
+        ctx.meta.update({k: v for k, v in member.meta.items() if k.startswith("section_")})
         sources: dict[str | None, _Source] = {}
         version = getattr(connector, "version", "1")
 
@@ -465,7 +553,7 @@ class Ingestor:
                     raise IngestError(f"{member.name}: connector {connector.name} cannot read text sections")
                 items = connector.parse_lines(member.lines, ctx)
                 try:
-                    self._consume(items, get, member.stream, writer)
+                    self._consume(items, get, member.stream, writer, origin.add_artifact)
                 finally:
                     _close(items)
             else:
@@ -473,7 +561,7 @@ class Ingestor:
                 with member.open() as stream:
                     items = connector.parse(stream, ctx)
                     try:
-                        self._consume(items, get, member.stream, writer)
+                        self._consume(items, get, member.stream, writer, origin.add_artifact)
                     finally:
                         _close(items)  # before the stream closes
             if not sources:
@@ -515,10 +603,11 @@ class Ingestor:
 
     def _consume(
         self,
-        items: Iterator[RawRecord | StreamMarker],
+        items: Iterator[RawRecord | StreamMarker | RawArtifact],
         get: Callable[[str | None], _Source],
         default_stream: str | None,
         writer: db.BatchWriter,
+        add_artifact: Callable[[RawArtifact, _Source, int], int],
     ) -> None:
         redact = self.redactor.redact
         redact_tag = self.redactor.redact_cached
@@ -528,10 +617,27 @@ class Ingestor:
         dumps = db.dumps
         cur: _Source | None = None  # created on the first record, so a leading marker leaves no empty source
         for item in items:
-            if type(item) is StreamMarker:
-                cur = get(item.stream)
+            kind = type(item)
+            if kind is StreamMarker:
+                cur = get(item.stream)  # type: ignore[union-attr]
                 continue
-            rec: RawRecord = item  # type: ignore[assignment]
+            art: RawArtifact | None = None
+            if kind is RawArtifact:
+                art = item  # type: ignore[assignment]
+                assert art is not None
+                rec = RawRecord(
+                    msg="",
+                    ts=art.ts,
+                    ts_src=art.ts,
+                    ts_raw=art.ts_raw or (fmt_wall(art.ts) if art.ts is not None else None),
+                    level=art.level,
+                    tag=art.type,
+                    pid=art.pid,
+                    tid=art.tid,
+                    lines=max(art.consumed, 1),
+                )
+            else:
+                rec = item  # type: ignore[assignment]
             if rec.stream is not None:
                 st = get(rec.stream)
             else:
@@ -540,6 +646,13 @@ class Ingestor:
                 st = cur
             st.seq += 1
             seq = st.seq
+            if art is not None:
+                aid = add_artifact(art, st, record_id(st.id, seq))
+                rec.msg = f"{art.headline} [art:{aid}]"
+                rec.attrs = {"art": aid}
+            elif rec.artifact is not None:
+                aid = add_artifact(rec.artifact, st, record_id(st.id, seq))
+                rec.attrs = {**(rec.attrs or {}), "art": aid}
             msg = redact(rec.msg)
             tag = rec.tag
             tag_id = None

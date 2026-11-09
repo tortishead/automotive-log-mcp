@@ -1,0 +1,23 @@
+Process: com.example.hvac
+PID: 1234
+UID: 10042
+Flags: 0x38c8be44
+Package: com.example.hvac v12 (1.2)
+Foreground: Yes
+Process-Runtime: 4012
+Build: google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys
+Loading-Progress: 1.0
+Dropped-Count: 0
+
+java.lang.IllegalStateException: Could not execute method for android:onClick
+	at androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)
+	at android.view.View.performClick(View.java:7448)
+	at android.view.View.performClickInternal(View.java:7425)
+Caused by: java.lang.reflect.InvocationTargetException
+	at java.lang.reflect.Method.invoke(Native Method)
+	at androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:412)
+	... 3 more
+Caused by: java.lang.NullPointerException: boom
+	at com.example.hvac.Controller.update(Controller.java:42)
+	at com.example.hvac.MainActivity.onFanClicked(MainActivity.java:88)
+	... 5 more

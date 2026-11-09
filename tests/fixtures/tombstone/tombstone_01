@@ -1,0 +1,24 @@
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+Build fingerprint: 'google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys'
+Revision: '0'
+ABI: 'x86_64'
+Timestamp: 2026-01-01 00:02:30.250000000+0100
+Process uptime: 440s
+Cmdline: /vendor/bin/hw/vendor.example.audio-service
+pid: 900, tid: 915, name: AudioStream  >>> /vendor/bin/hw/vendor.example.audio-service <<<
+uid: 1041
+signal 6 (SIGABRT), code -1 (SI_QUEUE), fault addr --------
+Abort message: 'Check failed: stream != nullptr (vehicle WVWZZZ1JZXW000001, zone 2) '
+    rax 0000000000000000  rbx 0000000000000384  rcx 00007f11aa0ee4c8  rdx 0000000000000006
+    rip 00007f11aa0ee4c8  rbp 00007f11a9e3e0a0  rsp 00007f11a9e3e068  eflags 0000000000000246
+
+backtrace:
+      #00 pc 00000000000ee4c8  /apex/com.android.runtime/lib64/bionic/libc.so (abort+164) (BuildId: 5e6f7a8b)
+      #01 pc 0000000000017a2c  /system/lib64/libbase.so (android::base::DefaultAborter(char const*)+12) (BuildId: 77665544)
+      #02 pc 0000000000018b40  /system/lib64/libbase.so (android::base::LogMessage::~LogMessage()+352) (BuildId: 77665544)
+      #03 pc 0000000000031c08  /vendor/lib64/libaudiohal_example.so (AudioStream::open(int)+120) (BuildId: 3344aabb)
+      #04 pc 0000000000030a10  /vendor/lib64/libaudiohal_example.so (AudioHal::startZone(int)+40) (BuildId: 3344aabb)
+      #05 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 5e6f7a8b)
+
+memory map (1 entry):
+    00007f11aa000000-00007f11aa0fffff r-x         0    100000  /apex/com.android.runtime/lib64/bionic/libc.so (BuildId: 5e6f7a8b)

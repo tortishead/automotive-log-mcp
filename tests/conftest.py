@@ -101,6 +101,38 @@ def dump_case(app: App, case: str) -> dict[str, Any]:
                 "SELECT source_id, seg, reason, first_seq, last_seq, count FROM segments ORDER BY 1, 2"
             )
         ]
+        arts = [
+            {
+                "cite": f"art:{aid}",
+                "type": typ,
+                "name": name,
+                "member": member,
+                "record": f"log:{rid >> 40}#{rid & ((1 << 40) - 1)}",
+                "ts": query.fmt_ns(ts),
+                "ts_raw": ts_raw,
+                "pid": pid,
+                "tid": tid,
+                "process": process,
+                "signature": sig,
+                "headline": headline,
+                "summary": summary.split("\n"),
+                "fields": json.loads(fields) if fields else None,
+                "lines": lines,
+                "sections": [
+                    list(row)
+                    for row in conn.execute(
+                        "SELECT name, first_line, lines FROM artifact_sections WHERE artifact_id = ? ORDER BY idx",
+                        (aid,),
+                    )
+                ],
+            }
+            for aid, typ, name, member, rid, ts, ts_raw, pid, tid, process, sig, headline, summary, fields, lines in conn.execute(
+                "SELECT id, type, name, member, record_id, ts, ts_raw, pid, tid, process, signature, headline, "
+                "summary, fields, lines FROM artifacts ORDER BY id"
+            )
+        ]
+        if arts:
+            out["artifacts"] = [{k: v for k, v in a.items() if v is not None} for a in arts]
     return out
 
 

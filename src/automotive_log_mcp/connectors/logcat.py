@@ -10,16 +10,20 @@ so each buffer becomes its own source. A message logged with embedded newlines i
 logcat as several lines with the same header; such lines are merged into one record when the
 header is identical and the continuation looks like one (stack frames, ``Caused by:``, indented
 text, ...). Lines that match no format become records with ``level=None`` and the raw text.
+
+An ``AndroidRuntime`` record starting ``FATAL EXCEPTION`` (normally in the crash buffer) carries a
+``java_crash`` artifact; the record itself is the artifact's line on the timeline.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from typing import Any
 
 from ..core.timeparse import NS, YearTracker, day_ns, frac_ns
 from ..model import RawRecord, StreamMarker
+from .artifacts import java_crash
 from .base import ParseItem, SourceContext, TextConnector, head_lines
 
 _LVL = "VDIWEFAS"
@@ -51,6 +55,7 @@ CONTINUATION = re.compile(
 )
 
 BOOT_TAGS = frozenset({"boot_progress_start"})
+FATAL_PREFIXES = ("FATAL EXCEPTION", "*** FATAL EXCEPTION")
 
 
 class _Clock:
@@ -122,6 +127,21 @@ class LogcatConnector(TextConnector):
         return min(score, 0.95)
 
     def parse_lines(self, lines: Iterator[str], ctx: SourceContext) -> Iterator[ParseItem]:
+        """Records, with a ``java_crash`` artifact attached to each ``FATAL EXCEPTION`` record."""
+        items = self._parse(lines, ctx)
+        try:
+            for item in items:
+                if (
+                    type(item) is RawRecord
+                    and item.tag == "AndroidRuntime"
+                    and item.msg.startswith(FATAL_PREFIXES)
+                ):
+                    item.artifact = java_crash.from_record(item)
+                yield item
+        finally:
+            items.close()
+
+    def _parse(self, lines: Iterator[str], ctx: SourceContext) -> Generator[ParseItem, None, None]:
         clock = _Clock(ctx)
         pending: RawRecord | None = None
         pending_key = ""

@@ -1,0 +1,48 @@
+Subject: Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent)
+
+----- pid 2345 at 2026-01-01 00:04:10.500123456+0100 -----
+Cmd line: com.example.media
+Build fingerprint: 'google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys'
+ABI: 'x86_64'
+Build type: optimized
+
+DALVIK THREADS (3):
+"main" prio=5 tid=1 Blocked
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x72a0b8a0 self=0x7b5e0c0000
+  | sysTid=2345 nice=-10 cgrp=top-app sched=0/0 handle=0x7b5f2a54f8
+  | state=S schedstat=( 812345678 123456789 900 ) utm=60 stm=21 core=2 HZ=100
+  at com.example.media.Library.currentTrack(Library.java:118)
+  - waiting to lock <0x0e3f5a21> (a com.example.media.Library) held by thread 15
+  at com.example.media.PlayerActivity.onTouch(PlayerActivity.java:77)
+  at android.view.View.dispatchTouchEvent(View.java:15050)
+
+"Signal Catcher" daemon prio=10 tid=4 Runnable
+  | group="system" sCount=0 ucsCount=0 flags=0 obj=0x12c80258 self=0x7b5e0c3800
+  | sysTid=2351 nice=-20 cgrp=top-app sched=0/0 handle=0x7a1f2e7cb0
+  native: #00 pc 00000000004c1f18  /apex/com.android.art/lib64/libart.so (art::DumpNativeStack(std::ostream&, int)+120) (BuildId: aa11bb22)
+  (no managed stack frames)
+
+"MediaScanner" prio=5 tid=15 Sleeping
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x12c81000 self=0x7b5e0d1000
+  | sysTid=2370 nice=0 cgrp=top-app sched=0/0 handle=0x7a0e1ffcb0
+  at java.lang.Thread.sleep(Native method)
+  - sleeping on <0x07c1d2e3> (a java.lang.Object)
+  at java.lang.Thread.sleep(Thread.java:450)
+  at com.example.media.Library.rescan(Library.java:201)
+  - locked <0x0e3f5a21> (a com.example.media.Library)
+  at com.example.media.Scanner.run(Scanner.java:55)
+
+----- end 2345 -----
+
+----- pid 812 at 2026-01-01 00:04:10.620000000+0100 -----
+Cmd line: /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service
+ABI: 'x86_64'
+
+"android.hardwar" sysTid=812
+    #00 pc 00000000000a1f40  /apex/com.android.runtime/lib64/bionic/libc.so (__epoll_pwait+8) (BuildId: 5e6f7a8b)
+    #01 pc 0000000000012345  /system/lib64/libutils.so (android::Looper::pollOnce(int, int*, int*, void**)+220) (BuildId: 9c9d9e9f)
+
+"VehicleHal" sysTid=830
+    #00 pc 000000000009e4f8  /apex/com.android.runtime/lib64/bionic/libc.so (__ioctl+8) (BuildId: 5e6f7a8b)
+
+----- end 812 -----

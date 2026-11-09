@@ -1,22 +1,597 @@
 {
- "records": [
+ "artifacts": [
   {
-   "cite": "log:1#1",
-   "level": "I",
-   "msg": "older line",
-   "pid": 1000,
-   "seg": 1,
-   "tag": "PersistLog",
-   "template": "older line",
-   "tid": 1100,
-   "ts": "2025-12-31 23:50:00.000",
-   "ts_raw": "12-31 23:50:00.000"
+   "cite": "art:1",
+   "fields": {
+    "causes": [],
+    "exception": {
+     "class": "java.lang.NullPointerException",
+     "message": "boom"
+    },
+    "frames": [
+     "com.example.hvac.Controller.update(Controller.java:42)"
+    ],
+    "origin": "logcat",
+    "thread": "main"
+   },
+   "headline": "Java crash in com.example.hvac (pid 1234, thread main): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "lines": 4,
+   "member": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:crash",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:3#1",
+   "sections": [
+    [
+     "header",
+     1,
+     2
+    ],
+    [
+     "exception",
+     3,
+     2
+    ]
+   ],
+   "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update",
+   "summary": [
+    "Java crash in com.example.hvac (pid 1234, thread main) at 2026-01-01 00:00:01.000",
+    "java.lang.NullPointerException: boom",
+    "  at com.example.hvac.Controller.update(Controller.java:42)"
+   ],
+   "tid": 1250,
+   "ts": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
   },
+  {
+   "cite": "art:2",
+   "fields": {
+    "binder": {
+     "interface": "android.car.hardware.property.ICarProperty",
+     "method": "setProperty",
+     "peer": {
+      "from": "BINDER TRANSACTIONS",
+      "pid": 1000,
+      "process": "system_server",
+      "tid": 1100
+     },
+     "sys_tid": 1530,
+     "thread": "RadioWorker",
+     "tid": 12
+    },
+    "lock_chain": [
+     {
+      "frames": [
+       "android.os.BinderProxy.transactNative(Native method)",
+       "android.os.BinderProxy.transact(BinderProxy.java:571)",
+       "android.car.hardware.property.ICarProperty$Stub$Proxy.setProperty(ICarProperty.java:500)",
+       "com.example.radio.Tuner.applyBand(Tuner.java:90)",
+       "com.example.radio.Tuner$Worker.run(Tuner.java:140)"
+      ],
+      "lock": "0x0a1b2c3d",
+      "lock_class": "com.example.radio.Tuner",
+      "name": "RadioWorker",
+      "native": [
+       "libc.so!__ioctl",
+       "libbinder.so!android::IPCThreadState::talkWithDriver",
+       "libbinder.so!android::IPCThreadState::waitForResponse"
+      ],
+      "state": "Native",
+      "sys_tid": 1530,
+      "tid": 12
+     }
+    ],
+    "main": {
+     "frames": [
+      "com.example.radio.Tuner.tune(Tuner.java:61)",
+      "com.example.radio.TuneReceiver.onReceive(TuneReceiver.java:25)"
+     ],
+     "name": "main",
+     "state": "Blocked",
+     "sys_tid": 1500,
+     "tid": 1,
+     "waiting": {
+      "class": "com.example.radio.Tuner",
+      "holder_tid": 12,
+      "lock": "0x0a1b2c3d"
+     }
+    },
+    "pids": {
+     "1500": "com.example.radio"
+    },
+    "subject": "Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com.example.radio/.TuneReceiver }",
+    "threads": 2,
+    "utc_offset": "+0100"
+   },
+   "headline": "ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com.example.radio/.TuneReceiver }; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"RadioWorker\" (Native), i…",
+   "lines": 28,
+   "member": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR",
+   "pid": 1500,
+   "process": "com.example.radio",
+   "record": "log:6#1",
+   "sections": [
+    [
+     "header",
+     1,
+     2
+    ],
+    [
+     "p1500",
+     3,
+     5
+    ],
+    [
+     "p1500.t1.main",
+     8,
+     7
+    ],
+    [
+     "p1500.t12.radioworker",
+     15,
+     14
+    ]
+   ],
+   "signature": "ANR Blocked com.example.radio: com.example.radio.Tuner.tune < com.example.radio.TuneReceiver.onReceive",
+   "summary": [
+    "ANR in com.example.radio (pid 1500) at 2026-01-01 00:05:00.000",
+    "Subject: Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com.example.radio/.TuneReceiver }",
+    "main thread (tid 1 \"main\" (Blocked)):",
+    "  at com.example.radio.Tuner.tune(Tuner.java:61)",
+    "  at com.example.radio.TuneReceiver.onReceive(TuneReceiver.java:25)",
+    "waiting to lock <0x0a1b2c3d> (a com.example.radio.Tuner) held by tid 12 \"RadioWorker\" (Native)",
+    "  at android.os.BinderProxy.transactNative(Native method)",
+    "  at android.os.BinderProxy.transact(BinderProxy.java:571)",
+    "  at android.car.hardware.property.ICarProperty$Stub$Proxy.setProperty(ICarProperty.java:500)",
+    "  at com.example.radio.Tuner.applyBand(Tuner.java:90)",
+    "tid 12 \"RadioWorker\" is in binder call ICarProperty.setProperty -> pid 1000 (system_server)",
+    "threads in com.example.radio: 2"
+   ],
+   "ts": "2026-01-01 00:05:00.000",
+   "ts_raw": "2026-01-01 00:05:00.000000000+0100",
+   "type": "anr"
+  },
+  {
+   "cite": "art:3",
+   "fields": {
+    "causes": [],
+    "dropbox_entry": "text, 611 bytes",
+    "dropbox_header": {
+     "Flags": "0x38c8be45",
+     "Foreground": "Yes",
+     "PID": "1600",
+     "Package": "com.android.car.settings v34 (14)",
+     "Process": "com.android.car.settings"
+    },
+    "dropbox_tag": "system_app_crash",
+    "exception": {
+     "class": "java.lang.IllegalStateException",
+     "message": "Bluetooth device <MAC:abcce245> is not bonded"
+    },
+    "frames": [
+     "com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130)",
+     "androidx.preference.Preference.performClick(Preference.java:1210)"
+    ]
+   },
+   "headline": "Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130)",
+   "lines": 10,
+   "member": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#DROPBOX SYSTEM APP CRASHES",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#DROPBOX SYSTEM APP CRASHES",
+   "pid": 1600,
+   "process": "com.android.car.settings",
+   "record": "log:7#1",
+   "sections": [
+    [
+     "entry",
+     1,
+     1
+    ],
+    [
+     "dropbox_header",
+     2,
+     6
+    ],
+    [
+     "exception",
+     8,
+     3
+    ]
+   ],
+   "signature": "java.lang.IllegalStateException com.android.car.settings: com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick < androidx.preference.Preference.performClick",
+   "summary": [
+    "Java crash in com.android.car.settings (pid 1600) at 2026-01-01 00:06:00.000",
+    "java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded",
+    "  at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130)",
+    "  at androidx.preference.Preference.performClick(Preference.java:1210)"
+   ],
+   "ts": "2026-01-01 00:06:00.000",
+   "ts_raw": "2026-01-01 00:06:00",
+   "type": "java_crash"
+  },
+  {
+   "cite": "art:4",
+   "fields": {
+    "causes": [
+     "java.lang.reflect.InvocationTargetException",
+     "java.lang.NullPointerException"
+    ],
+    "dropbox_header": {
+     "Build": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "Dropped-Count": "0",
+     "Flags": "0x38c8be44",
+     "Foreground": "Yes",
+     "Loading-Progress": "1.0",
+     "PID": "1234",
+     "Package": "com.example.hvac v12 (1.2)",
+     "Process": "com.example.hvac",
+     "Process-Runtime": "4012",
+     "UID": "10042"
+    },
+    "dropbox_tag": "data_app_crash",
+    "epoch_ms": 1767222001000,
+    "exception": {
+     "class": "java.lang.IllegalStateException",
+     "message": "Could not execute method for android:onClick"
+    },
+    "frames": [
+     "androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)",
+     "android.view.View.performClick(View.java:7448)",
+     "android.view.View.performClickInternal(View.java:7425)"
+    ],
+    "root_cause": {
+     "class": "java.lang.NullPointerException",
+     "message": "boom"
+    },
+    "root_frames": [
+     "com.example.hvac.Controller.update(Controller.java:42)",
+     "com.example.hvac.MainActivity.onFanClicked(MainActivity.java:88)"
+    ],
+    "ts_zone": "Europe/Berlin"
+   },
+   "headline": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "lines": 23,
+   "member": "FS/data/system/dropbox/data_app_crash@1767222001000.txt.gz!data_app_crash@1767222001000.txt",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/system/dropbox/<EMAIL:5f27b833>!<EMAIL:f13bc729>",
+   "pid": 1234,
+   "process": "com.example.hvac",
+   "record": "log:9#1",
+   "sections": [
+    [
+     "dropbox_header",
+     1,
+     11
+    ],
+    [
+     "exception",
+     12,
+     12
+    ]
+   ],
+   "signature": "java.lang.NullPointerException com.example.hvac: com.example.hvac.Controller.update < com.example.hvac.MainActivity.onFanClicked",
+   "summary": [
+    "Java crash in com.example.hvac (pid 1234) at 2026-01-01 00:00:01.000",
+    "java.lang.IllegalStateException: Could not execute method for android:onClick",
+    "  at androidx.appcompat.app.AppCompatViewInflater$DeclaredOnClickListener.onClick(AppCompatViewInflater.java:417)",
+    "  at android.view.View.performClick(View.java:7448)",
+    "  at android.view.View.performClickInternal(View.java:7425)",
+    "Caused by: java.lang.NullPointerException: boom (root cause)",
+    "  at com.example.hvac.Controller.update(Controller.java:42)",
+    "  at com.example.hvac.MainActivity.onFanClicked(MainActivity.java:88)"
+   ],
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "2026-01-01 00:00:01.000",
+   "type": "java_crash"
+  },
+  {
+   "cite": "art:5",
+   "fields": {
+    "causes": [],
+    "dropbox_header": {
+     "Build": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "Process": "system_server",
+     "Subsystem": "CarService"
+    },
+    "dropbox_tag": "system_server_wtf",
+    "epoch_ms": 1767222200000,
+    "exception": {
+     "class": "android.util.Log$TerribleFailure",
+     "message": "Unexpected power state transition 3 -> 7"
+    },
+    "first_line": "android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+    "frames": [
+     "android.util.Log.wtf(Log.java:338)",
+     "com.android.car.power.CarPowerManagementService.onApPowerStateChange(CarPowerManagementService.java:812)",
+     "com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage(CarPowerManagementService.java:1990)"
+    ],
+    "ts_zone": "Europe/Berlin"
+   },
+   "headline": "dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+   "lines": 8,
+   "member": "FS/data/system/dropbox/system_server_wtf@1767222200000.txt",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/system/dropbox/<EMAIL:66889e16>",
+   "process": "system_server",
+   "record": "log:10#1",
+   "sections": [
+    [
+     "dropbox_header",
+     1,
+     4
+    ],
+    [
+     "body",
+     5,
+     4
+    ]
+   ],
+   "signature": "system_server_wtf android.util.Log$TerribleFailure system_server: android.util.Log.wtf < com.android.car.power.CarPowerManagementService.onApPowerStateChange < com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage",
+   "summary": [
+    "dropbox system_server_wtf from system_server at 2026-01-01 00:03:20.000",
+    "android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7",
+    "  at android.util.Log.wtf(Log.java:338)",
+    "  at com.android.car.power.CarPowerManagementService.onApPowerStateChange(CarPowerManagementService.java:812)",
+    "  at com.android.car.power.CarPowerManagementService$PowerHandler.handleMessage(CarPowerManagementService.java:1990)"
+   ],
+   "ts": "2026-01-01 00:03:20.000",
+   "ts_raw": "2026-01-01 00:03:20.000",
+   "type": "dropbox"
+  },
+  {
+   "cite": "art:6",
+   "fields": {
+    "abi": "x86_64",
+    "cause": "null pointer dereference",
+    "cmdline": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "frames": [
+     {
+      "build_id": "8f2c1d0e4b3a29171615141312111009",
+      "func": "VehicleHal::setValue(VehiclePropValue const&)",
+      "map": "/vendor/lib64/libvhal_example.so",
+      "n": 0,
+      "offset": 48,
+      "pc": "000000000004a2b0"
+     },
+     {
+      "build_id": "8f2c1d0e4b3a29171615141312111009",
+      "func": "VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)",
+      "map": "/vendor/lib64/libvhal_example.so",
+      "n": 1,
+      "offset": 112,
+      "pc": "0000000000049e10"
+     },
+     {
+      "build_id": "0a0b0c0d",
+      "func": "AIBinder_Class_onTransact",
+      "map": "/system/lib64/libbinder_ndk.so",
+      "n": 2,
+      "offset": 92,
+      "pc": "0000000000061a3c"
+     },
+     {
+      "build_id": "1a2b3c4d",
+      "func": "android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)",
+      "map": "/system/lib64/libbinder.so",
+      "n": 3,
+      "offset": 256,
+      "pc": "000000000005c2f0"
+     },
+     {
+      "build_id": "5e6f7a8b",
+      "func": "__start_thread",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 4,
+      "offset": 64,
+      "pc": "00000000000a1f40"
+     }
+    ],
+    "log_buffers": [
+     "main"
+    ],
+    "other_threads": 1,
+    "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+    "process_uptime": "290s",
+    "signal": {
+     "code": 1,
+     "code_name": "SEGV_MAPERR",
+     "fault_addr": "0x0000000000000010",
+     "name": "SIGSEGV",
+     "number": 11
+    },
+    "thread": "VehicleHal",
+    "uid": "1000",
+    "utc_offset": "+0100"
+   },
+   "headline": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+   "lines": 50,
+   "member": "FS/data/tombstones/tombstone_00",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "pid": 812,
+   "process": "/vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service",
+   "record": "log:11#1",
+   "sections": [
+    [
+     "header",
+     1,
+     11
+    ],
+    [
+     "registers",
+     12,
+     4
+    ],
+    [
+     "backtrace",
+     16,
+     7
+    ],
+    [
+     "memory",
+     23,
+     7
+    ],
+    [
+     "memory_map",
+     30,
+     5
+    ],
+    [
+     "threads",
+     35,
+     9
+    ],
+    [
+     "open_files",
+     44,
+     4
+    ],
+    [
+     "log",
+     48,
+     3
+    ]
+   ],
+   "signature": "SIGSEGV android.hardware.automotive.vehicle@V1-example-service: libvhal_example.so!VehicleHal::setValue < libvhal_example.so!VehicleHal::onSetValues < libbinder_ndk.so!AIBinder_Class_onTransact",
+   "summary": [
+    "Native crash in /vendor/bin/hw/android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\") at 2026-01-01 00:00:05.123",
+    "signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000010",
+    "Cause: null pointer dereference",
+    "backtrace:",
+    "  #00 libvhal_example.so (VehicleHal::setValue(VehiclePropValue const&)+48)",
+    "  #01 libvhal_example.so (VehicleHal::onSetValues(std::vector<VehiclePropValue> const&)+112)",
+    "  #02 libbinder_ndk.so (AIBinder_Class_onTransact+92)",
+    "  #03 libbinder.so (android::BBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)+256)",
+    "  #04 libc.so (__start_thread+64)",
+    "other threads: 1"
+   ],
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100",
+   "type": "tombstone"
+  },
+  {
+   "cite": "art:7",
+   "fields": {
+    "abi": "x86_64",
+    "abort_message": "Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ",
+    "cmdline": "/vendor/bin/hw/vendor.example.audio-service",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "frames": [
+     {
+      "build_id": "5e6f7a8b",
+      "func": "abort",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 0,
+      "offset": 164,
+      "pc": "00000000000ee4c8"
+     },
+     {
+      "build_id": "77665544",
+      "func": "android::base::DefaultAborter(char const*)",
+      "map": "/system/lib64/libbase.so",
+      "n": 1,
+      "offset": 12,
+      "pc": "0000000000017a2c"
+     },
+     {
+      "build_id": "77665544",
+      "func": "android::base::LogMessage::~LogMessage()",
+      "map": "/system/lib64/libbase.so",
+      "n": 2,
+      "offset": 352,
+      "pc": "0000000000018b40"
+     },
+     {
+      "build_id": "3344aabb",
+      "func": "AudioStream::open(int)",
+      "map": "/vendor/lib64/libaudiohal_example.so",
+      "n": 3,
+      "offset": 120,
+      "pc": "0000000000031c08"
+     },
+     {
+      "build_id": "3344aabb",
+      "func": "AudioHal::startZone(int)",
+      "map": "/vendor/lib64/libaudiohal_example.so",
+      "n": 4,
+      "offset": 40,
+      "pc": "0000000000030a10"
+     },
+     {
+      "build_id": "5e6f7a8b",
+      "func": "__start_thread",
+      "map": "/apex/com.android.runtime/lib64/bionic/libc.so",
+      "n": 5,
+      "offset": 64,
+      "pc": "00000000000a1f40"
+     }
+    ],
+    "other_threads": 0,
+    "process": "/vendor/bin/hw/vendor.example.audio-service",
+    "process_uptime": "440s",
+    "signal": {
+     "code": -1,
+     "code_name": "SI_QUEUE",
+     "name": "SIGABRT",
+     "number": 6
+    },
+    "thread": "AudioStream",
+    "uid": "1041",
+    "utc_offset": "+0100"
+   },
+   "headline": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open",
+   "lines": 24,
+   "member": "FS/data/tombstones/tombstone_01",
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_01",
+   "pid": 900,
+   "process": "/vendor/bin/hw/vendor.example.audio-service",
+   "record": "log:12#1",
+   "sections": [
+    [
+     "header",
+     1,
+     11
+    ],
+    [
+     "registers",
+     12,
+     3
+    ],
+    [
+     "backtrace",
+     15,
+     8
+    ],
+    [
+     "memory_map",
+     23,
+     2
+    ]
+   ],
+   "signature": "SIGABRT vendor.example.audio-service: libaudiohal_example.so!AudioStream::open < libaudiohal_example.so!AudioHal::startZone",
+   "summary": [
+    "Native crash in /vendor/bin/hw/vendor.example.audio-service (pid 900, tid 915 \"AudioStream\") at 2026-01-01 00:02:30.250",
+    "signal 6 (SIGABRT), code -1 (SI_QUEUE)",
+    "Abort message: 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) '",
+    "backtrace:",
+    "  #00 libc.so (abort+164)",
+    "  #01 libbase.so (android::base::DefaultAborter(char const*)+12)",
+    "  #02 libbase.so (android::base::LogMessage::~LogMessage()+352)",
+    "  #03 libaudiohal_example.so (AudioStream::open(int)+120)",
+    "  #04 libaudiohal_example.so (AudioHal::startZone(int)+40)",
+    "  #05 libc.so (__start_thread+64)"
+   ],
+   "tid": 915,
+   "ts": "2026-01-01 00:02:30.250",
+   "ts_raw": "2026-01-01 00:02:30.250000000+0100",
+   "type": "tombstone"
+  }
+ ],
+ "records": [
   {
    "attrs": {
     "uid": "1000"
    },
-   "cite": "log:2#1",
+   "cite": "log:1#1",
    "level": "I",
    "msg": "setTemp 21.5 for zone 1",
    "pid": 1234,
@@ -31,7 +606,7 @@
    "attrs": {
     "uid": "1000"
    },
-   "cite": "log:2#2",
+   "cite": "log:1#2",
    "level": "E",
    "msg": "setProperty failed, status=NOT_AVAILABLE",
    "pid": 1234,
@@ -46,7 +621,7 @@
    "attrs": {
     "uid": "1000"
    },
-   "cite": "log:3#1",
+   "cite": "log:2#1",
    "level": "W",
    "msg": "Process com.example.hvac (pid 1234) has died",
    "pid": 1000,
@@ -59,9 +634,10 @@
   },
   {
    "attrs": {
+    "art": 1,
     "uid": "u0_a42"
    },
-   "cite": "log:4#1",
+   "cite": "log:3#1",
    "level": "E",
    "msg": "FATAL EXCEPTION: main\nProcess: com.example.hvac, PID: 1234\njava.lang.NullPointerException: boom\n\tat com.example.hvac.Controller.update(Controller.java:42)",
    "pid": 1234,
@@ -76,7 +652,7 @@
    "attrs": {
     "uid": "1000"
    },
-   "cite": "log:5#1",
+   "cite": "log:4#1",
    "level": "I",
    "msg": "1234",
    "pid": 500,
@@ -91,7 +667,7 @@
    "attrs": {
     "uid": "1000"
    },
-   "cite": "log:5#2",
+   "cite": "log:4#2",
    "level": "I",
    "msg": "[0,1234,com.example.hvac,900,2]",
    "pid": 1000,
@@ -103,7 +679,7 @@
    "ts_raw": "01-01 00:00:02.000"
   },
   {
-   "cite": "log:6#1",
+   "cite": "log:5#1",
    "level": "I",
    "msg": "Booting Linux on physical CPU 0x0000000000 [0x411fd070]",
    "seg": 1,
@@ -112,7 +688,7 @@
    "ts_src": 0
   },
   {
-   "cite": "log:6#2",
+   "cite": "log:5#2",
    "level": "E",
    "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
    "seg": 1,
@@ -122,7 +698,7 @@
    "ts_src": 123456789000
   },
   {
-   "cite": "log:6#3",
+   "cite": "log:5#3",
    "level": "I",
    "msg": "wlan0: associated with <MAC:abcce245>",
    "seg": 1,
@@ -130,6 +706,103 @@
    "template": "wlan0: associated with <MAC>",
    "ts_raw": "124.000000",
    "ts_src": 124000000000
+  },
+  {
+   "attrs": {
+    "art": 2
+   },
+   "cite": "log:6#1",
+   "level": "E",
+   "msg": "ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com.example.radio/.TuneReceiver }; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"RadioWorker\" (Native), i… [art:2]",
+   "pid": 1500,
+   "seg": 1,
+   "tag": "anr",
+   "template": "ANR in com.example.radio (pid <*>): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=<*> cmp=com.example.radio/.TuneReceiver }; main Blocked at com.example.radio.Tuner.tune, lock held by tid <*> \"RadioWorker\" (Native), i… [art:<*>]",
+   "ts": "2026-01-01 00:05:00.000",
+   "ts_raw": "2026-01-01 00:05:00.000000000+0100"
+  },
+  {
+   "attrs": {
+    "art": 3
+   },
+   "cite": "log:7#1",
+   "level": "F",
+   "msg": "Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:130) [art:3]",
+   "pid": 1600,
+   "seg": 1,
+   "tag": "java_crash",
+   "template": "Java crash in com.android.car.settings (pid <*>): java.lang.IllegalStateException: Bluetooth device <MAC> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreference.onClick(BluetoothDevicePreference.java:<*>) [art:<*>]",
+   "ts": "2026-01-01 00:06:00.000",
+   "ts_raw": "2026-01-01 00:06:00"
+  },
+  {
+   "cite": "log:8#1",
+   "level": "I",
+   "msg": "older line",
+   "pid": 1000,
+   "seg": 1,
+   "tag": "PersistLog",
+   "template": "older line",
+   "tid": 1100,
+   "ts": "2025-12-31 23:50:00.000",
+   "ts_raw": "12-31 23:50:00.000"
+  },
+  {
+   "attrs": {
+    "art": 4
+   },
+   "cite": "log:9#1",
+   "level": "F",
+   "msg": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42) [art:4]",
+   "pid": 1234,
+   "seg": 1,
+   "tag": "java_crash",
+   "template": "Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>) [art:<*>]",
+   "ts": "2026-01-01 00:00:01.000",
+   "ts_raw": "2026-01-01 00:00:01.000"
+  },
+  {
+   "attrs": {
+    "art": 5
+   },
+   "cite": "log:10#1",
+   "level": "W",
+   "msg": "dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition 3 -> 7 [art:5]",
+   "seg": 1,
+   "tag": "dropbox",
+   "template": "dropbox system_server_wtf from system_server: android.util.Log$TerribleFailure: Unexpected power state transition <*> -> <*> [art:<*>]",
+   "ts": "2026-01-01 00:03:20.000",
+   "ts_raw": "2026-01-01 00:03:20.000"
+  },
+  {
+   "attrs": {
+    "art": 6
+   },
+   "cite": "log:11#1",
+   "level": "F",
+   "msg": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:6]",
+   "pid": 812,
+   "seg": 1,
+   "tag": "tombstone",
+   "template": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:<*>]",
+   "tid": 830,
+   "ts": "2026-01-01 00:00:05.123",
+   "ts_raw": "2026-01-01 00:00:05.123456789+0100"
+  },
+  {
+   "attrs": {
+    "art": 7
+   },
+   "cite": "log:12#1",
+   "level": "F",
+   "msg": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open [art:7]",
+   "pid": 900,
+   "seg": 1,
+   "tag": "tombstone",
+   "template": "Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN>, zone <*>) ' at libaudiohal_example.so!AudioStream::open [art:<*>]",
+   "tid": 915,
+   "ts": "2026-01-01 00:02:30.250",
+   "ts_raw": "2026-01-01 00:02:30.250000000+0100"
   }
  ],
  "segments": [
@@ -138,16 +811,16 @@
    1,
    "start",
    1,
-   1,
-   1
+   2,
+   2
   ],
   [
    2,
    1,
    "start",
    1,
-   2,
-   2
+   1,
+   1
   ],
   [
    3,
@@ -160,52 +833,81 @@
   [
    4,
    1,
-   "start",
-   1,
-   1,
-   1
-  ],
-  [
-   5,
-   1,
    "boot",
    1,
    2,
    2
   ],
   [
-   6,
+   5,
    1,
    "boot",
    1,
    3,
    3
+  ],
+  [
+   6,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   7,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   8,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   9,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   10,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   11,
+   1,
+   "start",
+   1,
+   1,
+   1
+  ],
+  [
+   12,
+   1,
+   "start",
+   1,
+   1,
+   1
   ]
  ],
  "sources": [
   {
-   "fingerprint": null,
-   "format": "logcat",
-   "id": 1,
-   "lines": 1,
-   "meta": {
-    "ts_format": "md_ms"
-   },
-   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/misc/logd/logcat.01",
-   "range": [
-    "2025-12-31 23:50:00.000",
-    "2025-12-31 23:50:00.000"
-   ],
-   "records": 1,
-   "segments": 1,
-   "status": "done",
-   "stream": null,
-   "unparsed": 0
-  },
-  {
    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
    "format": "logcat",
-   "id": 2,
+   "id": 1,
    "lines": 2,
    "meta": {
     "bugreport_format": "2.0",
@@ -236,7 +938,7 @@
   {
    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
    "format": "logcat",
-   "id": 3,
+   "id": 2,
    "lines": 1,
    "meta": {
     "bugreport_format": "2.0",
@@ -267,7 +969,7 @@
   {
    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
    "format": "logcat",
-   "id": 4,
+   "id": 3,
    "lines": 4,
    "meta": {
     "bugreport_format": "2.0",
@@ -298,7 +1000,7 @@
   {
    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
    "format": "logcat",
-   "id": 5,
+   "id": 4,
    "lines": 2,
    "meta": {
     "bugreport_format": "2.0",
@@ -329,7 +1031,7 @@
   {
    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
    "format": "kernel",
-   "id": 6,
+   "id": 5,
    "lines": 3,
    "meta": {
     "bugreport_format": "2.0",
@@ -355,6 +1057,219 @@
    "segments": 1,
    "status": "done",
    "stream": "kernel",
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "anr",
+   "id": 6,
+   "lines": 28,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "section_file": "/data/anr/anr_2026-01-01-00-05-00-000",
+    "section_time": "2026-01-01 00:05:00",
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR",
+   "range": [
+    "2026-01-01 00:05:00.000",
+    "2026-01-01 00:05:00.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "dropbox",
+   "id": 7,
+   "lines": 16,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#DROPBOX SYSTEM APP CRASHES",
+   "range": [
+    "2026-01-01 00:06:00.000",
+    "2026-01-01 00:06:00.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "logcat",
+   "id": 8,
+   "lines": 1,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "ts_format": "md_ms",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/misc/logd/logcat.01",
+   "range": [
+    "2025-12-31 23:50:00.000",
+    "2025-12-31 23:50:00.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "dropbox",
+   "id": 9,
+   "lines": 23,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/system/dropbox/data_app_crash@1767222001000.txt.gz!data_app_crash@1767222001000.txt",
+   "range": [
+    "2026-01-01 00:00:01.000",
+    "2026-01-01 00:00:01.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "dropbox",
+   "id": 10,
+   "lines": 8,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/system/dropbox/system_server_wtf@1767222200000.txt",
+   "range": [
+    "2026-01-01 00:03:20.000",
+    "2026-01-01 00:03:20.000"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "tombstone",
+   "id": 11,
+   "lines": 50,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_00",
+   "range": [
+    "2026-01-01 00:00:05.123",
+    "2026-01-01 00:00:05.123"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
+   "unparsed": 0
+  },
+  {
+   "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+   "format": "tombstone",
+   "id": 12,
+   "lines": 24,
+   "meta": {
+    "bugreport_format": "2.0",
+    "build": "sdk_car_x86_64-userdebug 14 UAA1.250512.001 13398012 test-keys",
+    "dumpstate_time": "2026-01-01 00:10:00",
+    "fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+    "kernel": "Linux version 5.15.110-android14 (build@host) #1 SMP PREEMPT",
+    "props": {
+     "persist.sys.timezone": "Europe/Berlin",
+     "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
+     "ro.product.model": "sdk_car_x86_64"
+    },
+    "timezone": "Europe/Berlin",
+    "uptime_s": 720
+   },
+   "name": "bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip!FS/data/tombstones/tombstone_01",
+   "range": [
+    "2026-01-01 00:02:30.250",
+    "2026-01-01 00:02:30.250"
+   ],
+   "records": 1,
+   "segments": 1,
+   "status": "done",
+   "stream": null,
    "unparsed": 0
   }
  ]
