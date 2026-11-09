@@ -140,11 +140,11 @@
    },
    "cite": "log:1#1",
    "level": "F",
-   "msg": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:1]",
+   "msg": "[art:1] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
    "pid": 812,
    "seg": 1,
    "tag": "tombstone",
-   "template": "Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue [art:<*>]",
+   "template": "[art:<*>] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
    "tid": 830,
    "ts": "2026-01-01 00:00:05.123",
    "ts_raw": "2026-01-01 00:00:05.123456789+0100"

@@ -3,7 +3,9 @@
 Without an agent: ``index <case> <path>`` indexes a log file, archive or directory;
 ``sources <case>`` lists what a case holds; ``query <case> --search ...`` searches it;
 ``relink <case> <source> <path>`` points a case at a moved original (the hash must match);
-``reindex <case> <source>`` indexes an original again. ``rules`` arrives with M4.
+``reindex <case> <source>`` indexes an original again; ``artifacts <case>`` lists tombstones,
+ANR traces, Java crashes and dropbox entries, ``artifacts <case> --show art:<id>[/section][:L<n>]``
+prints one. ``rules`` arrives with M4.
 """
 
 from __future__ import annotations
@@ -62,6 +64,15 @@ def _parser() -> argparse.ArgumentParser:
     qu.add_argument("--limit", "-n", type=int, default=50)
     qu.add_argument("--count", action="store_true", help="print only the number of matches")
 
+    ar = sub.add_parser("artifacts", help="list artifacts (tombstones, ANRs, crashes, dropbox) or show one")
+    ar.add_argument("case", type=_case)
+    ar.add_argument("--type", choices=["tombstone", "anr", "java_crash", "dropbox"])
+    ar.add_argument(
+        "--show",
+        metavar="CITATION",
+        help="art:<id> (summary and sections), art:<id>/<section> or art:<id>[/<section>]:L<n>[-L<m>]",
+    )
+
     rl = sub.add_parser("relink", help="point a case at a moved original file (hash must match)")
     rl.add_argument("case", type=_case)
     rl.add_argument("source", type=int)
@@ -99,6 +110,49 @@ def _print_sources(app: App, case: str) -> int:
     return 0
 
 
+def _print_artifacts(app: App, case: str, type: str | None) -> int:
+    rows = app.list_artifacts(case, type)
+    if rows is None:
+        _err(f"case '{case}' does not exist")
+        return 1
+    if not rows:
+        print(f"No artifacts in case '{case}'" + (f" of type {type}." if type else "."))
+    for a in rows:
+        when = query.fmt_ns(a.ts) or "-"
+        who = f"pid {a.pid}" if a.pid is not None else "pid -"
+        print(f"{a.cite:<7} {a.type:<10} {when:<23}  {who:<10} {a.process or '-'}  {a.signature or '-'}")
+    return 0
+
+
+def _show_artifact(app: App, case: str, cite: str) -> int:
+    try:
+        a, lines = app.read_artifact(case, cite)
+    except ValueError as e:
+        _err(str(e))
+        return 2
+    if lines is not None:
+        width = len(str(lines[-1][0])) if lines else 1
+        for n, text in lines:
+            print(f"L{n:<{width}}  {text}")
+        return 0
+    when = query.fmt_ns(a.ts) or "unknown"
+    print(f"{a.cite}  {a.type}  record {a.record_cite}")
+    print(f"name: {a.name}")
+    print(f"time: {when}" + (f"  (as written: {a.ts_raw})" if a.ts_raw and a.ts_raw != when else ""))
+    if a.process or a.pid is not None:
+        print(f"process: {a.process or '-'}  pid {a.pid if a.pid is not None else '-'}  tid {a.tid or '-'}")
+    if a.signature:
+        print(f"signature: {a.signature}")
+    print()
+    print(a.summary)
+    print()
+    print(f"sections ({a.lines} lines; cite lines as {a.cite}/<section>:L<n>):")
+    width = max((len(s.name) for s in a.sections), default=0)
+    for s in a.sections:
+        print(f"  {a.cite}/{s.name:<{width}}  L{s.first_line}-L{s.last_line}")
+    return 0
+
+
 def _run(app: App, args: argparse.Namespace) -> int:
     if args.command == "index":
         if not args.quiet:
@@ -122,6 +176,10 @@ def _run(app: App, args: argparse.Namespace) -> int:
         return 0
     if args.command == "sources":
         return _print_sources(app, args.case)
+    if args.command == "artifacts":
+        if args.show:
+            return _show_artifact(app, args.case, args.show)
+        return _print_artifacts(app, args.case, args.type)
     if args.command == "relink":
         ids = app.relink(args.case, args.source, args.path)
         print(f"relinked sources {', '.join(map(str, ids))} to {args.path.expanduser().resolve()}")

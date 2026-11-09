@@ -38,6 +38,7 @@ from ..base import ParseItem, SourceContext, TextConnector, head_lines
 from .common import (
     Parsed,
     Sections,
+    clip,
     fmt_time,
     parse_wall,
     section_time,
@@ -271,7 +272,7 @@ def describe(p: Parsed) -> tuple[str, str, str | None]:
     main = f.get("main")
     head = f"ANR in {proc} ({where})"
     if f.get("subject"):
-        head += f": {f['subject']}"
+        head += f": {clip(f['subject'], 80)}"
     sig_frames: list[str] = []
     if main:
         lines.append(f"main thread ({_thread_label(main)}):")

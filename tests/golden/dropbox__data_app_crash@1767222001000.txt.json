@@ -42,7 +42,7 @@
    },
    "headline": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
    "lines": 23,
-   "name": "<EMAIL:f13bc729>",
+   "name": "data_app_crash@1767222001000.txt",
    "pid": 1234,
    "process": "com.example.hvac",
    "record": "log:1#1",
@@ -81,11 +81,11 @@
    },
    "cite": "log:1#1",
    "level": "F",
-   "msg": "Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42) [art:1]",
+   "msg": "[art:1] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
    "pid": 1234,
    "seg": 1,
    "tag": "java_crash",
-   "template": "Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>) [art:<*>]",
+   "template": "[art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:<*>)",
    "ts": "2025-12-31 23:00:01.000",
    "ts_raw": "2025-12-31 23:00:01.000"
   }

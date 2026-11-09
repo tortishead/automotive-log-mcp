@@ -55,6 +55,33 @@ class App:
         with db.opened(path) as conn:
             return query.sources(conn, self.versions(), self.redactor.rules_hash, self.blocked)
 
+    def visible_source_ids(self, case: str) -> list[int] | None:
+        rows = self.list_sources(case)
+        return None if rows is None else [s.id for s in rows]
+
+    def list_artifacts(self, case: str, type: str | None = None) -> list[query.ArtifactRow] | None:
+        """Artifacts of a case from sources the policy does not block; None if no such case."""
+        visible = self.visible_source_ids(case)
+        if visible is None:
+            return None
+        with db.opened(self.config.case_db(case)) as conn:
+            return query.artifacts(conn, type, visible)
+
+    def read_artifact(self, case: str, cite: str) -> tuple[query.ArtifactRow, list[tuple[int, str]] | None]:
+        """An artifact (with its section list) and, if the citation names a section or lines, those
+        lines. Raises ValueError for a malformed citation or an unknown artifact, section or line."""
+        c = query.parse_art_citation(cite)
+        visible = self.visible_source_ids(case)
+        if visible is None:
+            raise ValueError(f"case '{case}' does not exist")
+        with db.opened(self.config.case_db(case)) as conn:
+            a = query.artifact(conn, c.id)
+            if a is None or a.source_id not in visible:
+                raise ValueError(f"no artifact art:{c.id} in case '{case}'")
+            if c.section is None and c.first is None:
+                return a, None
+            return a, query.artifact_lines(conn, a, c)
+
     def relink(self, case: str, source_id: int, new_path: Path) -> list[int]:
         path = self.config.case_db(case)
         if not path.exists():

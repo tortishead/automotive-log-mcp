@@ -8,7 +8,7 @@ Redaction runs before templating, so no raw value reaches ``records`` or ``templ
 Unparseable lines become records with ``level=None`` and the raw (redacted) text.
 
 Artifacts (tombstones, ANR traces, Java crashes, dropbox entries) get their record on the
-timeline while their member is parsed: a synthetic record ``<headline> [art:<id>]`` in the current
+timeline while their member is parsed: a synthetic record ``[art:<id>] <headline>`` in the current
 source, or the record they were parsed from (``attrs.art``). The artifact rows themselves are
 written at the end of the file, after :func:`connectors.artifacts.complete` has added what only
 the whole bugreport knows (process names, binder peers); everything they store is redacted.
@@ -373,7 +373,7 @@ class Ingestor:
                     redact(a.name),
                     str(origin.path),
                     origin.sha256,
-                    a.member,
+                    redact(a.member) if a.member else None,
                     art.ts,
                     art.ts_raw,
                     art.pid,
@@ -648,7 +648,7 @@ class Ingestor:
             seq = st.seq
             if art is not None:
                 aid = add_artifact(art, st, record_id(st.id, seq))
-                rec.msg = f"{art.headline} [art:{aid}]"
+                rec.msg = f"[art:{aid}] {art.headline}"
                 rec.attrs = {"art": aid}
             elif rec.artifact is not None:
                 aid = add_artifact(rec.artifact, st, record_id(st.id, seq))

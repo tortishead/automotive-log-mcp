@@ -48,6 +48,8 @@ def test_rules_catch(text: str, kind: str, value: str) -> None:
         "ratio 0.5, 0.25 load average: 1.00, 0.90, 0.80",
         "uuid 123e4567-e89b-12d3-a456-426614174000 session 42",
         "android.hardware.automotive.vehicle@2.0-service",
+        "FS/data/system/dropbox/data_app_crash@1767222001000.txt.gz",  # dropbox entry names
+        "SYSTEM_TOMBSTONE@1767222001000.dat system_server_wtf@1767222001000.lost",
     ],
 )
 def test_no_false_positives(text: str) -> None:

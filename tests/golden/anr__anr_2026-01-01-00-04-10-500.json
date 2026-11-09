@@ -50,7 +50,7 @@
     "threads": 3,
     "utc_offset": "+0100"
    },
-   "headline": "ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping)",
+   "headline": "ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms f…; main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping)",
    "lines": 48,
    "name": "anr_2026-01-01-00-04-10-500",
    "pid": 2345,
@@ -125,11 +125,11 @@
    },
    "cite": "log:1#1",
    "level": "E",
-   "msg": "ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping) [art:1]",
+   "msg": "[art:1] ANR in com.example.media (pid 2345): Input dispatching timed out (com.example.media/.PlayerActivity, Waited 5000ms f…; main Blocked at com.example.media.Library.currentTrack, lock held by tid 15 \"MediaScanner\" (Sleeping)",
    "pid": 2345,
    "seg": 1,
    "tag": "anr",
-   "template": "ANR in com.example.media (pid <*>): Input dispatching timed out (com.example.media/.PlayerActivity, Waited <*>ms for MotionEvent); main Blocked at com.example.media.Library.currentTrack, lock held by tid <*> \"MediaScanner\" (Sleeping) [art:<*>]",
+   "template": "[art:<*>] ANR in com.example.media (pid <*>): Input dispatching timed out (com.example.media/.PlayerActivity, Waited <*>ms f…; main Blocked at com.example.media.Library.currentTrack, lock held by tid <*> \"MediaScanner\" (Sleeping)",
    "ts": "2026-01-01 00:04:10.500",
    "ts_raw": "2026-01-01 00:04:10.500123456+0100"
   }

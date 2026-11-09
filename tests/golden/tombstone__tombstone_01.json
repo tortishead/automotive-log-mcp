@@ -124,11 +124,11 @@
    },
    "cite": "log:1#1",
    "level": "F",
-   "msg": "Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open [art:1]",
+   "msg": "[art:1] Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example.so!AudioStream::open",
    "pid": 900,
    "seg": 1,
    "tag": "tombstone",
-   "template": "Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN>, zone <*>) ' at libaudiohal_example.so!AudioStream::open [art:<*>]",
+   "template": "[art:<*>] Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN>, zone <*>) ' at libaudiohal_example.so!AudioStream::open",
    "tid": 915,
    "ts": "2026-01-01 00:02:30.250",
    "ts_raw": "2026-01-01 00:02:30.250000000+0100"

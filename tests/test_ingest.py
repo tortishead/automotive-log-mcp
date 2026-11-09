@@ -125,7 +125,13 @@ def test_bugreport_processes_and_meta(app: App, tmp_path: Path) -> None:
 def test_after_indexing_no_rule_matches_records_templates_or_meta(app: App, tmp_path: Path) -> None:
     z = make_bugreport_zip(tmp_path)
     app.ingestor.add(app.config.case_db("br"), str(z))
-    for rel in ("logcat/threadtime.log", "kernel/kmsg.txt", "syslog/syslog.log"):
+    for rel in (
+        "logcat/threadtime.log",
+        "kernel/kmsg.txt",
+        "syslog/syslog.log",
+        "tombstone/tombstone_01",
+        "anr/anr_2026-01-01-00-04-10-500",
+    ):
         app.ingestor.add(app.config.case_db("br"), str(copy_fixture(rel, tmp_path)))
     r = app.redactor
     with db.opened(app.config.case_db("br")) as conn:
@@ -134,11 +140,23 @@ def test_after_indexing_no_rule_matches_records_templates_or_meta(app: App, tmp_
         texts += [a for (a,) in conn.execute("SELECT attrs FROM records WHERE attrs IS NOT NULL")]
         texts += [m for (m,) in conn.execute("SELECT meta FROM sources WHERE meta IS NOT NULL")]
         texts += [n for (n,) in conn.execute("SELECT name FROM processes")]
+        # Artifacts (M2): everything they store as text.
+        for row in conn.execute(
+            "SELECT name, member, ts_raw, process, signature, headline, summary, fields FROM artifacts"
+        ):
+            texts += [t for t in row if t]
+        texts += [t for row in conn.execute("SELECT name, text FROM artifact_sections") for t in row]
+        n_art = conn.execute("SELECT count(*) FROM artifacts").fetchone()[0]
         n_tokens = sum(t.count("<MAC:") + t.count("<SSID:") + t.count("<IP:") for t in texts)
+        n_vin = sum(t.count("<VIN:") for t in texts)
     assert n_tokens >= 3  # the fixtures do contain values to redact
+    assert n_art >= 7 and n_vin >= 4  # the abort message's VIN: headline, summary, fields, section
     leaks = [(t, r.find(t)) for t in texts if r.find(t)]
     assert leaks == []
-    assert not any("EMULATOR35X1X11X0" in t or "3c:5a:b4" in t or "HomeNet" in t for t in texts)
+    assert not any(
+        "EMULATOR35X1X11X0" in t or "3c:5a:b4" in t or "HomeNet" in t or "WVWZZZ1JZXW000001" in t
+        for t in texts
+    )
 
 
 def test_failed_import_marks_sources_failed_and_keeps_no_rows(

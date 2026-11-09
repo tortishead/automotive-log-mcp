@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 TOKEN_RE = re.compile(r"<([A-Z][A-Z0-9_]*):([0-9a-f]{8})>")
-RULES_VERSION = "1"
+RULES_VERSION = "2"  # 2: file names like tag@123.txt are not e-mail addresses
 
 
 def _luhn_ok(digits: str) -> bool:
@@ -38,6 +38,14 @@ def _luhn_ok(digits: str) -> bool:
                 d -= 9
         total += d
     return total % 10 == 0
+
+
+# Android dropbox entries are named <tag>@<ms since epoch>.<ext>: a number, not a mail domain.
+_FILE_DOMAIN = re.compile(r"\d+(?:\.(?:txt|gz|dat|lost|log|pb|lz4|zip|json|xml|bin))+", re.IGNORECASE)
+
+
+def _email(s: str) -> str | None:
+    return None if _FILE_DOMAIN.fullmatch(s.rsplit("@", 1)[1]) else "EMAIL"
 
 
 def _vin(s: str) -> str | None:
@@ -111,7 +119,7 @@ DEFAULT_RULES: tuple[Rule, ...] = (
     Rule(
         "email",
         r"(?P<v>\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b)",
-        _const("EMAIL"),
+        _email,
         lambda s, low: "@" in s,
     ),
     Rule(

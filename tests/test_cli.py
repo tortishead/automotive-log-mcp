@@ -83,3 +83,33 @@ def test_relink_and_reindex(home: Path, tmp_path: Path, capsys: pytest.CaptureFi
     assert code == 0 and "relinked sources 1" in out
     code, out, _ = run(capsys, "reindex", "c", "1", "-q")
     assert code == 0 and "reindexed" in out
+
+
+def test_artifacts_command(
+    home: Path, tmp_path: Path, secret: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    z = make_bugreport_zip(tmp_path)
+    assert run(capsys, "index", "T-1", str(z), "-q")[0] == 0
+    code, out, _ = run(capsys, "artifacts", "T-1")
+    assert code == 0
+    rows = out.splitlines()
+    assert len(rows) == 7
+    assert rows[0].startswith("art:1   java_crash 2026-01-01 00:00:01.000  pid 1234   com.example.hvac  ")
+    tomb = next(r for r in rows if "SIGSEGV" in r)
+    cite = tomb.split()[0]
+
+    code, out, _ = run(capsys, "artifacts", "T-1", "--type", "anr")
+    assert len(out.splitlines()) == 1 and "ANR Blocked com.example.radio" in out
+
+    code, out, _ = run(capsys, "artifacts", "T-1", "--show", cite)
+    assert code == 0
+    assert "record log:11#1" in out and "signal 11 (SIGSEGV)" in out
+    assert f"{cite}/backtrace" in out and "L16-L22" in out
+
+    code, out, _ = run(capsys, "artifacts", "T-1", "--show", f"{cite}/backtrace:L17")
+    assert out.startswith("L17  ") and "VehicleHal::setValue" in out
+
+    code, _, err = run(capsys, "artifacts", "T-1", "--show", f"{cite}/nope")
+    assert code == 2 and "no section 'nope'" in err
+    code, _, err = run(capsys, "artifacts", "nope")
+    assert code == 1 and "does not exist" in err

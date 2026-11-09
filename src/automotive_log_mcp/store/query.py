@@ -290,3 +290,151 @@ def relink(conn: sqlite3.Connection, source_id: int, new_path: Path, sha256_of: 
             "UPDATE sources SET path = ? WHERE sha256 = ? AND path = ?", (str(new_path), sha, old_path)
         )
     return ids
+
+
+# -- artifacts --------------------------------------------------------------------------------
+
+# art:<id>[/<section>][:L<line>[-L<line>]] (D6); 'art:' may be left out on the command line.
+ART_CITE = re.compile(r"(?:art:)?(\d+)(?:/([a-z0-9_.-]+))?(?::L(\d+)(?:-L?(\d+))?)?")
+
+
+@dataclass
+class SectionRow:
+    name: str
+    first_line: int
+    lines: int
+
+    @property
+    def last_line(self) -> int:
+        return self.first_line + self.lines - 1
+
+
+@dataclass
+class ArtifactRow:
+    id: int
+    source_id: int
+    record_id: int
+    type: str
+    name: str
+    ts: int | None
+    ts_raw: str | None
+    pid: int | None
+    tid: int | None
+    process: str | None
+    signature: str | None
+    headline: str
+    summary: str
+    fields: dict[str, Any]
+    lines: int
+    sections: list[SectionRow] = field(default_factory=list)
+
+    @property
+    def cite(self) -> str:
+        return f"art:{self.id}"
+
+    @property
+    def record_cite(self) -> str:
+        return citation(self.record_id >> SEQ_BITS, self.record_id & ((1 << SEQ_BITS) - 1))
+
+
+@dataclass(frozen=True)
+class ArtCitation:
+    id: int
+    section: str | None = None
+    first: int | None = None
+    last: int | None = None
+
+
+def parse_art_citation(text: str) -> ArtCitation:
+    m = ART_CITE.fullmatch(text.strip())
+    if m is None:
+        raise ValueError(f"invalid artifact citation {text!r}; expected art:<id>[/<section>][:L<line>]")
+    first = int(m[3]) if m[3] else None
+    last = int(m[4]) if m[4] else first
+    if first is not None and (first < 1 or (last is not None and last < first)):
+        raise ValueError(f"invalid line range in {text!r}")
+    return ArtCitation(int(m[1]), m[2], first, last)
+
+
+_ART_COLS = (
+    "id, source_id, record_id, type, name, ts, ts_raw, pid, tid, process, signature, headline, summary, "
+    "fields, lines"
+)
+
+
+def _artifact(row: tuple[Any, ...]) -> ArtifactRow:
+    values = list(row)
+    values[13] = json.loads(values[13]) if values[13] else {}
+    return ArtifactRow(*values)
+
+
+def artifacts(
+    conn: sqlite3.Connection, type: str | None = None, sources: list[int] | None = None
+) -> list[ArtifactRow]:
+    """Artifacts in time order (unknown times last), without sections."""
+    where: list[str] = []
+    params: list[Any] = []
+    if type:
+        where.append("type = ?")
+        params.append(type)
+    if sources is not None:
+        if not sources:
+            return []
+        where.append(f"source_id IN ({','.join('?' * len(sources))})")
+        params.extend(sources)
+    sql = f"SELECT {_ART_COLS} FROM artifacts"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += " ORDER BY ts IS NULL, ts, id"
+    return [_artifact(r) for r in conn.execute(sql, params)]
+
+
+def artifact(conn: sqlite3.Connection, art_id: int) -> ArtifactRow | None:
+    row = conn.execute(f"SELECT {_ART_COLS} FROM artifacts WHERE id = ?", (art_id,)).fetchone()
+    if row is None:
+        return None
+    a = _artifact(row)
+    a.sections = [
+        SectionRow(*r)
+        for r in conn.execute(
+            "SELECT name, first_line, lines FROM artifact_sections WHERE artifact_id = ? ORDER BY idx",
+            (art_id,),
+        )
+    ]
+    return a
+
+
+def artifact_lines(conn: sqlite3.Connection, a: ArtifactRow, cite: ArtCitation) -> list[tuple[int, str]]:
+    """The lines a citation names, as (line number in the artifact, text).
+
+    ``/section`` alone gives the section; ``:L<n>`` (optionally ``-L<m>``) the lines, which must lie
+    inside the section when one is given. Raises ValueError for unknown sections or lines.
+    """
+    secs = a.sections
+    if cite.section is not None:
+        sec = next((s for s in secs if s.name == cite.section), None)
+        if sec is None:
+            names = ", ".join(s.name for s in secs[:20])
+            raise ValueError(f"{a.cite} has no section '{cite.section}'; sections: {names}")
+        lo, hi = sec.first_line, sec.last_line
+    else:
+        lo, hi = 1, a.lines
+    if cite.first is not None:
+        last = cite.last if cite.last is not None else cite.first
+        if cite.first < lo or last > hi:
+            where = f"section '{cite.section}' (L{lo}-L{hi})" if cite.section else f"{a.cite} (L1-L{hi})"
+            raise ValueError(
+                f"line L{cite.first}" + (f"-L{last}" if last != cite.first else "") + f" is outside {where}"
+            )
+        lo, hi = cite.first, last
+    out: list[tuple[int, str]] = []
+    for first, text in conn.execute(
+        "SELECT first_line, text FROM artifact_sections WHERE artifact_id = ? AND first_line <= ? "
+        "AND first_line + lines - 1 >= ? ORDER BY idx",
+        (a.id, hi, lo),
+    ):
+        for i, line in enumerate(text.split("\n")):
+            n = first + i
+            if lo <= n <= hi:
+                out.append((n, line))
+    return out
