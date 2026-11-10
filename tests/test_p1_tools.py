@@ -459,3 +459,26 @@ def test_call_log_keeps_only_size_of_checked_text(app: App, tmp_path: Path) -> N
     entry = next(x for x in lines if x["tool"] == "check_citations")
     assert entry["args"]["text"].startswith("<20 chars, sha256 ")
     assert "secret" not in json.dumps(lines)
+
+
+def test_dlt_viewer_export_example_connector(home: Path, tmp_path: Path) -> None:
+    """docs/dlt.md: a DLT Viewer text export indexed with examples/rules/dlt_viewer_ascii.yaml."""
+    rules = Path(__file__).resolve().parent.parent / "examples" / "rules"
+    cfg = tmp_path / "c.yaml"
+    cfg.write_text(f"rule_dirs: [{rules.as_posix()}]\n", encoding="utf-8")
+    home.mkdir(parents=True, exist_ok=True)
+    (home / "secret.key").write_bytes(FIXED_SECRET)
+    app = App.create(load_config(cfg), Policy())
+    p = tmp_path / "ecu1_dlt.txt"
+    p.write_text(
+        "0 2026/01/01 08:00:00.000100 10.0001 1 ECU1 HVAC CTRL log info verbose 1 HVAC controller started\n"
+        "1 2026/01/01 08:00:01.123456 11.1234 2 ECU1 HVAC CTRL log error verbose 1 setProperty failed, "
+        "status=NOT_AVAILABLE\n",
+        encoding="utf-8",
+    )
+    app.ingestor.add(app.config.case_db("d"), str(p))
+    t = Tools(app)
+    rec = t.get_records("d", ["log:1#2"]).data.records[0]  # type: ignore[attr-defined]
+    assert (rec.level, rec.tag, rec.ts) == ("E", "CTRL", "2026-01-01 08:00:01.123")
+    assert rec.attrs["ecu"] == "ECU1" and rec.attrs["apid"] == "HVAC"
+    assert _hits(t.detect("d", rules=["vhal_error"])) == {"vhal_error": ["log:1#2"]}

@@ -1,0 +1,16 @@
+# Example regex connector for a DLT Viewer text export ("Export" -> "ASCII"), one message per line:
+#   <index> <date> <time> <timestamp> <count> <ecu> <apid> <ctid> <type> <subtype> <mode> <#args> <payload>
+#   12 2026/01/01 08:00:01.123456 15.4321 7 ECU1 HVAC CTRL log error verbose 1 setProperty failed
+# Columns differ between DLT Viewer versions and settings: compare with one line of your export
+# and adjust `line` before use. Copy this file into a directory listed under rule_dirs.
+connector: dlt_viewer_ascii
+version: "1"
+description: DLT Viewer ASCII export (example; check the columns against your export)
+sniff:
+  filenames: ["*.dlt.txt", "*_dlt.txt"]
+  min_fraction: 0.6
+line: '^\s*(?P<index>\d+) (?P<ts>\d{4}/\d\d/\d\d \d\d:\d\d:\d\d\.\d{6}) +(?P<ticks>\d+\.\d+) +(?P<count>\d+) (?P<ecu>\S+) (?P<apid>\S+) (?P<tag>\S+) (?P<type>\S+) (?P<level>\S+) (?P<mode>\S+) (?P<nargs>\d+) (?P<msg>.*)$'
+timestamp:
+  format: '%Y/%m/%d %H:%M:%S.%f'
+levels: {fatal: F, error: E, warn: W, info: I, debug: D, verbose: V}
+attrs: [ecu, apid, ticks, type]

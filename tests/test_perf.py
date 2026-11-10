@@ -10,6 +10,8 @@ results, not on missed targets, so the numbers are always reported.
 - M1 ingest: lines/s (target >= 100k) and DB size (target <= 1.5x input).
 - M3 tools: every tool's text output under 8 KB with a broad query; latency: text search < 1 s,
   context < 200 ms, filtered regex < 5 s.
+- M4 tools (overview, count, detect, check_citations): text under 8 KB; latency is reported (the
+  plan sets no target for them).
 """
 
 from __future__ import annotations
@@ -152,6 +154,26 @@ def _calls(tools: Tools) -> list[tuple[str, str, float | None, Call]]:
         ("read_artifact", "section", None, lambda t: t.read_artifact("perf", "art:1/exception")),
         ("get_records", "100 ids", None, lambda t: t.get_records("perf", _ids(mid))),
         ("list_sources", "-", None, lambda t: _list_sources(t)),
+        ("overview", "whole case", None, lambda t: t.overview("perf")),
+        ("overview", "15 min window", None, lambda t: t.overview("perf", window)),
+        ("count", "by tag", None, lambda t: t.count("perf")),
+        ("count", "by level, bucket 10m", None, lambda t: t.count("perf", by="level", bucket="10m")),
+        ("count", "by template", None, lambda t: t.count("perf", by="template")),
+        ("count", "text, broad ('failed'), by tag", None, lambda t: t.count("perf", text="failed")),
+        (
+            "count",
+            "regex filtered (level E, tag), by pid",
+            None,
+            lambda t: t.count("perf", by="pid", text=r"status=\w+_AVAILABLE", mode="regex", filter=hvac),
+        ),
+        ("detect", "all rules", None, lambda t: t.detect("perf")),
+        ("detect", "all rules, 15 min window", None, lambda t: t.detect("perf", filter=window)),
+        (
+            "check_citations",
+            "answer with 40 citations",
+            None,
+            lambda t: t.check_citations("perf", _answer(mid)),
+        ),
     ]
 
 
@@ -159,6 +181,15 @@ def _middle(tools: Tools) -> str:
     rows = tools.app.list_sources("perf") or []
     main = max(rows, key=lambda s: s.records)
     return f"log:{main.id}#{main.records // 2}"
+
+
+def _answer(mid: str) -> str:
+    sid, seq = mid[4:].split("#")
+    paras = [
+        f"Finding {i}: `setProperty failed` at log:{sid}#{int(seq) + i} and log:{sid}#{int(seq) + 1000 * i}."
+        for i in range(20)
+    ]
+    return "# Answer\n\n" + "\n\n".join(paras) + "\n\nThe rest is a guess.\n"
 
 
 def _ids(mid: str) -> list[str]:

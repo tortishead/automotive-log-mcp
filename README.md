@@ -3,14 +3,18 @@
 An MCP server that lets any agent analyse a defect from automotive logs (Android bugreport,
 logcat, kernel logs), with every finding cited to a log line or artifact.
 
-Status: **M3 P0 tools**. Logcat (all `-v` formats), kernel logs (`dmesg`, `/dev/kmsg`), Android
-bugreports (zip or text), archives (zip, tar, gz) and YAML-defined text formats are indexed into
-one SQLite DB per case, with redaction at index time. Tombstones, ANR traces, Java crashes and
-dropbox entries become artifacts with a summary, a crash signature and a record on the timeline.
-All P0 tools work over MCP: `add_source`, `list_sources`, `search`, `context`, `list_artifacts`,
-`read_artifact`, `get_records`, with capped, cited output. Everything is verified on synthetic
-fixtures only, not yet on real bugreports; ingest (about 33–42k lines/s, DB 1.9× the input) misses
-the M1 targets. See [docs/design.md](docs/design.md) and
+Status: **M4 P1 tools + evaluation**. Logcat (all `-v` formats), kernel logs (`dmesg`,
+`/dev/kmsg`), Android bugreports (zip or text), archives (zip, tar, gz) and YAML-defined text
+formats are indexed into one SQLite DB per case, with redaction at index time. Tombstones, ANR
+traces, Java crashes and dropbox entries become artifacts with a summary, a crash signature and a
+record on the timeline. Eleven tools work over MCP: the P0 tools `add_source`, `list_sources`,
+`search`, `context`, `list_artifacts`, `read_artifact`, `get_records` and the P1 tools `overview`,
+`count`, `detect` (10 default detector rules, more from rule directories) and `check_citations`,
+all with capped, cited output. An evaluation harness ([eval/](eval/)) checks evidence recall
+without an agent and gives a checklist for agent runs. Everything is verified on synthetic
+fixtures and synthetic evaluation cases only, not yet on real bugreports or real closed defects;
+ingest (about 33–42k lines/s, DB 1.9× the input) misses the M1 targets. DLT is not read yet (M5):
+see [docs/dlt.md](docs/dlt.md). See [docs/design.md](docs/design.md) and
 [docs/implementation-plan.md](docs/implementation-plan.md).
 
 ## Install
@@ -42,6 +46,10 @@ case: it waits up to 10 s, then reports that indexing continues; `list_sources` 
 | `list_artifacts(case, type?)` | tombstones, ANRs, Java crashes, dropbox entries grouped by crash signature, in time order; copies of one crash marked `same crash as art:<id>` |
 | `read_artifact(case, id, section?, start_line?, end_line?)` | summary, signature and section list; then a section or a line range, lines numbered `L<n>` |
 | `get_records(case, ids)` | full records: untruncated message, timestamp as written, attributes, template text |
+| `overview(case, filter?)` | records and levels, top tags, pids and messages (templates), clock segments, gaps over 30 s, error bursts, a histogram, detector and artifact counts |
+| `count(case, by, query?, mode, filter?, bucket?, limit)` | records by `tag`, `level`, `pid`, `source` or `template`, optionally matching a query, optionally per time bucket (`'1m'`, at most 60 buckets, empty ones shown) |
+| `detect(case, rules?, filter?, examples)` | hits of the detector rules by severity and time, collapsed by message (or pid), each with a hint what to read next |
+| `check_citations(case, text)` | checks a Markdown answer: every `log:`/`art:` citation must be well-formed and resolve (errors); uncited paragraphs and quotes not in the cited lines are warnings; `PASS`/`FAIL` |
 
 A search hit looks like the design's line format; collapsed repeats add a count and the last
 occurrence, and hits that belong to an artifact name it:
@@ -71,6 +79,51 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
   templates), with a declared output schema per tool.
 - Raw values in queries and filters (a MAC, a VIN) are redacted like the logs, so they match
   their tokens.
+
+### P1 tools
+
+- **overview** is the first call after `list_sources`: where the errors are and what to look at.
+  Gaps are stretches of more than 30 s without any record (wall clock); an error burst is a run of
+  10-s buckets whose E/F count is above 5× the median bucket and above 10. The histogram has up to
+  60 buckets of a round size; the text shows it as two sparklines (all records, E/F), the
+  structured content has the numbers. Each item comes with an example citation.
+- **count** without a query groups every record that passes the filter; with `query` it counts
+  matches (as `search` would). Broad text queries (over 300k matches) are counted from every k-th
+  match and marked `≈`; a regex scan that hits `caps.regex_scan_rows` gives lower bounds
+  (`at least`). Bucket starts are printed so that they can be passed back as `from`.
+- **detect** runs the rules below (or `rules=[...]`); `filter` narrows the records the rules see
+  (a second event of a `followed_by` rule is looked for beyond `to`). The `search` hint of a rule
+  lists every hit.
+- **check_citations** is what the `defect_triage` prompt calls before an answer is final. Citations
+  inside fenced code blocks are not checked; paragraphs that say they are a guess ("probably",
+  "unknown", "the logs do not show", …) or are shorter than 8 words need no citation. The call log
+  keeps only the text's length and hash.
+
+### Detector rules
+
+| Rule | Severity | Matches |
+| --- | --- | --- |
+| `java_crash` | high | `AndroidRuntime: FATAL EXCEPTION`, Java crash artifacts |
+| `native_crash` | high | `libc: Fatal signal`, the debuggerd `*** ***` banner, tombstones |
+| `anr` | high | `ActivityManager: ANR in`, ANR artifacts |
+| `watchdog` | high | `Watchdog: Blocked in handler/monitor`, `WATCHDOG KILLING SYSTEM PROCESS` |
+| `boot_not_completed` | high | `boot_progress_start` not followed within 3 min by `boot_progress_enable_screen`, `sf_stop_bootanim` or boot completed |
+| `lmk` | medium | `lowmemorykiller`/`lmkd: Kill '…'`, kernel `Out of memory: Killed process` |
+| `binder_failure` | medium | `!!! FAILED BINDER TRANSACTION !!!`, `DeadObjectException`, kernel `binder: … transaction failed` |
+| `vhal_error` | medium | E/F from VHAL tags (`*VehicleHal*`, `*Vhal*`, …), `status=NOT_AVAILABLE` (and `TRY_AGAIN`, `INTERNAL_ERROR`, `ACCESS_DENIED`, `INVALID_ARG`) at W or above |
+| `service_restart` | medium | `init: Service '…' (pid N) exited/killed/received signal`, `Process … has died`, `Scheduling restart of crashed service` |
+| `selinux_denial` | low | `audit(…): avc: denied`, one line per pid |
+
+Rules are YAML files (format in
+[src/automotive_log_mcp/detect/engine.py](src/automotive_log_mcp/detect/engine.py)): `match` (a
+regex over message and tag), `level`, `tags`, or `any:` alternatives of these; `followed_by` a
+second event `within` a time (`absent: true`: a hit when it does not follow); `group_by: pid`;
+`severity`, `description`, `note`. The package rules are in
+[src/automotive_log_mcp/rules/detect/](src/automotive_log_mcp/rules/detect/). YAML files in the
+directories under `rule_dirs` in `config.yaml` add rules; a rule with the name of a package rule
+replaces it (later directories win). `automotive-log-mcp rules` lists the rules in effect and where
+each comes from. Rule patterns are redacted like queries, so a raw value in a pattern matches its
+token.
 
 ### Filter
 
@@ -105,6 +158,11 @@ automotive-log-mcp artifacts T-1 --show art:6/backtrace              # one secti
 automotive-log-mcp artifacts T-1 --show art:6/backtrace:L17          # one line (or :L17-L20)
 automotive-log-mcp relink T-1 3 /new/place/bugreport-2026-10-11.zip  # original moved; hash must match
 automotive-log-mcp reindex T-1 3                                     # index an original again
+automotive-log-mcp overview T-1                                      # as the overview tool
+automotive-log-mcp detect T-1 --rule anr --examples 5                # as the detect tool
+automotive-log-mcp count T-1 --by level --bucket 1m --search "setProperty failed"
+automotive-log-mcp check T-1 answer.md                               # check_citations; exit 1 on errors
+automotive-log-mcp rules                                             # detector rules and their origin
 ```
 
 - `index` options: `--format <connector>` forces a format instead of sniffing; `--force`
@@ -119,6 +177,9 @@ automotive-log-mcp reindex T-1 3                                     # index an 
   `log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE`.
 - `sources` flags sources whose original file is missing (use `relink`) and sources indexed with
   an older connector or redaction rules (`stale: reindex recommended`).
+- `overview`, `detect` and `count` take the same filter flags as `query`; `count --by none` gives
+  totals only. `check` reads a Markdown file (`-` for standard input) and exits with 1 when a
+  citation is malformed or does not resolve. `rules --show <name>` prints a rule's file.
 - `artifacts` lists one line per artifact: citation, type, time, pid, process, signature (in time
   order). `--show` takes a citation `art:<id>[/<section>][:L<n>[-L<m>]]`.
 
@@ -161,7 +222,8 @@ automotive-log-mcp reindex T-1 3                                     # index an 
 | `syslog` | BSD syslog / `journalctl -o short` (a YAML connector shipped in the package) |
 
 Own text formats are added as YAML files in a directory listed under `rule_dirs` in
-`config.yaml`; the format is documented in
+`config.yaml` (an example for a DLT Viewer text export is in
+[examples/rules/](examples/rules/dlt_viewer_ascii.yaml)); the format is documented in
 [src/automotive_log_mcp/connectors/regex_yaml.py](src/automotive_log_mcp/connectors/regex_yaml.py).
 Python connectors can be registered as entry points (`automotive_log_mcp.connectors`); they are
 loaded only when the policy sets `allow_code_connectors: true`. Lines a connector cannot parse are
@@ -185,7 +247,7 @@ All state lives under `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MC
 | `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors` |
 | `cases/<case>.db` | one SQLite DB per case; originals are referenced by path and SHA-256, never copied |
 | `secret.key` | redaction key, created on first run; deleting it changes every token of later imports |
-| `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes; never log content |
+| `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes; never log content (the text given to `check_citations` is logged as its length and hash) |
 
 Example `policy.yaml`:
 
@@ -193,6 +255,16 @@ Example `policy.yaml`:
 allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records]
 byte_budget: 500000
 ```
+
+## Evaluation
+
+[eval/](eval/README.md) holds the M4 evaluation: `cases.yaml` (closed defects with the expected
+component and root-cause citations, written before any run), `evidence_recall.py` (do `detect`,
+`list_artifacts` and recorded queries show the root-cause lines on their first page; runs in the
+test suite on 5 synthetic cases), the agent-run checklist in `eval/agent_runs/` and
+`callstats.py` (calls and bytes per session from the call log). Real defects go into the
+git-ignored `eval/cases.local.yaml`; [eval/README.md](eval/README.md) has the steps for Windows
+(`py -m automotive_log_mcp`, VS Code Copilot agent mode) and Linux (Claude Code).
 
 ## Develop
 
@@ -203,7 +275,7 @@ ruff check . && ruff format --check . && python -m mypy && python -m pytest
 Golden records for the fixtures in `tests/fixtures/` are in `tests/golden/`; after an intended
 change regenerate them with `UPDATE_GOLDEN=1 python -m pytest tests/test_golden.py` and review the
 diff; golden outputs of every tool are in `tests/golden/tools__*.json` (same command with
-`tests/test_tools.py`). The performance tests generate a large logcat outside the repository,
+`tests/test_tools.py` and `tests/test_p1_tools.py`). The performance tests generate a large logcat outside the repository,
 index it once and measure ingest and every tool (latency, output bytes):
 `PERF_MB=1024 python -m pytest -m perf -s tests/test_perf.py` (`PERF_KEEP=<dir>` keeps the log
 and the DB for later runs).
