@@ -1,8 +1,26 @@
 """JSONL call log: one line per tool call, without any log content.
 
 Each line records when, which tool, the (redacted) arguments, the outcome, the duration and the
-number of output bytes. Tool output itself is never written. Arguments pass through a redactor
-before they are written (D5); until the redaction rules land in M1 the default is the identity.
+number of output bytes. Tool output itself is never written. Optional fields (added after M4, all
+derived from sizes, counts and citation ids, never from log text) explain token use; see
+``usage.py`` and the ``calls`` CLI command:
+
+- ``seq``: call number within the server session (1, 2, …);
+- ``text_bytes``, ``structured_bytes``: the text content and the structured content (compact
+  JSON, 0 when the server sends none) of the result; ``tokens_est``: about bytes/4 of what the
+  model is likely to read (the structured content if present, as Claude Code sends it, else the
+  text);
+- ``args_hash``, ``near_hash``: hashes of the normalized arguments, the second without paging and
+  size arguments (``limit``, ``cursor``, ``before``, ``after``, ``examples``), to spot repeated and
+  near-duplicate calls;
+- ``capped``: which output caps were hit (``lines``, ``bytes``, ``limit``); ``results``,
+  ``total``, ``exact``: items returned, matches in all, and whether counts are exact;
+- ``cites``: citation ids in the output, compacted to ranges (``log:3#1-5``, ``art:4``), and for
+  ``check_citations`` ``answer_cites`` (the ids the answer cites) and ``ok``;
+- ``server`` (first call of a session only): version, whether structured output is on, and the
+  fixed bytes the server adds to every model request (instructions, tool list).
+
+Arguments pass through a redactor before they are written (D5).
 """
 
 from __future__ import annotations
@@ -49,6 +67,7 @@ class CallLog:
         duration_ms: float,
         bytes_out: int,
         error: str | None = None,
+        extra: dict[str, Any] | None = None,
     ) -> None:
         if self.path is None:
             return
@@ -63,6 +82,8 @@ class CallLog:
         }
         if error is not None:
             entry["error"] = self._redact(error)
+        if extra:
+            entry.update(extra)  # sizes, counts, hashes and citation ids only (no log text)
         line = json.dumps(entry, ensure_ascii=False, default=str) + "\n"
         # Open per write: keeps the file closed between calls, which matters on Windows.
         with self._lock, self.path.open("a", encoding="utf-8") as f:

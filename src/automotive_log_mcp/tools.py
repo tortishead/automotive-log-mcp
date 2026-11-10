@@ -50,7 +50,7 @@ class ToolInputError(ValueError):
 
 
 class Filter(BaseModel):
-    """Record filter shared by search and later tools. All fields are optional and combine with AND."""
+    """Record filter; all fields optional, combined with AND."""
 
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
@@ -60,16 +60,12 @@ class Filter(BaseModel):
     from_: str | None = Field(
         default=None,
         alias="from",
-        description="Start time (inclusive): a timestamp exactly as printed in outputs "
-        "('01-01 00:00:01.000', '2026-01-01 00:00:01.000', or '123.456789' seconds since boot for "
-        "kernel records), a relative time ('-5m': before the end of the case; '+30s': after its "
-        "start), or a citation 'log:<source>#<seq>' / 'art:<id>', optionally with an offset "
-        "('log:3#1-30s').",
+        description="Start time, inclusive: a timestamp as printed, '-5m' (before the case end), "
+        "'+30s' (after its start), or a citation with optional offset ('log:3#1-30s', 'art:2').",
     )
     to: str | None = Field(
         default=None,
-        description="End time (inclusive, to the precision given: '08:14' includes all of 08:14), "
-        "same forms as 'from'; '+30s' here means 30 s after 'from'.",
+        description="End time, inclusive to the precision given; as 'from' ('+30s': after 'from').",
     )
     level: Level | None = Field(default=None, description="Minimum level: V < D < I < W < E < F.")
     tags: list[str] | None = Field(default=None, description="Tags to include; globs allowed, e.g. 'Car*'.")
@@ -77,8 +73,7 @@ class Filter(BaseModel):
     pid: int | None = Field(default=None, ge=0, description="Process id.")
     attrs: dict[str, str | int | float | bool] | None = Field(
         default=None,
-        description="Format-specific attributes that must match exactly, e.g. {'uid': '1000'} or "
-        "{'art': 3} (the record of artifact art:3), as get_records shows them.",
+        description="Attributes that must match exactly, as get_records shows them, e.g. {'art': 3}.",
     )
 
 

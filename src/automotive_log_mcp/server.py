@@ -3,7 +3,14 @@
 Every tool is registered with its full parameter schema, an output schema and annotations; the
 tool logic is in ``tools.py``. Every call passes through the policy (allowed tools, byte budget)
 and is written to the call log with redacted arguments (D5); the text given to
-``check_citations`` is logged only as its length and hash (it quotes log content).
+``check_citations`` is logged only as its length and hash (it quotes log content), plus the
+citation ids it contains. Each call-log line also holds sizes, counts and hashes that explain
+token use (see ``calllog.py``).
+
+Structured content: off by default. Clients that get both a text and ``structuredContent`` may
+forward only the JSON to the model (Claude Code 2.1 does), which is 1.5-2x the bytes of the text
+and drops its footer hints ('capped: narrow with …'). ``structured_output: true`` in the config
+(or ``serve --structured``) restores the output schemas and structured content.
 """
 
 from __future__ import annotations
@@ -12,9 +19,11 @@ import functools
 import hashlib
 import inspect
 import re
+import threading
 import time
 import uuid
 from collections.abc import Callable
+from contextvars import ContextVar
 from typing import Annotated, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
@@ -26,6 +35,7 @@ from . import __version__
 from .app import App
 from .calllog import CallLog
 from .config import CASE_NAME_RE, Config
+from .core import format as fmt
 from .core.ingest import AddResult, IngestError
 from .policy import ByteBudget, Policy
 from .store import query
@@ -45,43 +55,33 @@ from .tools import (
     ToolInputError,
     Tools,
 )
+from .usage import FixedCost, args_hashes, cite_ids, compact_cites, est_tokens, fixed_cost, json_bytes
 
 SERVER_NAME = "automotive-log-mcp"
 
 INSTRUCTIONS = """\
-Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs). \
-The server parses, indexes and searches; it never interprets. Reasoning is your job.
+Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs). The \
+server parses, indexes and searches; reasoning is yours. Each call re-sends the whole \
+conversation, so make few, narrow calls and stop once the evidence answers the question.
 
-Analysis order:
-1. list_sources(case): what is in the case (sources, time ranges, build fingerprint). If it is \
-empty, add_source(case, path) with the bugreport zip or log file.
-2. overview(case): levels, top tags, processes and messages, gaps, error bursts, a histogram, \
-detector and artifact counts: where to look first.
-3. detect(case): known failure patterns (crashes, ANRs, watchdog, low memory kills, SELinux \
-denials, binder failures, VHAL errors, service restarts, boot not completed) with cited lines.
-4. list_artifacts(case): tombstones (native crashes), ANRs, Java crashes and dropbox entries, \
-grouped by crash signature, in time order. Copies of one crash are marked 'same crash as'.
-5. read_artifact(case, id='art:<id>') for the summary and section list, then the section it \
-suggests (backtrace, exception, the main thread of an ANR) for the stack trace.
-6. context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before a crash; \
-scope='pid' follows one process across the buffers of a bugreport.
-7. search(case, query, filter) for errors around the defect: start with filter level 'W' or 'E' \
-and a time window (from/to), keep collapse on, narrow with tags or pid. Use mode='regex' only for \
-patterns; text mode matches whole words. count(case, by, query, filter, bucket) counts records by \
-tag, level, pid, source or template, optionally per time bucket.
-8. get_records(case, ids) for full messages that other tools cut with '…'.
-9. check_citations(case, text) with your answer before you give it: every citation must resolve.
+Simple questions (what crashed, and why): 3-4 calls.
+1. add_source(case, path) if the case is new; its reply lists the sources (no list_sources needed).
+2. list_artifacts(case): tombstones, ANRs, Java crashes, dropbox entries, grouped by signature in \
+time order; 'same crash as' marks copies, which need no second read.
+3. read_artifact(case, id='art:<id>') for the crash that fits: its summary has the signal or \
+exception, cause and top of the stack; read a section only if the summary is not enough.
+4. Answer, citing each finding; check_citations(case, text) before answering when asked to cite.
 
-Citation rule: every finding in your answer cites the line or artifact it comes from, exactly as \
-the tools print it: log:<source>#<seq> for a log line, art:<id>[/section][:L<line>] for an \
-artifact line. A statement without a citation is a guess; say so.
+Broader questions: detect(case) for known failure patterns (crash, ANR, watchdog, low memory \
+kill, SELinux, binder, VHAL, service restart, boot not completed); overview(case) for where \
+errors cluster; context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before an \
+event (scope='pid' follows one process across buffers); search/count with filter level 'W' or \
+'E' and from/to; get_records for messages cut with '…'.
 
-Outputs are capped (about 50 lines / 8 KB, messages cut at 200 characters with …). When a result \
-says it was capped, narrow the query instead of paging through everything. Timestamps printed in \
-outputs can be passed back as from/to unchanged; from/to also take '-5m' (before the end of the \
-case), '+30s' (after from) and citations such as 'log:3#120-30s'. Values like MAC addresses and \
-VINs are redacted to tokens (<MAC:3fa2c1d0>); the same value always has the same token. Counts \
-marked ≈ are estimated from a sample of a very broad query.
+Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>]; a statement \
+without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \
+from/to, tags or pid instead of paging. Printed timestamps work as from/to, as do '-5m', '+30s' \
+and 'log:3#120-30s'. Redacted values are stable tokens (<MAC:3fa2c1d0>); ≈ marks estimated counts.
 """
 
 TRIAGE_PROMPT = """\
@@ -126,7 +126,7 @@ Case = Annotated[
     str,
     Field(
         pattern=CASE_RE,
-        description="Case name, e.g. a ticket id. Letters, digits, '.', '_' and '-'; at most 64 characters.",
+        description="Case name, e.g. a ticket id.",
     ),
 ]
 
@@ -188,30 +188,96 @@ def _describe_add(result: AddResult) -> str:
     return "\n".join(lines)
 
 
-def _text(text: str, structured: BaseModel | None = None) -> CallToolResult:
+# Filled by _output during a call, read by the guard: counts for the call log (never content).
+_STATS: ContextVar[dict[str, Any] | None] = ContextVar("_STATS", default=None)
+_ITEM_FIELDS = ("hits", "records", "groups", "results", "lines", "sources", "buckets", "errors")
+
+
+def _result_stats(data: BaseModel) -> dict[str, Any]:
+    stats: dict[str, Any] = {}
+    for name in _ITEM_FIELDS:
+        items = getattr(data, name, None)
+        if isinstance(items, list):
+            stats["results"] = len(items)
+            break
+    total = getattr(data, "total", None)
+    if isinstance(total, int) and not isinstance(total, bool):
+        stats["total"] = total
+    if getattr(data, "exact", True) is False:
+        stats["exact"] = False
+    if isinstance(data, CheckCitationsResult):
+        stats["ok"] = data.ok
+        stats["results"] = len(data.errors)
+        stats["warnings"] = len(data.warnings)
+    return stats
+
+
+def _note(data: BaseModel) -> None:
+    stats = _STATS.get()
+    if stats is not None:
+        stats.update(_result_stats(data))
+
+
+def _text(text: str, structured: BaseModel | None = None, send_structured: bool = True) -> CallToolResult:
+    if structured is not None:
+        _note(structured)
     return CallToolResult(
         content=[TextContent(type="text", text=text)],
-        structured_content=structured.model_dump(mode="json", by_alias=True) if structured else None,
+        structured_content=structured.model_dump(mode="json", by_alias=True)
+        if structured is not None and send_structured
+        else None,
     )
 
 
-def _output(run: Callable[[], Output]) -> CallToolResult:
+def _output(run: Callable[[], Output], send_structured: bool = True) -> CallToolResult:
     """Run a read tool; invalid arguments and unknown ids become tool errors the agent can read."""
     try:
         out = run()
     except (ToolInputError, StoreError) as e:
         raise ToolError(str(e)) from None
+    _note(out.data)
     return CallToolResult(
         content=[TextContent(type="text", text=out.text)],
-        structured_content=out.data.model_dump(mode="json", by_alias=True, exclude_none=True),
+        structured_content=out.data.model_dump(mode="json", by_alias=True, exclude_none=True)
+        if send_structured
+        else None,
     )
 
 
+def _result_text(result: Any) -> str:
+    if isinstance(result, CallToolResult):
+        return "\n".join(c.text for c in result.content if isinstance(c, TextContent))
+    return str(result)
+
+
 def _result_bytes(result: Any) -> int:
-    """Bytes the agent reads: the text content of a tool result."""
+    """Bytes of the text content of a tool result."""
     if isinstance(result, CallToolResult):
         return sum(len(c.text.encode("utf-8")) for c in result.content if isinstance(c, TextContent))
     return len(str(result).encode("utf-8"))
+
+
+def _call_extra(result: Any, text: str, caps: list[str]) -> dict[str, Any]:
+    """Sizes, caps and citation ids of a result for the call log (no content)."""
+    structured = result.structured_content if isinstance(result, CallToolResult) else None
+    text_b = len(text.encode("utf-8"))
+    struct_b = json_bytes(structured) if structured is not None else 0
+    extra: dict[str, Any] = {
+        "text_bytes": text_b,
+        "structured_bytes": struct_b,
+        "tokens_est": est_tokens(struct_b or text_b),
+    }
+    if "(config caps." in text:
+        caps = [*caps, "limit"]
+    if caps:
+        extra["capped"] = sorted(set(caps))
+    logs, arts = cite_ids(text)
+    cites = compact_cites(logs, arts)
+    if cites:
+        extra["cites"] = cites[:MAX_LOG_CITES]
+        if len(cites) > MAX_LOG_CITES:
+            extra["cites_more"] = len(cites) - MAX_LOG_CITES
+    return extra
 
 
 def _jsonable(value: Any) -> Any:
@@ -233,6 +299,7 @@ WRITES_CASE = ToolAnnotations(
 )
 
 _F = TypeVar("_F", bound=Callable[..., Any])
+MAX_LOG_CITES = 300
 
 
 class LogServer:
@@ -246,6 +313,10 @@ class LogServer:
         self.session = session or uuid.uuid4().hex[:12]
         self.calllog = CallLog(config.call_log, self.session, redact=self.app.redactor.redact)
         self.budget = ByteBudget(policy.byte_budget)
+        self.structured = config.structured_output
+        self._seq = 0
+        self._seq_lock = threading.Lock()
+        self._fixed: FixedCost | None = None
         self.mcp: MCPServer = MCPServer(
             name=SERVER_NAME,
             title="Automotive log analysis",
@@ -257,6 +328,19 @@ class LogServer:
 
     # -- plumbing ---------------------------------------------------------------------------
 
+    def fixed_cost(self) -> FixedCost:
+        """What this server adds to every model request: instructions and the tool list."""
+        if self._fixed is None:
+            listing = _sync(self.mcp.list_tools())
+            tools = [t.model_dump(mode="json", by_alias=True, exclude_none=True) for t in listing]
+            self._fixed = fixed_cost(INSTRUCTIONS, tools)
+        return self._fixed
+
+    def _next_seq(self) -> int:
+        with self._seq_lock:
+            self._seq += 1
+            return self._seq
+
     def _guard(self, fn: _F) -> _F:
         """Apply the byte budget and write one call-log line per call."""
         name = fn.__name__
@@ -265,15 +349,39 @@ class LogServer:
         @functools.wraps(fn)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             start = time.perf_counter()
+            seq = self._next_seq()
             bound = sig.bind_partial(*args, **kwargs)
             log_args = _jsonable(dict(bound.arguments))
+            base: dict[str, Any] = {"seq": seq}
+            if seq == 1:
+                base["server"] = {
+                    "version": __version__,
+                    "structured": self.structured,
+                    "fixed": self.fixed_cost().as_log(),
+                }
             if name == "check_citations" and isinstance(log_args.get("text"), str):
                 text = log_args["text"]  # an answer quotes log content: keep only its size and hash
                 digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
                 log_args["text"] = f"<{len(text)} chars, sha256 {digest}>"
+                logs, arts = cite_ids(text)
+                base["answer_cites"] = compact_cites(logs, arts)[:MAX_LOG_CITES]
+            base["args_hash"], base["near_hash"] = args_hashes(name, log_args)
 
-            def log(status: Literal["ok", "error", "refused"], n: int, error: str | None = None) -> None:
-                self.calllog.write(name, log_args, status, (time.perf_counter() - start) * 1000, n, error)
+            def log(
+                status: Literal["ok", "error", "refused"],
+                n: int,
+                error: str | None = None,
+                extra: dict[str, Any] | None = None,
+            ) -> None:
+                self.calllog.write(
+                    name,
+                    log_args,
+                    status,
+                    (time.perf_counter() - start) * 1000,
+                    n,
+                    error,
+                    {**base, **(extra or {})},
+                )
 
             if self.budget.exhausted():
                 msg = (
@@ -282,21 +390,34 @@ class LogServer:
                 )
                 log("refused", 0, msg)
                 raise ToolError(msg)
+            stats: dict[str, Any] = {}
+            caps: list[str] = []
+            t_stats, t_caps = _STATS.set(stats), fmt.CAP_HITS.set(caps)
             try:
                 result = fn(*args, **kwargs)
             except Exception as e:
                 log("error", 0, str(e) or type(e).__name__)
                 raise
+            finally:
+                _STATS.reset(t_stats)
+                fmt.CAP_HITS.reset(t_caps)
+            text = _result_text(result)
             n = _result_bytes(result)
+            extra = _call_extra(result, text, caps)
             self.budget.add(n)
-            log("ok", n)
+            log("ok", n, None, {**extra, **stats})
             return result
 
         return wrapper  # type: ignore[return-value]
 
     def _tool(self, fn: _F, annotations: ToolAnnotations, title: str) -> None:
         if self.policy.tool_allowed(fn.__name__):
-            self.mcp.tool(title=title, annotations=annotations)(self._guard(fn))
+            # structured_output=False: no output schema in the tool list, no structured content.
+            structured = None if self.structured else False
+            self.mcp.tool(title=title, annotations=annotations, structured_output=structured)(self._guard(fn))
+            tool = self.mcp._tool_manager.get_tool(fn.__name__)
+            if tool is not None:
+                tool.parameters = slim_schema(tool.parameters)
 
     # -- tools ------------------------------------------------------------------------------
 
@@ -312,11 +433,8 @@ class LogServer:
                 Field(description="Connector name to force, e.g. 'logcat'; omit to sniff the format."),
             ] = None,
         ) -> CallToolResult:
-            """Register a log file or archive in a case and index it. Returns the new source ids.
-
-            A bugreport zip expands into several sources (main, system, events, crash, kernel) and its
-            tombstones, ANRs and crashes become artifacts. The original file is referenced, not copied.
-            """
+            """Index a log file, directory or zip (e.g. a bugreport) into a case; lists the new sources.
+            Tombstones, ANRs and crashes become artifacts. The original is referenced, not copied."""
             try:
                 self.app.ingestor.check(path, format)
             except IngestError as e:
@@ -342,7 +460,9 @@ class LogServer:
             if not infos:
                 why = "" if exists else " (the case does not exist yet)"
                 return _text(
-                    f"No sources in case '{case}'{why}. Add one with add_source(case, path).", result
+                    f"No sources in case '{case}'{why}. Add one with add_source(case, path).",
+                    result,
+                    self.structured,
                 )
             lines = []
             for i in infos:
@@ -361,7 +481,7 @@ class LogServer:
                 lines.append("fingerprint: " + ", ".join(fps))
             if self.app.workers.busy(case):
                 lines.append("An import is still running in this case.")
-            return _text("\n".join(lines), result)
+            return _text("\n".join(lines), result, self.structured)
 
         def search(
             case: Case,
@@ -369,9 +489,8 @@ class LogServer:
                 str,
                 Field(
                     min_length=1,
-                    description="Text: words that must all occur (case-insensitive, whole words), "
-                    "\"quoted phrases\", prefix*, upper-case AND/OR/NOT. Regex (mode='regex'): a Python "
-                    "regular expression over message and tag, case-sensitive.",
+                    description="Text: words that must all occur (whole words, case-insensitive), "
+                    '"phrases", prefix*, AND/OR/NOT. Regex mode: Python regex, case-sensitive.',
                 ),
             ],
             mode: Annotated[
@@ -380,10 +499,7 @@ class LogServer:
             filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
             collapse: Annotated[
                 bool,
-                Field(
-                    description="Collapse repeated messages (same source, template, tag and level) into "
-                    "one line with count and last time; lines are in time order of first occurrence."
-                ),
+                Field(description="One line per repeated message, with ×count and last time."),
             ] = True,
             count_only: Annotated[
                 bool, Field(description="Return only the number of matches, by level.")
@@ -393,12 +509,10 @@ class LogServer:
                 str | None, Field(description="Cursor from a previous result's footer, to get the next page.")
             ] = None,
         ) -> Annotated[CallToolResult, SearchResult]:
-            """Search log records by text or regex, in time order. Every hit is cited as log:<source>#<seq>.
+            """Search log records by text or regex, in time order, each hit cited as log:<source>#<seq>.
 
-            Collapsed hits show ×count and the last occurrence. Hits that belong to a crash, tombstone or
-            ANR name their artifact (art:<id>). A footer says how many more there are and how to narrow;
-            an empty result says why. 'code search' lists the constant text of the messages' templates.
-            """
+            Repeats collapse to one line with ×count; hits of a crash or ANR name their artifact. The
+            footer says how many more there are and how to narrow."""
             return _output(
                 lambda: tools.search(
                     case,
@@ -410,7 +524,8 @@ class LogServer:
                     limit,
                     cursor,
                     self.app.workers.busy(case),
-                )
+                ),
+                self.structured,
             )
 
         def context(
@@ -434,7 +549,7 @@ class LogServer:
             ] = "source",
         ) -> Annotated[CallToolResult, ContextResult]:
             """Show the lines around a record; the record itself is marked with '>'."""
-            return _output(lambda: tools.context(case, at, before, after, scope))
+            return _output(lambda: tools.context(case, at, before, after, scope), self.structured)
 
         def list_artifacts(
             case: Case,
@@ -443,12 +558,9 @@ class LogServer:
                 Field(description="Artifact type: 'tombstone', 'anr', 'java_crash' or 'dropbox'."),
             ] = None,
         ) -> Annotated[CallToolResult, ListArtifactsResult]:
-            """List tombstones, ANRs, Java crashes and dropbox entries, grouped by crash signature.
-
-            Groups are in time order of their first artifact. Copies of one crash (crash buffer and dropbox,
-            an ANR file and the bugreport section) are marked 'same crash as art:<id>'.
-            """
-            return _output(lambda: tools.list_artifacts(case, type))
+            """List tombstones, ANRs, Java crashes and dropbox entries, grouped by crash signature in
+            time order; copies of one crash are marked 'same crash as art:<id>'."""
+            return _output(lambda: tools.list_artifacts(case, type), self.structured)
 
         def read_artifact(
             case: Case,
@@ -475,7 +587,9 @@ class LogServer:
 
             Lines are numbered L<n> over the whole artifact; cite them as art:<id>/<section>:L<n>.
             """
-            return _output(lambda: tools.read_artifact(case, id, section, start_line, end_line))
+            return _output(
+                lambda: tools.read_artifact(case, id, section, start_line, end_line), self.structured
+            )
 
         def get_records(
             case: Case,
@@ -486,17 +600,15 @@ class LogServer:
         ) -> Annotated[CallToolResult, GetRecordsResult]:
             """Get full records: messages not truncated (multi-line stack traces included), the timestamp
             as written, all attributes and the template's constant text for a code search."""
-            return _output(lambda: tools.get_records(case, ids))
+            return _output(lambda: tools.get_records(case, ids), self.structured)
 
         def overview(
             case: Case,
             filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
         ) -> Annotated[CallToolResult, OverviewResult]:
-            """Orientation for a case: record and level counts, top tags, processes and messages
-            (templates), clock segments, gaps over 30 s, error bursts (E/F per 10 s above 5× the median),
-            a histogram of up to 60 buckets, detector hit counts and artifact counts. Each item is cited.
-            """
-            return _output(lambda: tools.overview(case, filter))
+            """Orientation for a case: level counts, top tags, processes and messages, clock segments,
+            gaps, error bursts, a histogram, detector and artifact counts, each cited."""
+            return _output(lambda: tools.overview(case, filter), self.structured)
 
         def count(
             case: Case,
@@ -523,12 +635,9 @@ class LogServer:
             ] = None,
             limit: Annotated[int, Field(ge=1, le=100, description="Maximum values to list.")] = 20,
         ) -> Annotated[CallToolResult, CountResult]:
-            """Count records by tag, level, pid, source or message template, optionally per time bucket.
-
-            Each value comes with an example citation. Broad text queries are counted from a sample (≈);
-            a capped regex scan gives lower bounds ('at least').
-            """
-            return _output(lambda: tools.count(case, by, query, mode, filter, bucket, limit))
+            """Count records by tag, level, pid, source or template, optionally per time bucket, each
+            value with an example citation (≈: estimated from a sample)."""
+            return _output(lambda: tools.count(case, by, query, mode, filter, bucket, limit), self.structured)
 
         def detect(
             case: Case,
@@ -541,11 +650,9 @@ class LogServer:
                 int, Field(ge=1, le=10, description="Example lines per rule (collapsed by message or pid).")
             ] = 3,
         ) -> Annotated[CallToolResult, DetectResult]:
-            """Run detector rules for known failure patterns: Java and native crashes, ANRs, watchdog, low
-            memory kills, SELinux denials, binder failures, VHAL errors, service restarts, boot not completed
-            (plus rules from the configured rule directories). Hits by severity and time, with citations and
-            a hint what to read next."""
-            return _output(lambda: tools.detect(case, rules, filter, examples))
+            """Run detector rules for known failure patterns (crashes, ANRs, watchdog, low memory kills,
+            SELinux, binder, VHAL errors, service restarts, boot not completed): cited hits by severity."""
+            return _output(lambda: tools.detect(case, rules, filter, examples), self.structured)
 
         def check_citations(
             case: Case,
@@ -558,11 +665,9 @@ class LogServer:
                 ),
             ],
         ) -> Annotated[CallToolResult, CheckCitationsResult]:
-            """Check an answer before giving it: every log:<source>#<seq> and art:<id>[/section][:L<n>]
-            citation must be well-formed and resolve in the case (errors); paragraphs with findings but no
-            citation, and quoted text not found in the cited lines, are warnings. 'PASS' when there are no
-            errors."""
-            return _output(lambda: tools.check_citations(case, text))
+            """Check an answer's citations: each must be well-formed and resolve (errors); uncited
+            findings and quotes not in the cited lines are warnings. 'PASS' when there are no errors."""
+            return _output(lambda: tools.check_citations(case, text), self.structured)
 
         self._tool(add_source, WRITES_CASE, "Add a log source")
         self._tool(list_sources, READ_ONLY, "List sources")
@@ -604,6 +709,36 @@ TOOL_NAMES = (
     "detect",
     "check_citations",
 )
+
+
+def slim_schema(node: Any) -> Any:
+    """A smaller input schema with the same meaning for a model: no generated titles, optional
+    fields as their plain type (``anyOf [X, null]`` and ``default: null`` dropped; the server still
+    accepts null, since arguments are validated against the pydantic models, not this schema).
+    Clients send these schemas with every model request, so every byte counts many times."""
+    if isinstance(node, list):
+        return [slim_schema(v) for v in node]
+    if not isinstance(node, dict):
+        return node
+    out = {k: slim_schema(v) for k, v in node.items() if k != "title" or not isinstance(v, str)}
+    any_of = out.get("anyOf")
+    if isinstance(any_of, list) and len(any_of) == 2 and {"type": "null"} in any_of:
+        other = next(v for v in any_of if v != {"type": "null"})
+        del out["anyOf"]
+        out = {**other, **out}
+    if "default" in out and out["default"] is None:
+        del out["default"]
+    return out
+
+
+def _sync(coro: Any) -> Any:
+    """Result of a coroutine that never awaits (MCPServer.list_tools), without an event loop."""
+    try:
+        coro.send(None)
+    except StopIteration as stop:
+        return stop.value
+    coro.close()
+    raise RuntimeError("coroutine awaited")
 
 
 def build_server(config: Config, policy: Policy, session: str | None = None) -> MCPServer:

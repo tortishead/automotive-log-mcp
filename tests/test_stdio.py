@@ -14,7 +14,8 @@ from mcp import Client, StdioServerParameters
 
 from automotive_log_mcp.server import TOOL_NAMES
 
-SERVE = [sys.executable, "-m", "automotive_log_mcp", "serve"]
+SERVE = [sys.executable, "-m", "automotive_log_mcp", "serve", "--structured"]  # structured contract
+SERVE_DEFAULT = [sys.executable, "-m", "automotive_log_mcp", "serve"]
 
 
 def env_for(home: Path) -> dict[str, str]:

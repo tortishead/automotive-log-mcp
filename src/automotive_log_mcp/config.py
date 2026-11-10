@@ -45,6 +45,9 @@ class Config:
     call_log: Path | None
     caps: Caps = field(default_factory=Caps)
     rule_dirs: tuple[Path, ...] = ()
+    # Tool results with structuredContent and output schemas; off by default because some clients
+    # (Claude Code) then forward only the JSON to the model, at 1.5-2x the bytes of the text.
+    structured_output: bool = False
 
     def case_db(self, case: str) -> Path:
         """Path of a case's DB file (D7). ``case`` must already be validated."""
@@ -56,7 +59,7 @@ def default_home() -> Path:
     return Path(env).expanduser() if env else Path.home() / ".automotive-log-mcp"
 
 
-_TOP_KEYS = {"cases_dir", "policy_file", "call_log", "caps", "rule_dirs"}
+_TOP_KEYS = {"cases_dir", "policy_file", "call_log", "caps", "rule_dirs", "structured_output"}
 _CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars", "regex_scan_rows"}
 
 
@@ -116,6 +119,10 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
     if not isinstance(rule_dirs_data, list):
         raise ConfigError("config key 'rule_dirs' must be a list of paths")
 
+    structured = data.get("structured_output", False)
+    if not isinstance(structured, bool):
+        raise ConfigError(f"config key 'structured_output' must be true or false, got {structured!r}")
+
     call_log: Path | None
     if "call_log" in data and data["call_log"] is None:
         call_log = None  # explicitly disabled
@@ -133,4 +140,5 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
         call_log=call_log,
         caps=caps,
         rule_dirs=tuple(_path(d, "rule_dirs[]", base) for d in rule_dirs_data),
+        structured_output=structured,
     )

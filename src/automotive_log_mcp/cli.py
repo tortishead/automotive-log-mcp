@@ -7,12 +7,14 @@ Without an agent: ``index <case> <path>`` indexes a log file, archive or directo
 ANR traces, Java crashes and dropbox entries, ``artifacts <case> --show art:<id>[/section][:L<n>]``
 prints one. ``overview``, ``count``, ``detect`` and ``check`` print the output of the MCP tools of
 the same names (``check`` runs check_citations on a Markdown file); ``rules`` lists the detector
-rules and where they come from.
+rules and where they come from. ``calls`` analyses agent sessions from the call log (optionally
+joined with a Claude Code transcript): where the tokens went, why a run failed, what to change.
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import re
 import sys
 from collections.abc import Sequence
@@ -20,12 +22,12 @@ from pathlib import Path
 
 from . import __version__
 from .app import App
-from .config import CASE_NAME_RE, ConfigError, load_config
+from .config import CASE_NAME_RE, Config, ConfigError, load_config
 from .connectors.base import ConnectorError
 from .core.ingest import IngestError
 from .core.levels import LEVEL_RANK
 from .detect.engine import BUILTIN_DIR
-from .policy import load_policy
+from .policy import Policy, load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
 from .tools import Filter, ToolInputError, Tools
@@ -44,7 +46,13 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--config", type=Path, help="config file (default: <home>/config.yaml)")
     sub = p.add_subparsers(dest="command", required=True)
-    sub.add_parser("serve", help="run the MCP server over stdio")
+    se = sub.add_parser("serve", help="run the MCP server over stdio")
+    se.add_argument(
+        "--structured",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="send structuredContent and output schemas (default: config structured_output, false)",
+    )
 
     ix = sub.add_parser("index", help="index a log file, archive or directory into a case")
     ix.add_argument("case", type=_case)
@@ -100,6 +108,28 @@ def _parser() -> argparse.ArgumentParser:
         metavar="CITATION",
         help="art:<id> (summary and sections), art:<id>/<section> or art:<id>[/<section>]:L<n>[-L<m>]",
     )
+
+    ca = sub.add_parser("calls", help="analyse an agent session: calls, bytes, tokens, problems, suggestions")
+    ca.add_argument("--log", type=Path, help="call log (default: config call_log, <home>/calllog.jsonl)")
+    ca.add_argument("--session", action="append", help="session id (prefix ok); repeatable")
+    ca.add_argument(
+        "--last", type=int, nargs="?", const=1, metavar="N", help="the last N sessions (default 1)"
+    )
+    ca.add_argument("--list", type=int, nargs="?", const=15, metavar="N", help="list the last N sessions")
+    ca.add_argument(
+        "--transcript",
+        type=Path,
+        help="Claude Code session .jsonl or 'claude -p --output-format stream-json' output, for real "
+        "token counts; picks the matching session unless --session is given",
+    )
+    ca.add_argument(
+        "--reads",
+        choices=["structured", "text", "both"],
+        default="structured",
+        help="what the client passes to the model when a result has structured content "
+        "(Claude Code: structured; without a transcript this is an assumption)",
+    )
+    ca.add_argument("--fixed", action="store_true", help="print the fixed cost per tool and exit")
 
     rl = sub.add_parser("relink", help="point a case at a moved original file (hash must match)")
     rl.add_argument("case", type=_case)
@@ -283,6 +313,62 @@ def _rules(app: App, show: str | None) -> int:
     return 0
 
 
+def _fixed(config: Config, policy: Policy) -> int:
+    from .server import LogServer
+    from .usage import est_tokens
+
+    fc = LogServer(config, policy, session="fixed-cost").fixed_cost()
+    print(f"{'tool':<16} {'model bytes':>11} {'~tokens':>8} {'output schema':>14}")
+    for t in sorted(fc.tools, key=lambda t: -t.model_bytes):
+        print(
+            f"{t.name:<16} {t.model_bytes:>11,} {est_tokens(t.model_bytes):>8,} {t.output_schema_bytes:>14,}"
+        )
+    print(f"{'instructions':<16} {fc.instructions_bytes:>11,} {est_tokens(fc.instructions_bytes):>8,}")
+    print(
+        f"{'per request':<16} {fc.model_bytes:>11,} {est_tokens(fc.model_bytes):>8,}  "
+        f"(structured output {'on' if config.structured_output else 'off'}; tokens ≈ bytes/4)"
+    )
+    return 0
+
+
+def _calls(config: Config, policy: Policy, args: argparse.Namespace) -> int:
+    from . import callreport as cr
+
+    if args.fixed:
+        return _fixed(config, policy)
+    path = args.log or config.call_log
+    if path is None or not path.is_file():
+        _err(f"no call log at {path} (config call_log)")
+        return 2
+    sessions = [s for s in cr.read_calllog(path) if s.calls]
+    if not sessions:
+        _err(f"no calls in {path}")
+        return 1
+    if args.list:
+        for s in sessions[-args.list :]:
+            print(cr.session_line(s, args.reads))
+        return 0
+    transcript = cr.read_transcript(args.transcript) if args.transcript else None
+    if args.session:
+        chosen = [s for s in sessions if any(s.id.startswith(p) for p in args.session)]
+        if not chosen:
+            _err(f"no session {', '.join(args.session)} in {path}; try --list")
+            return 1
+    elif transcript is not None:
+        best = max(sessions, key=lambda s: (cr.match_score(transcript, s), s.last))
+        if cr.match_score(transcript, best) == 0:
+            _err("no session in the call log matches the transcript's calls; give --session")
+            return 1
+        chosen = [best]
+    else:
+        chosen = sessions[-(args.last or 1) :]
+    for i, s in enumerate(chosen):
+        if i:
+            print()
+        print(cr.analyse(s, transcript, args.reads).text())
+    return 0
+
+
 def _run(app: App, args: argparse.Namespace) -> int:
     if args.command == "index":
         if not args.quiet:
@@ -348,9 +434,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         check_fts5()
         config = load_config(args.config)
         policy = load_policy(config.policy_file)
+        if args.command == "calls":
+            return _calls(config, policy, args)
         if args.command == "serve":
             from .server import build_server
 
+            if args.structured is not None:
+                config = dataclasses.replace(config, structured_output=args.structured)
             server = build_server(config, policy)
         else:
             app = App.create(config, policy)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,10 @@ from automotive_log_mcp.server import TOOL_NAMES, build_server
 P0_TOOLS = set(TOOL_NAMES)
 
 
+def structured(config: Config) -> Config:
+    return dataclasses.replace(config, structured_output=True)
+
+
 def run(fn: Any) -> Any:
     return anyio.run(fn)
 
@@ -26,7 +31,7 @@ def calllog_lines(config: Config) -> list[dict[str, Any]]:
 
 def test_lists_all_p0_tools_with_annotations(config: Config) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             tools = {t.name: t for t in (await client.list_tools()).tools}
             assert set(tools) == P0_TOOLS
             for name, tool in tools.items():
@@ -48,7 +53,7 @@ def test_lists_all_p0_tools_with_annotations(config: Config) -> None:
 
 def test_list_sources_on_empty_case(config: Config) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             result = await client.call_tool("list_sources", {"case": "TICKET-1"})
             assert not result.is_error
             assert result.structured_content == {"case": "TICKET-1", "exists": False, "sources": []}
@@ -65,7 +70,7 @@ def test_list_sources_on_empty_case(config: Config) -> None:
 
 def test_tool_errors_are_clear_and_logged(config: Config) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             result = await client.call_tool(
                 "search", {"case": "c1", "query": "crash", "filter": {"from": "-5m", "level": "E"}}
             )
@@ -89,7 +94,7 @@ def test_tool_errors_are_clear_and_logged(config: Config) -> None:
 )
 def test_invalid_params_fail_loudly(config: Config, tool: str, args: dict[str, Any]) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             result = await client.call_tool(tool, args)
             assert result.is_error
 
@@ -100,7 +105,7 @@ def test_policy_hides_tools(config: Config) -> None:
     policy = Policy(allowed_tools=frozenset({"list_sources", "search"}))
 
     async def main() -> None:
-        async with Client(build_server(config, policy)) as client:
+        async with Client(build_server(structured(config), policy)) as client:
             names = {t.name for t in (await client.list_tools()).tools}
             assert names == {"list_sources", "search"}
 
@@ -109,12 +114,12 @@ def test_policy_hides_tools(config: Config) -> None:
 
 def test_policy_unknown_tool_is_an_error(config: Config) -> None:
     with pytest.raises(ConfigError, match="srch"):
-        build_server(config, Policy(allowed_tools=frozenset({"srch"})))
+        build_server(structured(config), Policy(allowed_tools=frozenset({"srch"})))
 
 
 def test_byte_budget_refuses_after_limit(config: Config) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy(byte_budget=10))) as client:
+        async with Client(build_server(structured(config), Policy(byte_budget=10))) as client:
             first = await client.call_tool("list_sources", {"case": "c1"})
             assert not first.is_error
             second = await client.call_tool("list_sources", {"case": "c1"})
@@ -134,7 +139,7 @@ def test_call_log_can_be_disabled(home: Path) -> None:
     assert config.call_log is None
 
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             await client.call_tool("list_sources", {"case": "c1"})
 
     run(main)
@@ -143,7 +148,7 @@ def test_call_log_can_be_disabled(home: Path) -> None:
 
 def test_defect_triage_prompt(config: Config) -> None:
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             result = await client.get_prompt("defect_triage", {"case": "c1", "symptom": "HVAC freezes"})
             text = result.messages[0].content.text  # type: ignore[union-attr]
             assert "c1" in text

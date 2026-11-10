@@ -17,6 +17,7 @@ import base64
 import hashlib
 import json
 import re
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -90,6 +91,17 @@ def template_literal(template: str | None, limit: int = 120) -> str | None:
     return best if len(best) <= limit else best[:limit]
 
 
+# The server sets a list here around each tool call; every page that hits a cap appends 'lines' or
+# 'bytes', so the call log can say which outputs were capped (without looking at their content).
+CAP_HITS: ContextVar[list[str] | None] = ContextVar("CAP_HITS", default=None)
+
+
+def _note_cap(kind: str) -> None:
+    hits = CAP_HITS.get()
+    if hits is not None:
+        hits.append(kind)
+
+
 @dataclass
 class Page:
     """Accumulates output lines under a line cap and a byte cap.
@@ -113,9 +125,11 @@ class Page:
         n = utf8_len(line) + 1
         if count_line and self.counted >= self.max_lines:
             self.full, self.capped_by = True, "lines"
+            _note_cap("lines")
             return False
         if self.size + n > self.max_bytes - self.reserve:
             self.full, self.capped_by = True, "bytes"
+            _note_cap("bytes")
             return False
         self.lines.append(line)
         self.counted += 1 if count_line else 0

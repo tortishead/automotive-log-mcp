@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,10 @@ from .conftest import FIXED_SECRET, copy_fixture
 from .test_golden import make_bugreport_zip
 
 
+def structured(config: Config) -> Config:
+    return dataclasses.replace(config, structured_output=True)
+
+
 def calllog(config: Config) -> list[dict[str, Any]]:
     assert config.call_log is not None
     return [json.loads(x) for x in config.call_log.read_text(encoding="utf-8").splitlines()]
@@ -35,7 +40,7 @@ def test_add_and_list_bugreport(config: Config, tmp_path: Path, fixed_secret: No
     z = make_bugreport_zip(tmp_path)
 
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             r = await client.call_tool("add_source", {"case": "T-1", "path": str(z)})
             assert not r.is_error, r.content
             text = r.content[0].text  # type: ignore[union-attr]
@@ -65,7 +70,7 @@ def test_add_source_errors(config: Config, tmp_path: Path) -> None:
     notes.write_text("hello\n", encoding="utf-8")
 
     async def main() -> None:
-        async with Client(build_server(config, Policy(blocked_sources=("*secret*",)))) as client:
+        async with Client(build_server(structured(config), Policy(blocked_sources=("*secret*",)))) as client:
             for args, match in [
                 ({"path": str(tmp_path / "missing.log")}, "no such file"),
                 ({"path": str(notes)}, "unknown format"),
@@ -86,7 +91,7 @@ def test_call_log_arguments_are_redacted(config: Config, tmp_path: Path, fixed_s
     raw_path = tmp_path / "WVWZZZ1JZXW000001" / "trace 192.168.1.23.log"
 
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             await client.call_tool("add_source", {"case": "c", "path": str(raw_path)})
             await client.call_tool("search", {"case": "c", "query": "peer 3c:5a:b4:01:02:03"})
 
@@ -118,7 +123,7 @@ def test_add_source_reports_background_indexing(
     monkeypatch.setattr(ingest.Ingestor, "add", slow_add)
 
     async def main() -> None:
-        async with Client(build_server(config, Policy())) as client:
+        async with Client(build_server(structured(config), Policy())) as client:
             r = await client.call_tool("add_source", {"case": "c", "path": str(p)})
             assert "background" in r.content[0].text  # type: ignore[union-attr]
             ls = await client.call_tool("list_sources", {"case": "c"})
