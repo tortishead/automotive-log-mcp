@@ -13,7 +13,9 @@ record on the timeline. Eleven tools work over MCP: the P0 tools `add_source`, `
 all with capped, cited output. An evaluation harness ([eval/](eval/)) checks evidence recall
 without an agent and gives a checklist for agent runs. Everything is verified on synthetic
 fixtures and synthetic evaluation cases only, not yet on real bugreports or real closed defects;
-ingest (about 33–42k lines/s, DB 1.9× the input) misses the M1 targets. DLT is not read yet (M5):
+ingest (about 33–42k lines/s before the CamelCase index of schema 3, which costs about 18% of
+that and 7% more DB; DB 1.9× the input) misses the M1 targets. A case DB of schema 2 is migrated
+on first open by rebuilding its text index (about 3 s per 400k records), without a re-import. DLT is not read yet (M5):
 see [docs/dlt.md](docs/dlt.md). See [docs/design.md](docs/design.md) and
 [docs/implementation-plan.md](docs/implementation-plan.md).
 
@@ -83,12 +85,19 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
 - **Code search**: search hits carry their template and its longest constant text (`"setProperty
   failed, status="`), ready for a search in the source code.
 - **Text vs regex**: text mode is FTS5 (whole words, case-insensitive, `"phrases"`, `prefix*`,
-  `AND`/`OR`/`NOT`); a text query that looks like a regex gets a warning. Regex mode is Python
+  `AND`/`OR`/`NOT`); a text query that looks like a regex gets a warning. The parts of CamelCase
+  names are words too: `eso` or `Delegate` finds `EsoCarDelegateDisplayAreaPolicyProvider`, and a
+  CamelCase query word also matches its parts in a row (`DisplayArea` is searched as
+  `(DisplayArea OR "display area")`). Regex mode is Python
   `re`, case-sensitive; literal parts of the pattern prefilter in SQL (FTS and `instr`), then at
   most `regex_scan_rows` candidates are scanned (a capped scan says so and counts are lower
   bounds).
 - **Empty results say why**: a word that occurs nowhere, or which filter part removes the matches
   (`3 matches in the case, none with the filter: 3 without the level filter (level F)`).
+- **A sources filter says what it leaves out**: `Outside the sources filter: 3,120 more matches
+  (log:4 3,108, log:2 12)` (text queries; a regex search names the sources it did not search).
+- **No query lists the filter**: `search` with `query` `''` or `'*'` returns every record that
+  passes the filter, e.g. all lines of a tag or of a time window, collapsed or not.
 - **Structured content** holds the same items as the text (citations, full timestamps, counts,
   templates), with a declared output schema per tool.
 - Raw values in queries and filters (a MAC, a VIN) are redacted like the logs, so they match
@@ -229,9 +238,9 @@ automotive-log-mcp rules                                             # detector 
 
 | Connector | Input |
 | --- | --- |
-| `bugreport` | `bugreport-*.txt` (also inside the zip): `SYSTEM LOG` split per buffer (main, system, crash, …), `EVENT LOG`, `KERNEL LOG`, fingerprint, time zone, uptime, process list, binder transactions; ANR, tombstone and dropbox sections go to the artifact parsers |
+| `bugreport` | `bugreport-*.txt` (also inside the zip): `SYSTEM LOG` as one source named after its buffers (`main+system+crash`: without `-D`, logcat marks only where each buffer first appears, then interleaves them), split per buffer only when logcat ran with `-D`/`--dividers`, `EVENT LOG`, `KERNEL LOG`, fingerprint, time zone, uptime, process list, binder transactions; ANR, tombstone and dropbox sections go to the artifact parsers |
 | `tombstone`, `anr`, `dropbox` | the artifact files listed under [Artifacts](#artifacts) (sniffed by content or name) |
-| `logcat` | `threadtime`, `time`, `brief`, `process`, `tag`, `thread`, `long`, `raw`; modifiers `year`, `epoch`, `monotonic`, `usec`, `nsec`, `zone`, `UTC`, `uid`, `printable`, `color`; buffer markers; multi-line messages merged |
+| `logcat` | `threadtime`, `time`, `brief`, `process`, `tag`, `thread`, `long`, `raw`; modifiers `year`, `epoch`, `monotonic`, `usec`, `nsec`, `zone`, `UTC`, `uid`, `printable`, `color`; `beginning of`/`switch to` markers (one source per buffer only with dividers); multi-line messages merged |
 | `kernel` | `dmesg` (with or without `<prio>`, caller ids, `-x`, `-T`) and `/dev/kmsg` |
 | `archive` | zip, tar (plain, gz, bz2, xz), single-file gzip; nested up to depth 4 |
 | `syslog` | BSD syslog / `journalctl -o short` (a YAML connector shipped in the package) |

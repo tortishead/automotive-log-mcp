@@ -63,9 +63,17 @@ class RawRecord:
 
 @dataclass(slots=True)
 class StreamMarker:
-    """Emitted by a connector when the following records belong to another stream (buffer)."""
+    """Emitted by a connector when the following records belong to another stream (buffer).
+
+    ``join``: the following records belong to the current stream *or* ``stream`` (logcat without
+    ``--dividers`` prints ``beginning of <buffer>`` once per buffer, after which buffers interleave
+    with no further marker); the current source is renamed ``<current>+<stream>`` instead of a new
+    source being started. ``switch``: the connector saw an explicit switch (``switch to <buffer>``).
+    """
 
     stream: str
+    join: bool = False
+    switch: bool = False
 
 
 @dataclass(slots=True)

@@ -17,7 +17,9 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+from ..core.words import camel_parts
+
+SCHEMA_VERSION = 3
 BATCH_ROWS = 50_000
 
 
@@ -50,7 +52,7 @@ def _schema_sql(name: str = "schema.sql") -> str:
 
 # Steps from version n-1 to n, in order. Version 1 is schema.sql; later steps never edit it, so a
 # case DB of any older version opens and is brought up to date.
-MIGRATIONS: dict[int, str] = {1: "schema.sql", 2: "schema_v2.sql"}
+MIGRATIONS: dict[int, str] = {1: "schema.sql", 2: "schema_v2.sql", 3: "schema_v3.sql"}
 
 
 def _migrate(conn: sqlite3.Connection, path: Path) -> None:
@@ -86,6 +88,7 @@ def connect(path: Path, create: bool = False) -> sqlite3.Connection:
     except sqlite3.Error as e:
         raise StoreError(f"cannot open case DB {path}: {e}") from e
     try:
+        conn.create_function("camel_parts", 2, camel_parts, deterministic=True)
         conn.execute("PRAGMA busy_timeout=10000")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
@@ -131,7 +134,7 @@ class BatchWriter:
         self.conn = conn
         self.batch_rows = batch_rows or BATCH_ROWS
         self.rows: list[tuple[Any, ...]] = []
-        self.fts: list[tuple[int, str, str | None]] = []
+        self.fts: list[tuple[int, str, str | None, str]] = []
         self.tags: dict[str, int] = dict(conn.execute("SELECT name, id FROM tags").fetchall())
         self._templates: dict[str, int] = dict(conn.execute("SELECT text, id FROM templates").fetchall())
         self._new_templates: list[tuple[int, str]] = []
@@ -166,7 +169,7 @@ class BatchWriter:
     def add(self, row: tuple[Any, ...], tag: str | None) -> None:
         """Row: (id, ts, ts_src, ts_raw, level, tag_id, pid, tid, msg, template_id, seg, attrs)."""
         self.rows.append(row)
-        self.fts.append((row[0], row[8], tag))
+        self.fts.append((row[0], row[8], tag, camel_parts(row[8], tag)))
         if len(self.rows) >= self.batch_rows:
             self.flush()
 
@@ -207,7 +210,7 @@ class BatchWriter:
                     "seg, attrs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                     rows,
                 )
-                conn.executemany("INSERT INTO records_fts(rowid, msg, tag) VALUES (?,?,?)", fts)
+                conn.executemany("INSERT INTO records_fts(rowid, msg, tag, parts) VALUES (?,?,?,?)", fts)
             for sql, params in extra:
                 conn.execute(sql, params)
 
@@ -221,8 +224,8 @@ def delete_sources(conn: sqlite3.Connection, source_ids: list[int]) -> None:
             lo, hi = sid << SEQ_BITS, ((sid + 1) << SEQ_BITS) - 1
             # External-content FTS: delete index entries while the content rows still exist.
             conn.execute(
-                "INSERT INTO records_fts(records_fts, rowid, msg, tag) "
-                "SELECT 'delete', id, msg, tag FROM records_v WHERE id BETWEEN ? AND ?",
+                "INSERT INTO records_fts(records_fts, rowid, msg, tag, parts) "
+                "SELECT 'delete', id, msg, tag, parts FROM records_fts_v WHERE id BETWEEN ? AND ?",
                 (lo, hi),
             )
             rows = conn.execute(

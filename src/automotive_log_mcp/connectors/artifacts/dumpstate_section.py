@@ -58,6 +58,8 @@ class Header:
             out["section_file"] = self.file
         if self.file_time is not None:
             out["section_time"] = self.file_time
+        if self.command.startswith("logcat"):
+            out["section_command"] = self.command  # buffers and --dividers: how markers read
         return out
 
 

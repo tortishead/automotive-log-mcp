@@ -518,16 +518,16 @@
    "exact": true,
    "groups": [
     {
+     "count": 4,
+     "example": "log:1#1",
+     "key": 1234,
+     "label": "1234 hvac worker"
+    },
+    {
      "count": 2,
      "example": "log:2#1",
      "key": 1000,
      "label": "1000 system_server"
-    },
-    {
-     "count": 2,
-     "example": "log:3#1",
-     "key": 1234,
-     "label": "1234 hvac worker"
     },
     {
      "count": 1,
@@ -536,13 +536,13 @@
     }
    ],
    "query": "hvac",
-   "total": 5,
+   "total": 7,
    "warnings": []
   },
   "text": [
-   "5 records matching 'hvac' by pid, 3 distinct values:",
+   "7 records matching 'hvac' by pid, 3 distinct values:",
+   "            4  1234 hvac worker  e.g. log:1#1",
    "            2  1000 system_server  e.g. log:2#1",
-   "            2  1234 hvac worker  e.g. log:3#1",
    "            1  -  e.g. log:5#2"
   ]
  },

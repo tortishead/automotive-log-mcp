@@ -920,6 +920,7 @@
      "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
      "ro.product.model": "sdk_car_x86_64"
     },
+    "section_command": "logcat -D -v threadtime -v printable -v uid -d *:v",
     "timezone": "Europe/Berlin",
     "ts_format": "md_ms",
     "uptime_s": 720
@@ -951,6 +952,7 @@
      "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
      "ro.product.model": "sdk_car_x86_64"
     },
+    "section_command": "logcat -D -v threadtime -v printable -v uid -d *:v",
     "timezone": "Europe/Berlin",
     "ts_format": "md_ms",
     "uptime_s": 720
@@ -982,6 +984,7 @@
      "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
      "ro.product.model": "sdk_car_x86_64"
     },
+    "section_command": "logcat -D -v threadtime -v printable -v uid -d *:v",
     "timezone": "Europe/Berlin",
     "ts_format": "md_ms",
     "uptime_s": 720
@@ -1013,6 +1016,7 @@
      "ro.build.fingerprint": "google/sdk_car_x86_64/emulator_car64_x86_64:14/UAA1.250512.001/13398012:userdebug/test-keys",
      "ro.product.model": "sdk_car_x86_64"
     },
+    "section_command": "logcat -b events -v threadtime -v printable -v uid -d *:v",
     "timezone": "Europe/Berlin",
     "ts_format": "md_ms",
     "uptime_s": 720

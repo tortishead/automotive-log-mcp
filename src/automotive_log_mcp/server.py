@@ -506,11 +506,12 @@ class LogServer:
             query: Annotated[
                 str,
                 Field(
-                    min_length=1,
-                    description="Text: words that must all occur (whole words, case-insensitive), "
-                    '"phrases", prefix*, AND/OR/NOT. Regex mode: Python regex, case-sensitive.',
+                    description="Text: words that must all occur (whole words, case-insensitive; "
+                    'parts of CamelCase names count as words), "phrases", prefix*, AND/OR/NOT. '
+                    "Regex mode: Python regex, case-sensitive. '' or '*': every record that passes "
+                    "the filter (e.g. all lines of a tag or a time window).",
                 ),
-            ],
+            ] = "",
             mode: Annotated[
                 Literal["text", "regex"], Field(description="'text' (FTS5 over msg and tag) or 'regex'.")
             ] = "text",
@@ -530,12 +531,14 @@ class LogServer:
             """Search log records by text or regex, in time order, each hit cited as log:<source>#<seq>.
 
             Repeats collapse to one line with ×count; hits of a crash or ANR name their artifact. The
-            footer says how many more there are and how to narrow."""
+            footer says how many more there are and how to narrow, and how many matches a sources
+            filter left out. An empty query lists the records that pass the filter."""
+            every = query.strip() in ("", "*")
             return _output(
                 lambda: tools.search(
                     case,
-                    query,
-                    mode,
+                    None if every else query,
+                    "text" if every else mode,
                     filter,
                     collapse,
                     count_only,

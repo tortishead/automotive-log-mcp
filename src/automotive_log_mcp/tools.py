@@ -688,7 +688,7 @@ class Tools:
         cursor: str | None = None,
         busy: bool = False,
     ) -> Output:
-        """``text`` None (CLI only) matches every record that passes the filter."""
+        """``text`` None (an empty MCP query) matches every record that passes the filter."""
         warnings: list[str] = []
         q = self.app.redactor.redact(text.strip()) if text is not None else ""
         if text is not None and not q:
@@ -797,6 +797,7 @@ class Tools:
                 lines = [f"{head} ({levels})"]
                 if scan and not exact:
                     lines.append(_scan_note(scan, self.caps.regex_scan_rows))
+                lines.extend(self._other_sources(ctx, filter, rf, fts, rx))
                 data = SearchResult(
                     case=case,
                     mode=mode,
@@ -882,6 +883,7 @@ class Tools:
                 )
             if scan and not exact:
                 footer.append(_scan_note(scan, self.caps.regex_scan_rows))
+            footer.extend(self._other_sources(ctx, filter, rf, fts, rx))
             if busy:
                 footer.append("An import is still running in this case; counts may grow.")
             text_out = _join([header, *page.lines, *lit_lines, *footer, *_warn_lines(warnings)])
@@ -897,6 +899,49 @@ class Tools:
                 warnings=warnings,
             )
             return Output(text_out, data)
+
+    def _other_sources(
+        self,
+        ctx: _Ctx,
+        filter: Filter | None,
+        rf: RecordFilter,
+        fts: str | None,
+        rx: re.Pattern[str] | None,
+    ) -> list[str]:
+        """With a ``sources`` filter: how many matches the other (visible) sources have, so a
+        filter does not hide them silently. Text queries only (a regex would mean another scan)."""
+        if not (filter and filter.sources) or rf.sources is None:
+            return []
+        others = [s.id for s in ctx.sources if s.id not in set(rf.sources) and s.records]
+        if not others:
+            return []
+        if fts is None:
+            if rx is None:
+                return []
+            ids = ", ".join(f"log:{i}" for i in others[:8]) + (", …" if len(others) > 8 else "")
+            return [f"Not searched (sources filter): {ids}."]
+        where, params = rf.where(frozenset({"sources"}))
+        where = [
+            query.FTS_MATCH,
+            "(" + " OR ".join("r.id BETWEEN ? AND ?" for _ in others) + ")",
+            *where,
+        ]
+        bounds: list[Any] = []
+        for sid in others:
+            bounds.extend([sid << SEQ_BITS, ((sid + 1) << SEQ_BITS) - 1])
+        try:
+            counts = query.count_by_source(ctx.conn, where, [fts, *bounds, *params])
+        except sqlite3.OperationalError:
+            return []
+        if not counts:
+            return ["No matches in the other sources either."]
+        top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        listed = ", ".join(f"log:{sid} {n:,}" for sid, n in top[:6]) + (", …" if len(top) > 6 else "")
+        n = sum(counts.values())
+        return [
+            f"Outside the sources filter: {fmt.plural(n, 'more match', 'more matches')} ({listed}); "
+            "add them to 'sources' or drop it to see them."
+        ]
 
     def _narrow_hint(self, ctx: _Ctx, groups: list[query.Group], rf: RecordFilter) -> str:
         parts: list[str] = []

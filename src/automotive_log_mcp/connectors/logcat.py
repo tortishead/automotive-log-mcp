@@ -5,11 +5,19 @@ Formats: ``threadtime`` (default), ``time``, ``brief``, ``process``, ``tag``, ``
 ``epoch``, ``monotonic``, ``usec``/``nsec`` (any fraction length), ``zone``/``UTC`` (zone kept in
 the source metadata), ``uid``, ``printable``, ``color`` (ANSI escapes removed), ``descriptive``.
 
-Buffer markers (``--------- beginning of main``, ``--------- switch to crash``) switch the stream,
-so each buffer becomes its own source. A message logged with embedded newlines is printed by
-logcat as several lines with the same header; such lines are merged into one record when the
-header is identical and the continuation looks like one (stack frames, ``Caused by:``, indented
-text, ...). Lines that match no format become records with ``level=None`` and the raw text.
+Buffer markers (``--------- beginning of main``, ``--------- switch to crash``) name the logcat
+buffer. Logcat prints ``beginning of <buffer>`` only before the first record of each buffer;
+``switch to <buffer>`` lines appear only with ``-D``/``--dividers``. Without dividers (the
+bugreport ``SYSTEM LOG``), the buffers interleave after the second marker with no further marker,
+so the log stays one source and the source is renamed after the buffers it holds
+(``main+system+crash``). With dividers, each buffer becomes its own source. A logcat command known
+from the bugreport section header decides; otherwise records after a second ``beginning of`` are
+held back until a ``switch to`` line shows dividers (or ``HOLD_RECORDS`` records pass without one).
+
+A message logged with embedded newlines is printed by logcat as several lines with the same
+header; such lines are merged into one record when the header is identical and the continuation
+looks like one (stack frames, ``Caused by:``, indented text, ...). Lines that match no format
+become records with ``level=None`` and the raw text.
 
 An ``AndroidRuntime`` record starting ``FATAL EXCEPTION`` (normally in the crash buffer) carries a
 ``java_crash`` artifact; the record itself is the artifact's line on the timeline.
@@ -46,7 +54,9 @@ BRIEF = re.compile(r"([" + _LVL + r"])/(.*?)\(\s*(\d+)\):(?: |$)")
 PROCESS = re.compile(r"([" + _LVL + r"])\(\s*(\d+)\) (.*?)  \((.*)\)$")
 THREAD = re.compile(r"([" + _LVL + r"])\(\s*(\d+):\s*(\d+)\) ")
 TAG = re.compile(r"([" + _LVL + r"])/([^\s:(][^:(]*?):(?: |$)")
-MARKER = re.compile(r"--------- (?:beginning of|switch to) (\w+)")
+MARKER = re.compile(r"--------- (beginning of|switch to) (\w+)")
+DIVIDERS = re.compile(r"(?:^|\s)(?:-D|--dividers)(?:\s|$)")
+HOLD_RECORDS = 2000  # records after an ambiguous marker before deciding "no dividers"
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 
 CONTINUATION = re.compile(
@@ -99,9 +109,63 @@ def _int(s: str | None) -> int | None:
     return int(s) if s else None
 
 
+def _dividers(ctx: SourceContext) -> bool | None:
+    """True/False when the logcat command is known (bugreport section header), else None."""
+    cmd = ctx.meta.get("section_command")
+    if not isinstance(cmd, str) or not cmd.startswith("logcat"):
+        return None
+    return DIVIDERS.search(cmd) is not None
+
+
+def _resolve_buffers(items: Iterator[ParseItem], ctx: SourceContext) -> Iterator[ParseItem]:
+    """Turn buffer markers into stream switches or joins (see the module docstring)."""
+    dividers = _dividers(ctx)
+    begun = 0
+    held: list[ParseItem] | None = None  # from the ambiguous marker on, while undecided
+    held_records = 0
+
+    def release(split: bool) -> Iterator[ParseItem]:
+        assert held is not None
+        for it in held:
+            if type(it) is StreamMarker and not it.switch and not split:
+                yield StreamMarker(it.stream, join=True)
+            else:
+                yield it
+
+    for item in items:
+        if type(item) is StreamMarker:
+            if item.switch:
+                if held is not None:
+                    yield from release(True)
+                    held = None
+                dividers = True
+                yield item
+                continue
+            begun += 1
+            if begun == 1 or dividers:
+                yield item
+            elif dividers is False:
+                yield StreamMarker(item.stream, join=True)
+            elif held is not None:
+                held.append(item)
+            else:
+                held, held_records = [item], 0
+            continue
+        if held is None:
+            yield item
+            continue
+        held.append(item)
+        held_records += 1
+        if held_records >= HOLD_RECORDS:
+            yield from release(False)
+            held, dividers = None, False
+    if held is not None:
+        yield from release(False)
+
+
 class LogcatConnector(TextConnector):
     name = "logcat"
-    version = "1"
+    version = "2"  # 2: buffers without dividers stay one source (main+system+crash)
 
     def sniff(self, head: bytes, filename: str) -> float:
         lines = [ANSI.sub("", ln) for ln in head_lines(head, 60) if ln.strip()]
@@ -130,7 +194,7 @@ class LogcatConnector(TextConnector):
         """Records, with a ``java_crash`` artifact attached to each ``FATAL EXCEPTION`` record."""
         items = self._parse(lines, ctx)
         try:
-            for item in items:
+            for item in _resolve_buffers(items, ctx):
                 if (
                     type(item) is RawRecord
                     and item.tag == "AndroidRuntime"
@@ -201,7 +265,7 @@ class LogcatConnector(TextConnector):
                         yield pending
                         pending = None
                     long_mode = False
-                    yield StreamMarker(mk.group(1))
+                    yield StreamMarker(mk.group(2), switch=mk.group(1) == "switch to")
                     continue
 
             if long_mode and pending is not None and not line.startswith("[ "):

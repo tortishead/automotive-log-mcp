@@ -583,6 +583,23 @@ class Ingestor:
             origin.created.append((sid, internal, [*chain, ctx.meta]))
             return st
 
+        renamed: dict[int, _Source] = {}
+
+        def join(st: _Source, extra: str) -> _Source:
+            """The current source also holds stream ``extra`` from here on: rename it."""
+            old = st.meta["_stream"]
+            if old is not None and extra in old.split("+"):
+                return st
+            new = f"{old}+{extra}" if old else extra
+            if new in sources:
+                return sources[new]
+            del sources[old]
+            sources[new] = st
+            name = member.name + f":{new}"
+            st.meta["_stream"], st.meta["_name"], st.name = new, name, name
+            renamed[st.id] = st
+            return st
+
         def progress() -> list[db.Statement]:
             return [
                 (
@@ -609,7 +626,7 @@ class Ingestor:
                     raise IngestError(f"{member.name}: connector {connector.name} cannot read text sections")
                 items = connector.parse_lines(member.lines, ctx)
                 try:
-                    self._consume(items, get, member.stream, writer, origin.add_artifact)
+                    self._consume(items, get, join, member.stream, writer, origin.add_artifact)
                 finally:
                     _close(items)
             else:
@@ -617,7 +634,7 @@ class Ingestor:
                 with member.open() as stream:
                     items = connector.parse(stream, ctx)
                     try:
-                        self._consume(items, get, member.stream, writer, origin.add_artifact)
+                        self._consume(items, get, join, member.stream, writer, origin.add_artifact)
                     finally:
                         _close(items)  # before the stream closes
             if not sources:
@@ -628,6 +645,11 @@ class Ingestor:
         with conn:
             for sql, params in progress():
                 conn.execute(sql, params)
+            for st in renamed.values():
+                conn.execute(
+                    "UPDATE sources SET name = ?, stream = ? WHERE id = ?",
+                    (st.name, st.meta["_stream"], st.id),
+                )
             for st in sources.values():
                 conn.executemany(
                     "INSERT INTO segments(source_id, seg, reason, first_seq, last_seq, count, ts_first, "
@@ -661,6 +683,7 @@ class Ingestor:
         self,
         items: Iterator[RawRecord | StreamMarker | RawArtifact],
         get: Callable[[str | None], _Source],
+        join: Callable[[_Source, str], _Source],
         default_stream: str | None,
         writer: db.BatchWriter,
         add_artifact: Callable[[RawArtifact, _Source, int], int],
@@ -675,7 +698,8 @@ class Ingestor:
         for item in items:
             kind = type(item)
             if kind is StreamMarker:
-                cur = get(item.stream)  # type: ignore[union-attr]
+                mk: StreamMarker = item  # type: ignore[assignment]
+                cur = join(cur, mk.stream) if (mk.join and cur is not None) else get(mk.stream)
                 continue
             art: RawArtifact | None = None
             if kind is RawArtifact:

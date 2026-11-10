@@ -18,6 +18,7 @@ from typing import Any
 
 from ..core.levels import LEVEL_RANK
 from ..core.timeparse import NS
+from ..core.words import query_alternative
 from ..model import SEQ_BITS, SEQ_MASK, citation
 
 
@@ -328,20 +329,42 @@ def similar_tags(conn: sqlite3.Connection, glob: str, n: int = 5) -> list[str]:
 
 
 _FTS_BARE = re.compile(r"^[\w\s]+$")
+_HAS_UPPER = re.compile(r"[a-z][A-Z]|[A-Z]{2}[a-z]")
 _FTS_OPS = ('"', " AND ", " OR ", " NOT ", "NEAR(")
 
 
 def fts_query(text: str) -> str:
     """Pass simple word queries and queries with FTS5 operators through; otherwise quote each
     whitespace-separated token as a phrase (punctuation then only separates words). A trailing
-    ``*`` keeps its meaning as a prefix query."""
-    if _FTS_BARE.match(text) or any(op in text for op in _FTS_OPS):
+    ``*`` keeps its meaning as a prefix query. A CamelCase word outside quotes also matches its
+    parts in a row (``DisplayArea`` -> ``(DisplayArea OR "display area")``, core/words.py)."""
+    if any(op in text for op in ('"', "NEAR(")):
         return text
+    if _FTS_BARE.match(text) or any(op in text for op in _FTS_OPS):
+        if not _HAS_UPPER.search(text):
+            return text
+        return _join_terms([tok if tok in _OPS else (query_alternative(tok) or tok) for tok in text.split()])
     out = []
     for tok in text.split():
         star = tok.endswith("*") and len(tok) > 1
         body = tok.rstrip("*") if star else tok
-        out.append('"' + body.replace('"', '""') + '"' + ("*" if star else ""))
+        alt = query_alternative(tok.strip(".,:;!?()[]{}'"))
+        out.append(alt or ('"' + body.replace('"', '""') + '"' + ("*" if star else "")))
+    return _join_terms(out)
+
+
+_OPS = ("AND", "OR", "NOT")
+
+
+def _join_terms(terms: list[str]) -> str:
+    """Space-join; an explicit AND after a (group), which FTS5 does not AND implicitly."""
+    if not any(t.startswith("(") for t in terms):
+        return " ".join(terms)
+    out: list[str] = []
+    for t in terms:
+        if out and out[-1] not in _OPS and t not in _OPS:
+            out.append("AND")
+        out.append(t)
     return " ".join(out)
 
 
@@ -677,6 +700,13 @@ def _sorted(groups: dict[tuple[Any, ...], Group]) -> list[Group]:
 
 def _heap_sorted(heap: list[tuple[tuple[int, int, int], int, Rec]]) -> list[Rec]:
     return sorted((r for _, _, r in heap), key=lambda r: r.sort_key)
+
+
+def count_by_source(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> dict[int, int]:
+    """Matching records per source id."""
+    cond = " AND ".join(where) if where else "1"
+    sql = f"SELECT r.id >> {SEQ_BITS}, count(*) FROM records r WHERE {cond} GROUP BY 1"
+    return {int(sid): int(n) for sid, n in conn.execute(sql, params)}
 
 
 def count_candidates(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> int:

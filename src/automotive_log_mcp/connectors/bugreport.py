@@ -5,8 +5,10 @@ year for logcat lines), build fingerprint, kernel version and uptime. Sections
 (``------ NAME (command) ------`` up to ``------ 0.1s was the duration of 'NAME' ------`` or the
 next section) are handled by command:
 
-- ``logcat ...`` sections become logcat members; buffer markers inside split them into one source
-  per buffer (main, system, crash, events, radio, ...).
+- ``logcat ...`` sections become logcat members. The command goes to the source metadata
+  (``section_command``): without ``-D``/``--dividers`` (dumpstate's ``SYSTEM LOG``) the buffers
+  are interleaved after their first markers, so the section is one source named after its buffers
+  (``main+system+crash``); with dividers, one source per buffer (see connectors/logcat.py).
 - ``dmesg`` and ``LAST KMSG`` sections become kernel members.
 - ``SYSTEM PROPERTIES`` gives the fingerprint (if the header had none) and the time zone.
 - ``PROCESSES ...`` / ``ps`` sections give the process list.

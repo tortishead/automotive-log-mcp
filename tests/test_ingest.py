@@ -261,7 +261,7 @@ def test_stale_when_connector_version_changes(
 ) -> None:
     app.ingestor.add(app.config.case_db("c"), str(copy_fixture("logcat/time.log", tmp_path)))
     assert not (app.list_sources("c") or [])[0].stale
-    monkeypatch.setattr(app.registry.get("logcat"), "version", "2")
+    monkeypatch.setattr(app.registry.get("logcat"), "version", "next")
     assert (app.list_sources("c") or [])[0].stale
 
 

@@ -19,7 +19,7 @@ Dumpstate info: id=1 pid=4321 dry_run=0 parallel_run=1 args=-SBp extra_options=
 ------ MEMORY INFO (/proc/meminfo) ------
 MemTotal:        4022392 kB
 ------ 0.001s was the duration of 'MEMORY INFO' ------
------- SYSTEM LOG (logcat -v threadtime -v printable -v uid -d *:v) ------
+------ SYSTEM LOG (logcat -D -v threadtime -v printable -v uid -d *:v) ------
 --------- beginning of main
 12-31 23:59:58.100  1000  1234  1250 I HvacCtrl: setTemp 21.5 for zone 1
 12-31 23:59:59.412  1000  1234  1250 E HvacCtrl: setProperty failed, status=NOT_AVAILABLE
