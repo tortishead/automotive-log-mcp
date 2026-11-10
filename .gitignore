@@ -7,3 +7,7 @@ dist/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+# evaluation: real defects, run notes and reports stay local
+eval/cases.local.yaml
+eval/agent_runs/local/
+eval/results/

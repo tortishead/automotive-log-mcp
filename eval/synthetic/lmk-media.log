@@ -1,0 +1,24 @@
+--------- beginning of main
+05-02 17:30:00.000  2345  2345 I MediaPlayback: playing track 3 of 12 (stream 48 kHz)
+05-02 17:30:00.500  3456  3456 I NavApp: route started, 42 km, 3 waypoints
+05-02 17:30:30.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 1210KB AllocSpace bytes, heap 210MB/512MB
+05-02 17:31:00.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 1100KB AllocSpace bytes, heap 262MB/512MB
+05-02 17:31:10.000  1000  1120 I ActivityManager: Displayed com.example.nav/.MapActivity: +310ms
+05-02 17:31:30.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 980KB AllocSpace bytes, heap 318MB/512MB
+05-02 17:32:00.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 870KB AllocSpace bytes, heap 377MB/512MB
+05-02 17:32:30.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 620KB AllocSpace bytes, heap 436MB/512MB
+05-02 17:32:40.000  3456  3488 D NavApp: tile cache size 18420 entries
+05-02 17:33:00.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 410KB AllocSpace bytes, heap 491MB/512MB
+05-02 17:33:30.000  3456  3470 W com.example.nav: Clamp target GC heap from 523MB to 512MB
+05-02 17:33:30.900   400   400 I lowmemorykiller: Kill 'com.example.media' (2345), uid 10050, oom_score_adj 700 to free 85320kB rss, 1200kB swap; reason: low watermark is breached and thrashing (150%)
+05-02 17:33:31.000  1000  1120 I ActivityManager: Process com.example.media (pid 2345) has died: prev LAST
+05-02 17:33:31.100  1000  1120 W ActivityManager: Scheduling restart of crashed service com.example.media/.PlaybackService in 1000ms
+05-02 17:33:33.000  1000  1120 I ActivityManager: Start proc 2399:com.example.media/u0a50 for service {com.example.media/.PlaybackService}
+05-02 17:33:33.500  2399  2399 I MediaPlayback: playing track 3 of 12 (stream 48 kHz)
+05-02 17:34:00.000  3456  3470 I com.example.nav: Background concurrent copying GC freed 120KB AllocSpace bytes, heap 509MB/512MB
+05-02 17:34:20.000  3456  3488 D NavApp: tile cache size 24990 entries
+05-02 17:34:30.000  3456  3470 W com.example.nav: Clamp target GC heap from 531MB to 512MB
+05-02 17:34:31.200   400   400 I lowmemorykiller: Kill 'com.example.media' (2399), uid 10050, oom_score_adj 700 to free 83100kB rss, 1100kB swap; reason: low watermark is breached and thrashing (180%)
+05-02 17:34:31.300  1000  1120 I ActivityManager: Process com.example.media (pid 2399) has died: prev LAST
+05-02 17:34:31.400  1000  1120 W ActivityManager: Scheduling restart of crashed service com.example.media/.PlaybackService in 4000ms
+05-02 17:34:35.400  1000  1120 I ActivityManager: Start proc 2421:com.example.media/u0a50 for service {com.example.media/.PlaybackService}

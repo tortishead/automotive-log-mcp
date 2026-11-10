@@ -1,0 +1,108 @@
+# Evaluation cases (implementation plan, M4 item 6).
+#
+# Each case is a closed defect: the log files, the symptom as the defect report states it, and the
+# expected answer: the component at fault and the root-cause citations. Write the expected answer
+# BEFORE any run (tool-level or agent) and judge it against the fix commit, not against what the
+# tools happen to show. Citations depend on the order sources are indexed, so `files` are indexed
+# in the order listed, into a fresh case named after `id`.
+#
+# The cases in this file are SYNTHETIC: built from the test fixtures and the logs in synthetic/,
+# with the expected citations taken from how those logs were written. They keep the harness
+# honest in CI; they say nothing about real defects. Put real defects in cases.local.yaml (same
+# format, git-ignored; see eval/README.md) and run both files.
+#
+# Fields:
+#   id         case name: letters, digits, '.', '_', '-' (also the case DB name)
+#   synthetic  true for made-up cases (runs in CI)
+#   title, symptom
+#   files      paths relative to this file, or absolute
+#   expected:
+#     component    what was at fault (process, service, module), as the fix commit shows it
+#     root_cause   one or two sentences
+#     citations    the lines that show the root cause: log:<source>#<seq> or art:<id>[/section][:L<n>],
+#                  each optionally with the text the line must contain ({cite: …, text: …}): the
+#                  harness checks it, which catches citations that drifted (reindex, miscount)
+#   queries    optional: queries a reasonable engineer would run first, beyond detect and
+#              list_artifacts (tool + args, as the MCP tools take them); counted in evidence recall
+#   fix        the fix commit (or "synthetic")
+
+version: 1
+cases:
+  - id: syn-hvac-crash
+    synthetic: true
+    title: HVAC app closes when the temperature is changed
+    symptom: The climate app disappears when the driver sets the temperature; it reopens on the next tap.
+    files: [synthetic/bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip]
+    expected:
+      component: com.example.hvac (HvacCtrl, Controller.update)
+      root_cause: >-
+        setProperty for the temperature fails with NOT_AVAILABLE and the app does not handle it:
+        Controller.update dereferences the missing value (NullPointerException) and the app crashes.
+      citations:
+        - {cite: log:1#2, text: "setProperty failed, status=NOT_AVAILABLE"}
+        - {cite: art:1/exception:L3, text: "java.lang.NullPointerException"}
+    queries:
+      - {tool: search, args: {query: hvac, filter: {level: W}}}
+    fix: synthetic
+
+  - id: syn-radio-anr
+    synthetic: true
+    title: Radio freezes when tuning
+    symptom: The radio app stops responding for several seconds after a station button is pressed.
+    files: [synthetic/bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.zip]
+    expected:
+      component: com.example.radio (Tuner holds its lock across a binder call to system_server)
+      root_cause: >-
+        RadioWorker holds the Tuner lock while it calls ICarProperty.setProperty in system_server;
+        the main thread blocks on that lock in Tuner.tune and the broadcast times out (ANR).
+      citations:
+        - {cite: art:2/p1500.t1.main:L12, text: "waiting to lock <0x0a1b2c3d>"}
+        - {cite: art:2/p1500.t12.radioworker:L23, text: "ICarProperty$Stub$Proxy.setProperty"}
+    fix: synthetic
+
+  - id: syn-vhal-abort
+    synthetic: true
+    title: Climate unavailable after a temperature change
+    symptom: After setting 22 degrees the climate screen shows 'Climate unavailable' for a few seconds.
+    files: [synthetic/vhal-abort.log]
+    expected:
+      component: vehicle HAL (vendor.vehicle-hal-default, HVAC bus handling in HvacBus.cpp)
+      root_cause: >-
+        The HVAC bus write times out and the VHAL aborts on a failed check in onBusTimeout instead of
+        returning an error; the VHAL restarts and the property call fails meanwhile.
+      citations:
+        - {cite: log:1#15, text: "HVAC bus write failed"}
+        - {cite: log:1#16, text: "Check failed: pendingRequests.empty()"}
+    fix: synthetic
+
+  - id: syn-lmk-media
+    synthetic: true
+    title: Music stops during navigation
+    symptom: Media playback stops after a few minutes of route guidance and restarts by itself.
+    files: [synthetic/lmk-media.log]
+    expected:
+      component: com.example.nav (heap growth, tile cache)
+      root_cause: >-
+        The navigation app's heap grows to its limit; under memory pressure lmkd kills the media app
+        (higher oom_score_adj), which is then restarted.
+      citations:
+        - {cite: log:1#11, text: "Clamp target GC heap"}
+        - {cite: log:1#12, text: "Kill 'com.example.media'"}
+    queries:
+      - {tool: search, args: {query: heap, filter: {pid: 3456}}}
+    fix: synthetic
+
+  - id: syn-boot-selinux
+    synthetic: true
+    title: CarService does not start after a vendor update
+    symptom: After flashing the new vendor image the head unit stays on the boot animation.
+    files: [synthetic/boot-selinux.log]
+    expected:
+      component: vendor.hvac-daemon (hvacd) SELinux policy / labelling of /dev/vehicle_bus0
+      root_cause: >-
+        hvacd may not open /dev/vehicle_bus0 (the node is labelled 'device', so the enforced policy
+        denies read/write); the daemon exits and restarts in a loop and CarService waits for its HAL.
+      citations:
+        - {cite: log:1#4, text: "open /dev/vehicle_bus0 failed: Permission denied"}
+        - {cite: log:1#5, text: "avc: denied { read write }"}
+    fix: synthetic

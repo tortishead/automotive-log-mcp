@@ -1,0 +1,29 @@
+--------- beginning of main
+03-14 08:00:00.000   610   610 I VehicleService: Vehicle HAL started, 312 properties
+03-14 08:00:00.500  1000  1100 I CarService: CarService started, connected to IVehicle/default
+03-14 08:00:01.000  1000  1190 I ActivityManager: Start proc 1234:com.example.hvac/u0a42 for activity {com.example.hvac/.MainActivity}
+03-14 08:05:12.300  1234  1234 I HvacCtrl: setTemp 21.5 for zone 1
+03-14 08:05:12.302  1000  1188 D CarPropertyService: setProperty: propId=0x15600503, areaId=49, value=21.5
+03-14 08:05:12.310   610   640 D DefaultVehicleHal: setValues: 1 request(s), prop 0x15600503
+03-14 08:05:12.320   610   640 D DefaultVehicleHal: HVAC bus write ok for prop 0x15600503 in 9 ms
+03-14 08:10:40.000  1500  1530 I AudioFlinger: track 7 started, session 81, latency 40 ms
+03-14 08:12:00.100  1234  1234 I HvacCtrl: setTemp 22.0 for zone 1
+03-14 08:12:00.102  1000  1188 D CarPropertyService: setProperty: propId=0x15600503, areaId=49, value=22.0
+03-14 08:12:00.105   610   640 D DefaultVehicleHal: setValues: 1 request(s), prop 0x15600503
+03-14 08:12:00.210   610   640 W DefaultVehicleHal: HVAC bus write retry 1 for prop 0x15600503: no ack
+03-14 08:12:00.420   610   640 W DefaultVehicleHal: HVAC bus write retry 2 for prop 0x15600503: no ack
+03-14 08:12:00.730   610   640 W DefaultVehicleHal: HVAC bus write retry 3 for prop 0x15600503: no ack
+03-14 08:12:01.110   610   640 E DefaultVehicleHal: HVAC bus write failed for prop 0x15600503: -110 (timeout), pending requests 1
+03-14 08:12:01.111   610   640 F DefaultVehicleHal: Check failed: pendingRequests.empty() in onBusTimeout (HvacBus.cpp:218)
+03-14 08:12:01.112   610   640 F libc    : Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 640 (VhalWorker), pid 610 (vehicle-service)
+03-14 08:12:01.150   660   660 F DEBUG   : *** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+03-14 08:12:01.151   660   660 F DEBUG   : pid: 610, tid: 640, name: VhalWorker  >>> /vendor/bin/hw/android.hardware.automotive.vehicle-service <<<
+03-14 08:12:01.200  1000  1188 E JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel size = 120)
+03-14 08:12:01.201  1000  1188 E CarPropertyService: setProperty failed, status=TRY_AGAIN, prop=0x15600503
+03-14 08:12:01.202  1000  1100 W CarService: IVehicle died: android.os.DeadObjectException, reconnecting
+03-14 08:12:01.500     1     1 I init    : Service 'vendor.vehicle-hal-default' (pid 610) received signal 6
+03-14 08:12:01.600     1     1 I init    : starting service 'vendor.vehicle-hal-default'...
+03-14 08:12:02.000   655   655 I VehicleService: Vehicle HAL started, 312 properties
+03-14 08:12:02.050  1000  1100 I CarService: connected to IVehicle/default
+03-14 08:12:02.100  1234  1234 E HvacCtrl: setTemp failed: property service error, showing 'Climate unavailable'
+03-14 08:12:30.000  1500  1530 I AudioFlinger: track 7 stopped, session 81

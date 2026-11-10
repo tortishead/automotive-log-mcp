@@ -1,0 +1,28 @@
+--------- beginning of main
+06-20 07:00:01.000     1     1 I init    : init second stage started!
+06-20 07:00:05.000   500   500 I boot_progress_start: 5021
+06-20 07:00:06.000     1     1 I init    : starting service 'vendor.hvac-daemon'...
+06-20 07:00:06.100   700   700 E hvacd   : open /dev/vehicle_bus0 failed: Permission denied
+06-20 07:00:06.101   700   700 W hvacd   : type=1400 audit(0.0:41): avc: denied { read write } for name="vehicle_bus0" dev="tmpfs" ino=1234 scontext=u:r:hvacd:s0 tcontext=u:object_r:device:s0 tclass=chr_file permissive=0
+06-20 07:00:06.200     1     1 I init    : Service 'vendor.hvac-daemon' (pid 700) exited with status 1
+06-20 07:00:11.300     1     1 I init    : starting service 'vendor.hvac-daemon'...
+06-20 07:00:11.400   711   711 E hvacd   : open /dev/vehicle_bus0 failed: Permission denied
+06-20 07:00:11.401   711   711 W hvacd   : type=1400 audit(0.0:44): avc: denied { read write } for name="vehicle_bus0" dev="tmpfs" ino=1234 scontext=u:r:hvacd:s0 tcontext=u:object_r:device:s0 tclass=chr_file permissive=0
+06-20 07:00:11.500     1     1 I init    : Service 'vendor.hvac-daemon' (pid 711) exited with status 1
+06-20 07:00:12.000  1000  1000 I SystemServer: StartCarServiceHelperService
+06-20 07:00:12.500  1000  1150 W CarServiceHelper: Waiting for vendor.hvac.IHvac/default ...
+06-20 07:00:16.600     1     1 I init    : starting service 'vendor.hvac-daemon'...
+06-20 07:00:16.700   722   722 E hvacd   : open /dev/vehicle_bus0 failed: Permission denied
+06-20 07:00:16.701   722   722 W hvacd   : type=1400 audit(0.0:47): avc: denied { read write } for name="vehicle_bus0" dev="tmpfs" ino=1234 scontext=u:r:hvacd:s0 tcontext=u:object_r:device:s0 tclass=chr_file permissive=0
+06-20 07:00:16.800     1     1 I init    : Service 'vendor.hvac-daemon' (pid 722) exited with status 1
+06-20 07:00:17.000  1000  1150 W CarServiceHelper: Waiting for vendor.hvac.IHvac/default ...
+06-20 07:00:20.000   480   480 W audioserver: type=1400 audit(0.0:52): avc: denied { search } for name="vendor" dev="dm-3" ino=17 scontext=u:r:audioserver:s0 tcontext=u:object_r:vendor_data_file:s0 tclass=dir permissive=1
+06-20 07:00:21.900     1     1 I init    : starting service 'vendor.hvac-daemon'...
+06-20 07:00:22.000   733   733 E hvacd   : open /dev/vehicle_bus0 failed: Permission denied
+06-20 07:00:22.001   733   733 W hvacd   : type=1400 audit(0.0:55): avc: denied { read write } for name="vehicle_bus0" dev="tmpfs" ino=1234 scontext=u:r:hvacd:s0 tcontext=u:object_r:device:s0 tclass=chr_file permissive=0
+06-20 07:00:22.100     1     1 I init    : Service 'vendor.hvac-daemon' (pid 733) exited with status 1
+06-20 07:00:22.200     1     1 E init    : process with updatable components 'vendor.hvac-daemon' exited 4 times in 4 minutes
+06-20 07:00:30.000  1000  1150 E CarServiceHelper: vendor.hvac.IHvac/default not available after 17500 ms, CarService start blocked
+06-20 07:01:00.000  1000  1012 W Watchdog: Blocked in handler on main thread (main), 30s
+06-20 07:02:00.000  1000  1150 E CarServiceHelper: vendor.hvac.IHvac/default not available after 107500 ms, CarService start blocked
+06-20 07:04:00.000  1000  1150 E CarServiceHelper: vendor.hvac.IHvac/default not available after 227500 ms, CarService start blocked
