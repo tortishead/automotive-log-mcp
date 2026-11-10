@@ -27,6 +27,7 @@ from .core import citations as cit
 from .core import format as fmt
 from .core.timeparse import NS, ts_raw_of, wall_ns
 from .detect.engine import SEVERITIES, Rule, RuleResult, run_rule
+from .difftool import DiffTool
 from .model import SEQ_BITS, SEQ_MASK, citation
 from .store import db, query
 from .store.query import ArtifactRow, Rec, RecordFilter
@@ -75,6 +76,16 @@ class Filter(BaseModel):
     attrs: dict[str, str | int | float | bool] | None = Field(
         default=None,
         description="Attributes that must match exactly, as get_records shows them, e.g. {'art': 3}.",
+    )
+
+
+class DiffSide(Filter):
+    """One side of ``diff``: a record filter, optionally one segment of a single source."""
+
+    seg: int | None = Field(
+        default=None,
+        ge=1,
+        description="Segment (boot or clock reset) of the one source in 'sources'; overview lists them.",
     )
 
 
@@ -437,6 +448,7 @@ class Tools:
         self.app = app
         self.caps = app.config.caps
         self.clock = ClockTools(self)
+        self.differ = DiffTool(self)
 
     # -- plumbing ---------------------------------------------------------------------------------
 
@@ -1159,6 +1171,10 @@ class Tools:
         ref: str | None = None,
     ) -> Output:
         out: Output = self.clock.align(case, mode, source, seg, offset, at, ref)
+        return out
+
+    def diff(self, case: str, a: DiffSide, b: DiffSide, min_ratio: float = 4.0, limit: int = 12) -> Output:
+        out: Output = self.differ.diff(case, a, b, min_ratio, limit)
         return out
 
     def clock_summary(self, case: str) -> tuple[str, dict[str, str]]:

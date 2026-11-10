@@ -33,7 +33,8 @@ def main(path: str) -> int:
     if "tz" in values:
         meta["timezone"] = values["tz"]
     out.write(json.dumps({"type": "meta", "values": meta}) + "\n")
-    out.write(json.dumps({"msg": "MCU start", "mono": "0.0", "boot": True, "attrs": {"ecu": meta["ecu"]}}) + "\n")
+    start = {"msg": "MCU start", "mono": "0.0", "boot": True, "attrs": {"ecu": meta["ecu"]}}
+    out.write(json.dumps(start) + "\n")
     i = 1
     while i < len(lines):
         line = lines[i]

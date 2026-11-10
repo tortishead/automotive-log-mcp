@@ -31,7 +31,7 @@ import pytest
 from automotive_log_mcp.app import App
 from automotive_log_mcp.config import load_config
 from automotive_log_mcp.policy import Policy
-from automotive_log_mcp.tools import Filter, Output, Tools
+from automotive_log_mcp.tools import DiffSide, Filter, Output, Tools
 
 from .conftest import FIXED_SECRET
 
@@ -168,6 +168,17 @@ def _calls(tools: Tools) -> list[tuple[str, str, float | None, Call]]:
         ),
         ("detect", "all rules", None, lambda t: t.detect("perf")),
         ("detect", "all rules, 15 min window", None, lambda t: t.detect("perf", filter=window)),
+        ("diff", "first vs second half of the largest source", None, lambda t: _diff_halves(t, mid)),
+        (
+            "diff",
+            "two 15 min windows",
+            None,
+            lambda t: t.diff(
+                "perf",
+                DiffSide.model_validate({"from": f"{mid}-20m", "to": "+15m"}),
+                DiffSide.model_validate({"from": f"{mid}-5m", "to": "+15m"}),
+            ),
+        ),
         (
             "check_citations",
             "answer with 40 citations",
@@ -175,6 +186,15 @@ def _calls(tools: Tools) -> list[tuple[str, str, float | None, Call]]:
             lambda t: t.check_citations("perf", _answer(mid)),
         ),
     ]
+
+
+def _diff_halves(tools: Tools, mid: str) -> Output:
+    sid = mid[4:].split("#")[0]
+    return tools.diff(
+        "perf",
+        DiffSide.model_validate({"sources": [sid], "to": mid}),
+        DiffSide.model_validate({"sources": [sid], "from": mid}),
+    )
 
 
 def _middle(tools: Tools) -> str:

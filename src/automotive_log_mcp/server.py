@@ -39,6 +39,7 @@ from .clocktools import AlignResult, TimelineResult
 from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
+from .difftool import DiffResult
 from .policy import ByteBudget, Policy
 from .store import query
 from .store.db import StoreError
@@ -47,6 +48,7 @@ from .tools import (
     ContextResult,
     CountResult,
     DetectResult,
+    DiffSide,
     Filter,
     GetRecordsResult,
     ListArtifactsResult,
@@ -773,6 +775,27 @@ class LogServer:
             alignment when the automatic one is missing or wrong."""
             return _output(lambda: tools.align(case, mode, source, seg, offset, at, ref), self.structured)
 
+        def diff(
+            case: Case,
+            a: Annotated[
+                DiffSide,
+                Field(
+                    description="Side A (e.g. the good run): a filter such as {'sources': ['2']}, "
+                    "{'sources': ['2'], 'seg': 1} for one boot, or a from/to window."
+                ),
+            ],
+            b: Annotated[DiffSide, Field(description="Side B (e.g. the bad run), as a.")],
+            min_ratio: Annotated[
+                float,
+                Field(gt=1, le=1000, description="Report shares changed by this factor or more."),
+            ] = 4.0,
+            limit: Annotated[int, Field(ge=1, le=100, description="Maximum items per list.")] = 12,
+        ) -> Annotated[CallToolResult, DiffResult]:
+            """Compare two sets of records (two files or runs, two boots, before and after an event):
+            messages only in B, only in A, and those whose rate changed; each item cited. Sides may be
+            on different clocks."""
+            return _output(lambda: tools.diff(case, a, b, min_ratio, limit), self.structured)
+
         self._tool(add_source, WRITES_CASE, "Add a log source")
         self._tool(list_sources, READ_ONLY, "List sources")
         self._tool(search, READ_ONLY, "Search records")
@@ -786,6 +809,7 @@ class LogServer:
         self._tool(check_citations, READ_ONLY, "Check the citations of an answer")
         self._tool(timeline, READ_ONLY, "Timeline of all sources")
         self._tool(align, WRITES_CASE, "Align source clocks")
+        self._tool(diff, READ_ONLY, "Compare two sets of records")
 
     # -- prompts ----------------------------------------------------------------------------
 
@@ -816,6 +840,7 @@ TOOL_NAMES = (
     "check_citations",
     "timeline",
     "align",
+    "diff",
 )
 
 
@@ -841,6 +866,8 @@ class _RejectUnknownArgs(BaseModel):
         hints = [
             f"'{k}' belongs inside filter, e.g. filter={{'{k}': ...}}"
             if k in _FILTER_KEYS and "filter" in names
+            else f"'{k}' belongs inside a and b, e.g. a={{'sources': ['2'], '{k}': ...}}"
+            if k in _FILTER_KEYS and "a" in names
             else f"'{k}' is not a parameter"
             for k in unknown
         ]

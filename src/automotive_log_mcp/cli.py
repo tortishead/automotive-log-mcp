@@ -1,14 +1,15 @@
-"""Command line: ``automotive-log-mcp serve`` runs the MCP server over stdio.
+"""Command line: ``automotive-log-mcp serve`` runs the MCP server (stdio; ``--http``: streamable HTTP).
 
 Without an agent: ``index <case> <path>`` indexes a log file, archive or directory;
 ``sources <case>`` lists what a case holds; ``query <case> --search ...`` searches it;
 ``relink <case> <source> <path>`` points a case at a moved original (the hash must match);
 ``reindex <case> <source>`` indexes an original again; ``artifacts <case>`` lists tombstones,
 ANR traces, Java crashes and dropbox entries, ``artifacts <case> --show art:<id>[/section][:L<n>]``
-prints one. ``overview``, ``count``, ``detect`` and ``check`` print the output of the MCP tools of
-the same names (``check`` runs check_citations on a Markdown file); ``rules`` lists the detector
-rules and where they come from. ``calls`` analyses agent sessions from the call log (optionally
-joined with a Claude Code transcript): where the tokens went, why a run failed, what to change.
+prints one. ``overview``, ``count``, ``detect``, ``timeline``, ``align``, ``diff`` and ``check``
+print the output of the MCP tools of the same names (``check`` runs check_citations on a Markdown
+file); ``rules`` lists the detector rules and where they come from. ``calls`` analyses agent
+sessions from the call log (optionally joined with a Claude Code transcript): where the tokens
+went, why a run failed, what to change.
 """
 
 from __future__ import annotations
@@ -30,7 +31,7 @@ from .detect.engine import BUILTIN_DIR
 from .policy import Policy, load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
-from .tools import Filter, Output, ToolInputError, Tools
+from .tools import DiffSide, Filter, Output, ToolInputError, Tools
 
 
 def _case(value: str) -> str:
@@ -120,6 +121,24 @@ def _parser() -> argparse.ArgumentParser:
     )
     al.add_argument("--reference", metavar="SOURCE", help="use this source's clock as the case clock")
     al.add_argument("--reset", nargs="?", const="all", metavar="SOURCE", help="remove manual settings")
+
+    di = sub.add_parser("diff", help="messages only in A, only in B, and changed in rate between two sides")
+    di.add_argument("case", type=_case)
+    for side in ("a", "b"):
+        di.add_argument(
+            f"--{side}",
+            required=True,
+            metavar="SPEC",
+            help="sources: '2', '2,3', 'all', or one segment of a source '2:1'",
+        )
+        di.add_argument(f"--{side}-from", metavar="TIME", help=f"start of side {side.upper()}")
+        di.add_argument(f"--{side}-to", metavar="TIME", help=f"end of side {side.upper()} (inclusive)")
+    di.add_argument("--level", "-l", choices=list(LEVEL_RANK), help="minimum level, both sides")
+    di.add_argument("--tag", "-t", action="append", help="tag (glob), both sides; repeatable")
+    di.add_argument("--not-tag", action="append", help="tag to exclude (glob), both sides; repeatable")
+    di.add_argument("--pid", type=int, help="process id, both sides")
+    di.add_argument("--min-ratio", type=float, default=4.0, help="changed: share differs by this factor")
+    di.add_argument("--limit", "-n", type=int, default=12, help="items per list")
 
     ru = sub.add_parser("rules", help="list the detector rules (package and configured rule_dirs)")
     ru.add_argument("--show", metavar="NAME", help="print one rule's definition")
@@ -312,6 +331,10 @@ def _tool(app: App, args: argparse.Namespace) -> int:
             out = tools.timeline(args.case, _filter(args), args.search, max(1, args.limit), args.cursor)
         elif args.command == "align":
             out = _align(tools, args)
+        elif args.command == "diff":
+            out = tools.diff(
+                args.case, _diff_side(args, "a"), _diff_side(args, "b"), args.min_ratio, max(1, args.limit)
+            )
         else:
             text = sys.stdin.read() if str(args.file) == "-" else args.file.read_text(encoding="utf-8")
             out = tools.check_citations(args.case, text)
@@ -322,6 +345,27 @@ def _tool(app: App, args: argparse.Namespace) -> int:
     if args.command == "check":
         return 0 if out.data.ok else 1  # type: ignore[attr-defined]
     return 0
+
+
+def _diff_side(args: argparse.Namespace, side: str) -> DiffSide:
+    spec = getattr(args, side).strip()
+    m = re.fullmatch(r"(all|\d+(?:\s*,\s*\d+)*)(?::(\d+))?", spec)
+    if m is None:
+        raise ToolInputError(f"--{side} takes 'all', source ids '2,3' or a segment '2:1', not {spec!r}")
+    values = {
+        "sources": None if m[1] == "all" else [x.strip() for x in m[1].split(",")],
+        "seg": int(m[2]) if m[2] else None,
+        "from": getattr(args, f"{side}_from"),
+        "to": getattr(args, f"{side}_to"),
+        "level": args.level,
+        "tags": args.tag,
+        "not_tags": args.not_tag,
+        "pid": args.pid,
+    }
+    try:
+        return DiffSide.model_validate({k: v for k, v in values.items() if v is not None})
+    except ValueError as e:
+        raise ToolInputError(f"--{side}: {e}") from None
 
 
 def _align(tools: Tools, args: argparse.Namespace) -> Output:
@@ -467,7 +511,7 @@ def _run(app: App, args: argparse.Namespace) -> int:
         return 0
     if args.command == "query":
         return _query(app, args)
-    if args.command in ("overview", "count", "detect", "check", "timeline", "align"):
+    if args.command in ("overview", "count", "detect", "check", "timeline", "align", "diff"):
         return _tool(app, args)
     if args.command == "rules":
         return _rules(app, args.show)

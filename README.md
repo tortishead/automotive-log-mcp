@@ -73,6 +73,7 @@ py -m automotive_log_mcp index T-1 C:\logs\bugreport.zip     # Windows; waits un
 | `detect(case, rules?, filter?, examples)` | hits of the detector rules by severity and time, collapsed by message (or pid), each with a hint what to read next |
 | `timeline(case, filter?, query?, limit, cursor)` | records of all sources merged on the case clock in time order; `~` marks times aligned from another clock; `from`/`to` are case-clock times or citations |
 | `align(case, mode, source?, seg?, offset?, at?, ref?)` | how each source maps onto the case clock (confidence, offset or boot time, error, what it rests on); `mode='anchor'`/`'offset'`/`'reference'`/`'reset'` set it by hand |
+| `diff(case, a, b, min_ratio, limit)` | messages (tag + level + template) only in B, only in A, and those whose share of the side's records changed by `min_ratio` (default 4) or more; sides are filters plus an optional `seg`: two files or runs, two boots, before and after an event; each item cited |
 | `check_citations(case, text)` | checks a Markdown answer: every `log:`/`art:` citation must be well-formed and resolve (errors); uncited paragraphs and quotes not in the cited lines are warnings; `PASS`/`FAIL` |
 
 A search hit looks like the design's line format; collapsed repeats add a count and the last
@@ -146,6 +147,38 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
 An order across sources that rests on `~` times closer than their error is a guess; the server
 instructions tell agents to say so.
 
+### diff (M6)
+
+`diff(case, a={'sources': ['2']}, b={'sources': ['5']})` compares two sets of records: a good and
+a bad run, `{'sources': ['3'], 'seg': 1}` against `seg: 2` (two boots of a kernel log), or one
+source before and after an event (`{'sources': ['2'], 'to': 'log:2#500'}` against `'from'`). Each
+side takes the filter of `search` plus `seg`.
+
+```
+A: source 1: 44 records, 3 messages
+B: source 2: 73 records, 4 messages
+in both: 2; only in B: 2 (E 1); only in A: 1; changed 4× or more: 1
+(message = tag + level + template; changes compare each message's share of its side's records)
+Only in B, most severe first (2):
+  log:2#71  E AudioHal  firmware load failed for <*> (<*>)  ×2
+  log:2#73  I AudioHal  using fallback route speaker
+Changed, largest change first (1):
+  ×3 → ×30 (6×)  log:1#41 / log:2#41  W VehicleHal  retry <*> for prop <*>
+Only in A, most severe first (1):
+  log:1#44  I BootReceiver  boot completed in <*> ms
+```
+
+- A **message** is a tag, a level and a template; templates are shared by all sources of a case,
+  so the same line in two files is the same message. Each item cites its first record per side.
+- **Changed** compares shares, not counts: B's count over B's records against A's count over A's
+  records, so a longer log does not make everything look more frequent; the larger side needs at
+  least 5 records.
+- Times play no part in the comparison: each side's `from`/`to` are read on its own sources'
+  clocks, as in `search`, so the sides may be on different clocks (a dmesg boot against a logcat,
+  two devices) without alignment.
+- Lists are sorted most severe (only-in) or largest change first; each gets a share of the output
+  cap and ends with how many more there are.
+
 ### Detector rules
 
 | Rule | Severity | Matches |
@@ -214,6 +247,9 @@ automotive-log-mcp timeline T-1 --level W --from "01-01 00:00:00"    # all sourc
 automotive-log-mcp align T-1                                         # how each source is aligned
 automotive-log-mcp align T-1 --anchor log:8#4=log:1#120              # same moment on two clocks
 automotive-log-mcp align T-1 --offset 8=+1.5s                        # or a fixed offset (8:2=... per segment)
+automotive-log-mcp diff T-1 --a 2 --b 5 --level W                    # only in A / only in B / changed
+automotive-log-mcp diff T-1 --a 3:1 --b 3:2                          # two boots (segments) of source 3
+automotive-log-mcp diff T-1 --a 2 --a-to log:2#500 --b 2 --b-from log:2#500   # before / after an event
 ```
 
 - `index` options: `--format <connector>` forces a format instead of sniffing; `--force`
