@@ -1,0 +1,24 @@
+*** *** *** *** *** *** *** *** *** *** *** *** *** *** *** ***
+Build fingerprint: 'example/car_arm64/car_arm64:14/UAA1.250512.001/13398012:user/release-keys'
+Revision: '0'
+ABI: 'arm64'
+Timestamp: 2026-09-14 08:01:35.334000000+0200
+Process uptime: 95s
+Cmdline: /vendor/bin/hw/android.hardware.automotive.evs-v4l2
+pid: 905, tid: 921, name: EvsCapture  >>> /vendor/bin/hw/android.hardware.automotive.evs-v4l2 <<<
+uid: 1062
+signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0000000000000018
+Cause: null pointer dereference
+    x0  0000000000000000  x1  0000000000000002  x2  0000007fe1c2b340  x3  0000000000000000
+    sp  0000007fe1c2b2f0  lr  0000007a3c41f2a8  pc  0000007a3c41f2c4
+
+backtrace:
+      #00 pc 000000000001f2c4  /vendor/lib64/libevs_v4l2.so (V4l2Stream::dequeue(unsigned int)+212) (BuildId: 77a1c3e5)
+      #01 pc 000000000001e9b0  /vendor/lib64/libevs_v4l2.so (V4l2Stream::captureLoop()+96) (BuildId: 77a1c3e5)
+      #02 pc 00000000000c2b4c  /apex/com.android.runtime/lib64/bionic/libc.so (__pthread_start(void*)+204) (BuildId: 5e6f7a8b)
+      #03 pc 0000000000062a70  /apex/com.android.runtime/lib64/bionic/libc.so (__start_thread+64) (BuildId: 5e6f7a8b)
+
+memory map (2 entries):
+    0000005a1c000000-0000005a1c012fff r--         0     13000  /vendor/bin/hw/android.hardware.automotive.evs-v4l2
+    0000007a3c400000-0000007a3c47ffff r-x         0     80000  /vendor/lib64/libevs_v4l2.so (BuildId: 77a1c3e5)
+--->Fault address falls at 00000000'00000018 before any mapped regions

@@ -1,0 +1,8 @@
+09-14 08:00:00.000  1000  1100 I CarService: CarEvsService ready
+09-14 08:00:30.000   905   905 I EvsV4l2 : opening /dev/video3 for camera rear
+09-14 08:00:30.200   905   921 I EvsV4l2 : stream started 1280x800 NV12, 4 buffers
+09-14 08:01:35.000  1000  1100 I CarEvsService: gear R: show rear view
+09-14 08:01:35.310   905   921 E EvsV4l2 : VIDIOC_DQBUF failed: No such device (19), buffer 2 lost
+09-14 08:01:35.311   905   921 W EvsV4l2 : deserializer link lost on port 1
+09-14 08:01:35.330   905   921 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x18 in tid 921 (EvsCapture), pid 905 (evs_v4l2)
+09-14 08:01:35.900  1000  1100 E CarEvsService: EVS HAL died, rear view unavailable

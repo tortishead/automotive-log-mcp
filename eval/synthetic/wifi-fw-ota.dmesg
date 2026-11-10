@@ -1,0 +1,19 @@
+<6>[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd083]
+<5>[    0.000000] Linux version 5.15.148-android14-11 (build@host) #1 SMP PREEMPT
+<6>[    0.812004] pci 0000:01:00.0: [17cb:1103] type 00 class 0x028000
+<6>[    2.004511] usbcore: registered new interface driver usbhid
+<6>[    4.120300] wlan: loading firmware qca6390/wlanfw20.mbn
+<6>[    4.388120] wlan: firmware ready, version 1.0.0.912
+<6>[    4.390002] wlan: wlan0 registered
+<6>[    5.600120] binder: 412:412 ioctl 40046210 returned -22
+<6>[    6.900000] init: Service 'vendor.wifi_hal_legacy' started
+<6>[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd083]
+<5>[    0.000000] Linux version 5.15.148-android14-11 (build@host) #1 SMP PREEMPT
+<6>[    0.812004] pci 0000:01:00.0: [17cb:1103] type 00 class 0x028000
+<6>[    2.004511] usbcore: registered new interface driver usbhid
+<6>[    4.120300] wlan: loading firmware qca6390/wlanfw20.mbn
+<3>[    4.121802] wlan: firmware request failed for qca6390/wlanfw20.mbn: error -2
+<3>[    4.121950] wlan: probe of 0000:01:00.0 failed with error -2
+<6>[    5.600120] binder: 412:412 ioctl 40046210 returned -22
+<6>[    6.900000] init: Service 'vendor.wifi_hal_legacy' started
+<3>[    7.200300] init: Service 'vendor.wifi_hal_legacy' (pid 655) exited with status 1

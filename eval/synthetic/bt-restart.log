@@ -1,0 +1,22 @@
+09-14 08:00:00.000     1     1 I init    : starting service 'vendor.bluetooth-1-1'...
+09-14 08:00:00.100  1301  1301 I bt_vendor: init: chip BCM4359, uart /dev/ttyHS1 at 3000000
+09-14 08:00:00.150  1301  1301 E bt_vendor: Bluetooth firmware patch /vendor/firmware/BCM4359C0.hcd not found
+09-14 08:00:00.160  1301  1301 E bt_hci  : hci reset timeout after firmware download, aborting
+09-14 08:00:00.300     1     1 I init    : Service 'vendor.bluetooth-1-1' (pid 1301) exited with status 1
+09-14 08:00:05.300     1     1 I init    : starting service 'vendor.bluetooth-1-1'...
+09-14 08:00:05.400  1308  1308 I bt_vendor: init: chip BCM4359, uart /dev/ttyHS1 at 3000000
+09-14 08:00:05.450  1308  1308 E bt_vendor: Bluetooth firmware patch /vendor/firmware/BCM4359C0.hcd not found
+09-14 08:00:05.460  1308  1308 E bt_hci  : hci reset timeout after firmware download, aborting
+09-14 08:00:05.600     1     1 I init    : Service 'vendor.bluetooth-1-1' (pid 1308) exited with status 1
+09-14 08:00:10.600     1     1 I init    : starting service 'vendor.bluetooth-1-1'...
+09-14 08:00:10.700  1315  1315 I bt_vendor: init: chip BCM4359, uart /dev/ttyHS1 at 3000000
+09-14 08:00:10.750  1315  1315 E bt_vendor: Bluetooth firmware patch /vendor/firmware/BCM4359C0.hcd not found
+09-14 08:00:10.760  1315  1315 E bt_hci  : hci reset timeout after firmware download, aborting
+09-14 08:00:10.900     1     1 I init    : Service 'vendor.bluetooth-1-1' (pid 1315) exited with status 1
+09-14 08:00:15.900     1     1 I init    : starting service 'vendor.bluetooth-1-1'...
+09-14 08:00:16.000  1322  1322 I bt_vendor: init: chip BCM4359, uart /dev/ttyHS1 at 3000000
+09-14 08:00:16.050  1322  1322 E bt_vendor: Bluetooth firmware patch /vendor/firmware/BCM4359C0.hcd not found
+09-14 08:00:16.060  1322  1322 E bt_hci  : hci reset timeout after firmware download, aborting
+09-14 08:00:16.200     1     1 I init    : Service 'vendor.bluetooth-1-1' (pid 1322) exited with status 1
+09-14 08:00:21.200     1     1 I init    : starting service 'vendor.bluetooth-1-1'...
+09-14 08:00:21.300  1000  1150 W BluetoothManagerService: Bluetooth HAL not ready after 4 tries, giving up

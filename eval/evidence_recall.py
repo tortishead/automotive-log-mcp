@@ -11,7 +11,10 @@ expected citation counts as
 - **missed** otherwise.
 
 Recall = (exact + artifact) / expected. Every expected citation must also resolve in the case
-(check_citations); one that does not means the case definition is out of date.
+(check_citations); one that does not means the case definition is out of date. A case with
+``expected.order`` (citations on different clocks, in the order they happened) is also checked on
+the case clock that ``timeline`` uses: the order must hold and every one must be placed (a wrong
+order or an unplaced source fails the run like an unresolved citation).
 
     python eval/evidence_recall.py eval/cases.yaml                       # temporary home, deleted
     python eval/evidence_recall.py eval/cases.yaml eval/cases.local.yaml --report eval/results/recall.md
@@ -26,6 +29,7 @@ files are missing are skipped (reported), unless ``--strict``.
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import re
@@ -42,10 +46,21 @@ import yaml
 from automotive_log_mcp.app import App
 from automotive_log_mcp.config import CASE_NAME_RE, load_config
 from automotive_log_mcp.policy import Policy, load_policy
-from automotive_log_mcp.tools import Filter, Output, ToolInputError, Tools
+from automotive_log_mcp.tools import DiffSide, Filter, Output, ToolInputError, Tools
 
 CITE = re.compile(r"\b(?:log:\d+#\d+|art:\d+(?:/[a-z0-9_.-]+)?(?::L\d+(?:-L?\d+)?)?)")
-TOOLS = ("search", "count", "context", "list_artifacts", "read_artifact", "get_records", "detect", "overview")
+TOOLS = (
+    "search",
+    "count",
+    "context",
+    "list_artifacts",
+    "read_artifact",
+    "get_records",
+    "detect",
+    "overview",
+    "timeline",
+    "diff",
+)
 
 
 class CaseError(ValueError):
@@ -63,6 +78,7 @@ class Case:
     synthetic: bool = False
     symptom: str = ""
     queries: list[dict[str, Any]] = field(default_factory=list)
+    order: list[str] = field(default_factory=list)  # citations in the order they happened
     origin: str = ""
 
 
@@ -74,6 +90,7 @@ class CaseResult:
     artifact: list[str] = field(default_factory=list)
     missed: list[str] = field(default_factory=list)
     unresolved: list[str] = field(default_factory=list)
+    order: str = ""  # '', 'ok' or what is wrong
     found_by: dict[str, list[str]] = field(default_factory=dict)  # citation -> tools
     calls: list[dict[str, Any]] = field(default_factory=list)  # tool, args, bytes, ms
     note: str = ""
@@ -117,6 +134,9 @@ def load_cases(path: Path) -> list[Case]:
         bad = [x for x in cites if not CITE.fullmatch(x)]
         if bad:
             raise CaseError(f"{where} ({cid}): malformed citations {bad}")
+        order = exp.get("order") or []
+        if not isinstance(order, list) or not all(isinstance(x, str) and CITE.fullmatch(x) for x in order):
+            raise CaseError(f"{where} ({cid}): expected.order must be a list of citations")
         files = c.get("files")
         if not isinstance(files, list) or not files:
             raise CaseError(f"{where} ({cid}): 'files' must be a non-empty list")
@@ -139,6 +159,7 @@ def load_cases(path: Path) -> list[Case]:
                 synthetic=bool(c.get("synthetic", False)),
                 symptom=str(c.get("symptom", "")),
                 queries=queries,
+                order=order,
                 origin=str(path),
             )
         )
@@ -155,6 +176,14 @@ def _call(tools: Tools, case: str, tool: str, args: dict[str, Any]) -> Output:
         if "query" in args:
             args["text"] = args.pop("query")
         return tools.count(case, **args)
+    if tool == "timeline":
+        if "query" in args:
+            args["query_text"] = args.pop("query")
+        return tools.timeline(case, **args)
+    if tool == "diff":
+        for side in ("a", "b"):
+            args[side] = DiffSide.model_validate(args[side])
+        return tools.diff(case, **args)
     return getattr(tools, tool)(case, **args)  # type: ignore[no-any-return]
 
 
@@ -208,6 +237,10 @@ def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
         got = _cited_text(tools, case.id, c)
         if _norm(want) not in _norm(got):
             res.unresolved.append(f"{c}: the line does not contain {want!r} (it shows {got[:120]!r})")
+    if case.order:
+        res.order = _check_order(tools, case)
+        if not res.order.startswith("ok"):
+            res.unresolved.append(f"order {' < '.join(case.order)}: {res.order}")
     for c in case.citations:
         art = re.match(r"art:\d+", c)
         if c in seen:
@@ -219,6 +252,24 @@ def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
         else:
             res.missed.append(c)
     return res
+
+
+def _check_order(tools: Tools, case: Case) -> str:
+    """'ok' when the case clock puts ``case.order`` in that order, else what is wrong."""
+    times: list[tuple[str, int]] = []
+    for c in case.order:
+        try:
+            t = tools.case_time(case.id, c)
+        except ToolInputError as e:
+            return f"{c}: {e}"
+        if t is None:
+            return f"{c} is not on the case clock (its source has no anchor)"
+        times.append((c, t))
+    for (c1, t1), (c2, t2) in itertools.pairwise(times):
+        if not t1 < t2:
+            return f"{c1} is not before {c2} on the case clock ({(t1 - t2) / 1e6:+.1f} ms)"
+    gaps = ", ".join(f"{(t2 - t1) / 1e6:.0f} ms" for (_, t1), (_, t2) in itertools.pairwise(times))
+    return f"ok ({gaps})" if gaps else "ok"
 
 
 def report(results: list[CaseResult], min_recall: float) -> str:
@@ -256,6 +307,10 @@ def report(results: list[CaseResult], min_recall: float) -> str:
     if bad:
         lines += ["", "Expected citations that do not resolve (fix the case definition):"]
         lines += [f"- {r.case.id}: {u}" for r in bad for u in r.unresolved]
+    ordered = [r for r in ran if r.case.order]
+    if ordered:
+        lines += ["", "Order on the case clock (timeline, alignment):"]
+        lines += [f"- {r.case.id}: {' < '.join(r.case.order)}: {r.order}" for r in ordered]
     lines += ["", "Calls per case (first page, default arguments):"]
     for r in ran:
         calls = ", ".join(f"{c['tool']} {c['bytes']:,} B {c['ms']:.0f} ms" for c in r.calls)
@@ -329,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
                         "artifact": r.artifact,
                         "missed": r.missed,
                         "unresolved": r.unresolved,
+                        "order": r.order,
                         "found_by": r.found_by,
                         "calls": r.calls,
                         "note": r.note,

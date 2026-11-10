@@ -1,0 +1,21 @@
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd083]
+[    0.000000] Linux version 5.15.148-android14-11 (build@host) #1 SMP PREEMPT
+[    1.402118] flexcan: 2090000.can can0: registered (clock 40000000 Hz)
+[    2.911002] flexcan: 2090000.can can0: bitrate 500000, sample point 87.5%
+[   12.300400] init: second stage started
+[  141.204118] flexcan: 2090000.can can0: bus-off, stopping controller
+[  141.204390] flexcan: 2090000.can can0: tx queue stopped, 37 frames dropped
+[  141.305001] flexcan: 2090000.can can0: restarting controller after bus-off
+[  142.401227] flexcan: 2090000.can can0: bus-off recovered, error counters reset
+[  150.112000] thermal: zone2 trip point 1 cleared
+[  153.870000] binder: release 2210:2230 transaction 88412 out, still active
+[  158.004000] usbcore: registered new interface driver uvcvideo
+[  161.553000] rtc: alarm set to 1757837000
+[  166.020000] wlan: roam scan started on 5 channels
+[  170.731000] audit: rate limit exceeded
+[  174.400000] thermal: zone4 trip point 0 reached
+[  179.090000] binder: undelivered death notification, 4f1a2c00
+[  183.661000] wlan: roam to bss 3, rssi -61
+[  188.245000] usbcore: usb 2-1 disconnected, device number 3
+[  192.818000] rtc: alarm fired, 2 handlers
+[  197.310000] ion: heap system grew to 412 MiB

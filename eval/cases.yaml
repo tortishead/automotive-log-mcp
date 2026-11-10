@@ -22,6 +22,8 @@
 #     citations    the lines that show the root cause: log:<source>#<seq> or art:<id>[/section][:L<n>],
 #                  each optionally with the text the line must contain ({cite: …, text: …}): the
 #                  harness checks it, which catches citations that drifted (reindex, miscount)
+#     order        optional: citations on different clocks in the order they happened; the harness
+#                  checks that the case clock (timeline, alignment) puts them in this order
 #   queries    optional: queries a reasonable engineer would run first, beyond detect and
 #              list_artifacts (tool + args, as the MCP tools take them); counted in evidence recall
 #   fix        the fix commit (or "synthetic")
@@ -105,4 +107,94 @@ cases:
       citations:
         - {cite: log:1#4, text: "open /dev/vehicle_bus0 failed: Permission denied"}
         - {cite: log:1#5, text: "avc: denied { read write }"}
+    fix: synthetic
+
+  # -- M6 (Nov 10, 2026): five more synthetic cases, expected answers written before the first run --
+
+  - id: syn-can-busoff
+    synthetic: true
+    title: Speed shows '--' on the cluster while driving
+    symptom: For about a second the cluster shows '--' instead of the vehicle speed; it comes back by itself.
+    files: [synthetic/can-busoff/hu-logcat.txt, synthetic/can-busoff/dmesg.txt]
+    expected:
+      component: CAN controller can0 (flexcan driver) going bus-off; VHAL only reports the missing frames
+      root_cause: >-
+        The CAN controller goes bus-off and drops its tx queue 250 ms before the VHAL notices that the
+        speed frame 0x3A1 is missing; the kernel log (seconds since boot) has the cause, the head unit's
+        logcat (wall clock) the symptom, so the two must be put on one clock to see the order.
+      citations:
+        - {cite: log:2#6, text: "can0: bus-off, stopping controller"}
+        - {cite: log:1#6, text: "CAN rx timeout on can0"}
+      order: [log:2#6, log:1#6]
+    queries:
+      - {tool: timeline, args: {filter: {from: "log:1#6-1s", to: "log:1#6"}}}
+    fix: synthetic
+
+  - id: syn-watchdog-audio
+    synthetic: true
+    title: Head unit restarts when the audio system is switched on
+    symptom: Pressing the audio button freezes the screen for half a minute, then the head unit restarts.
+    files: [synthetic/watchdog-audio.log]
+    expected:
+      component: audio HAL (audio_hw, pcm_open of card 0 device 3) blocking system_server's main thread
+      root_cause: >-
+        CarAudioService calls AudioSystem.setParameters on system_server's main thread; the audio HAL holds
+        its stream lock while pcm_open fails and retries, so the call blocks and the watchdog kills
+        system_server.
+      citations:
+        - {cite: log:1#4, text: "pcm_open card 0 device 3 failed: I/O error"}
+        - {cite: log:1#8, text: "Blocked in handler on main thread (main)"}
+    queries:
+      - {tool: search, args: {query: audio, filter: {level: W}}}
+    fix: synthetic
+
+  - id: syn-evs-crash
+    synthetic: true
+    title: Rear camera image disappears when reversing
+    symptom: Shifting into reverse shows the rear view for a moment, then a 'camera unavailable' message.
+    files: [synthetic/evs-crash/evs.log, synthetic/evs-crash/tombstone_03]
+    expected:
+      component: EVS camera HAL (libevs_v4l2.so, V4l2Stream::dequeue)
+      root_cause: >-
+        The camera's deserializer link drops and VIDIOC_DQBUF fails with ENODEV; V4l2Stream::dequeue does
+        not handle the failure and dereferences a null buffer (SIGSEGV), so the EVS HAL dies.
+      citations:
+        - {cite: log:1#5, text: "VIDIOC_DQBUF failed: No such device"}
+        - {cite: art:1/backtrace:L16, text: "V4l2Stream::dequeue"}
+    queries:
+      - {tool: search, args: {query: evs, filter: {level: W}}}
+    fix: synthetic
+
+  - id: syn-wifi-fw-ota
+    synthetic: true
+    title: No Wi-Fi after the software update
+    symptom: After the OTA update and its reboot the head unit shows no Wi-Fi networks; before it worked.
+    files: [synthetic/wifi-fw-ota.dmesg]
+    expected:
+      component: Wi-Fi driver firmware (qca6390/wlanfw20.mbn missing from the updated image)
+      root_cause: >-
+        In the boot after the update the wlan driver cannot load its firmware file (ENOENT), the PCI probe
+        fails and the Wi-Fi HAL exits; the boot before the update loaded the same firmware.
+      citations:
+        - {cite: log:1#15, text: "firmware request failed for qca6390/wlanfw20.mbn"}
+        - {cite: log:1#16, text: "probe of 0000:01:00.0 failed"}
+    queries:
+      - {tool: diff, args: {a: {sources: ["1"], seg: 1}, b: {sources: ["1"], seg: 2}}}
+    fix: synthetic
+
+  - id: syn-bt-restart
+    synthetic: true
+    title: Bluetooth cannot be switched on
+    symptom: The Bluetooth toggle stays off; phones do not find the car.
+    files: [synthetic/bt-restart.log]
+    expected:
+      component: Bluetooth HAL (vendor.bluetooth-1-1), firmware patch BCM4359C0.hcd missing
+      root_cause: >-
+        The Bluetooth vendor library cannot find the chip's firmware patch, the HCI reset after the
+        download times out and the HAL exits; init restarts it four times and the framework gives up.
+      citations:
+        - {cite: log:1#3, text: "firmware patch /vendor/firmware/BCM4359C0.hcd not found"}
+        - {cite: log:1#5, text: "Service 'vendor.bluetooth-1-1' (pid 1301) exited with status 1"}
+    queries:
+      - {tool: search, args: {query: bluetooth, filter: {level: W}}}
     fix: synthetic

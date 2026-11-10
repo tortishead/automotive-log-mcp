@@ -1,0 +1,14 @@
+09-14 08:00:00.000  1000  1000 I SystemServer: Entered the Android system server!
+09-14 08:00:05.000   820   820 I audio_hw: adev_open: 4 buses, card 0
+09-14 08:01:00.000  1000  1180 I CarAudioService: setAudioEnabled(true) for zone 0
+09-14 08:01:00.010   820   851 E audio_hw: pcm_open card 0 device 3 failed: I/O error, retrying in 500 ms
+09-14 08:01:00.512   820   851 E audio_hw: pcm_open card 0 device 3 failed: I/O error, retrying in 500 ms
+09-14 08:01:01.014   820   851 E audio_hw: pcm_open card 0 device 3 failed: I/O error, retrying in 500 ms
+09-14 08:01:01.020   820   851 W audio_hw: out_write: stream lock held 1010 ms by set_parameters
+09-14 08:01:30.000  1000  1210 W Watchdog: Blocked in handler on main thread (main) for 30s
+09-14 08:01:30.001  1000  1210 W Watchdog: main stack:
+09-14 08:01:30.002  1000  1210 W Watchdog:     at android.media.AudioSystem.setParameters(Native Method)
+09-14 08:01:30.003  1000  1210 W Watchdog:     at com.android.car.audio.CarAudioService.setAudioEnabled(CarAudioService.java:812)
+09-14 08:02:00.000  1000  1210 E Watchdog: *** WATCHDOG KILLING SYSTEM PROCESS: Blocked in handler on main thread (main)
+09-14 08:02:00.500     1     1 I init    : Service 'system_server' (pid 1000) received signal 9
+09-14 08:02:01.000     1     1 I init    : starting service 'zygote'...

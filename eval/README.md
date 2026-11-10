@@ -12,17 +12,17 @@ Two levels, on the same cases (implementation plan, M4 item 6 and the checkpoint
 
 | File | What |
 | --- | --- |
-| `cases.yaml` | the 5 synthetic cases (from the test fixtures and `synthetic/`), with expected answers |
+| `cases.yaml` | the 10 synthetic cases (from the test fixtures and `synthetic/`), with expected answers |
 | `cases.local.yaml` | your real closed defects (git-ignored; create it from the example below) |
 | `evidence_recall.py` | evidence recall over one or more case files; Markdown report, optional JSON |
 | `callstats.py` | calls, bytes and tools per session from the server's call log (for where the tokens went and why a run was expensive, use `automotive-log-mcp calls`, see the main README "Token use") |
 | `agent_runs/` | the agent-run checklist and template; your run notes go in `agent_runs/local/` (git-ignored) |
 | `results/` | reports you write with `--report` (git-ignored) |
 
-**Status:** the harness and both procedures are built and checked on the 5 synthetic cases only.
-The M4 done criterion ("both evaluations run on 5 closed defects and written up") needs your
-real defects. The synthetic cases test the harness, not the server's value: their expected
-citations come from how the logs were written.
+**Status:** the harness and both procedures are built and checked on the 10 synthetic cases
+only. The M4 and M6 done criteria ("both evaluations run on 5 / 10 closed defects and written up")
+need your real defects; no agent run has been done on any case yet. The synthetic cases test the
+harness, not the server's value: their expected citations come from how the logs were written.
 
 ## Add a real case
 
@@ -77,7 +77,22 @@ against the fix, not against what the tools show.
    them after seeing what `detect` or an agent found.
 
 Five such cases are the checkpoint's minimum ("at least 3 of 5 agent runs point to the right
-component").
+component"); the release plan asks for ten.
+
+For a defect whose evidence is spread over files on different clocks (a kernel log in seconds
+since boot, a second device), also write `expected.order`: the citations in the order they
+happened. The harness checks that the case clock (what `timeline` shows) puts them in that order
+and that every one is placed; a wrong order fails the run like an unresolved citation.
+
+Recorded `queries` take the tools `search`, `count`, `context`, `list_artifacts`,
+`read_artifact`, `get_records`, `detect`, `overview`, `timeline` and `diff`, with the arguments the
+MCP tools take, e.g.:
+
+```yaml
+queries:
+  - {tool: timeline, args: {filter: {from: "log:1#6-1s", to: "log:1#6"}}}
+  - {tool: diff, args: {a: {sources: ["1"], seg: 1}, b: {sources: ["1"], seg: 2}}}
+```
 
 ## Run evidence recall
 
@@ -120,3 +135,24 @@ the logs are confidential):
 - the summary table from `agent_runs/README.md` (right component in how many of 5, check_citations
   passing on how many answers, median calls and bytes, baseline numbers if you ran it),
 - the go / adjust / stop decision with the reason (plan, "Checkpoint").
+
+## The synthetic cases
+
+| Case | Files | What it exercises |
+| --- | --- | --- |
+| `syn-hvac-crash` | fixture bugreport | Java crash artifact, VHAL error before it |
+| `syn-radio-anr` | fixture bugreport | ANR lock holder in a binder call |
+| `syn-vhal-abort` | `vhal-abort.log` | VHAL abort after a bus timeout |
+| `syn-lmk-media` | `lmk-media.log` | low memory kill of another app |
+| `syn-boot-selinux` | `boot-selinux.log` | SELinux denial at boot |
+| `syn-can-busoff` | `can-busoff/hu-logcat.txt`, `can-busoff/dmesg.txt` | two clocks: the dmesg is placed by 12 kernel lines it shares with the logcat (`paired`); the cause (CAN bus-off) shows only on the timeline, 248 ms before the VHAL error; `expected.order` |
+| `syn-watchdog-audio` | `watchdog-audio.log` | watchdog kill, audio HAL error found by a search |
+| `syn-evs-crash` | `evs-crash/evs.log`, `evs-crash/tombstone_03` | a standalone tombstone file next to a logcat |
+| `syn-wifi-fw-ota` | `wifi-fw-ota.dmesg` | two boots of one kernel log; only `diff` (boot 1 against boot 2) shows the missing firmware |
+| `syn-bt-restart` | `bt-restart.log` | a HAL restart loop, the cause found by a search |
+
+First run of all ten (Nov 10, 2026; expected answers written before it): **19 of 20** root-cause
+citations surfaced (15 exact, 4 through their artifact), every expected citation resolves to a
+line with its text, and the order check of `syn-can-busoff` holds. The miss is `syn-boot-selinux`
+`log:1#4` (since M4: no rule covers the daemon's own "Permission denied" line). Whether an agent
+finds the same evidence, and in how many calls, is not measured: no agent run was done.

@@ -1177,6 +1177,17 @@ class Tools:
         out: Output = self.differ.diff(case, a, b, min_ratio, limit)
         return out
 
+    def case_time(self, case: str, cite: str) -> int | None:
+        """A record's time on the case clock (ns), as timeline orders it; None when its source is
+        not placed. For the evaluation's order check."""
+        with self._case(case) as ctx:
+            cc = self.clock.model(ctx)
+            rid = self._anchor(ctx, cite)
+            r = query.records_by_id(ctx.conn, [rid]).get(rid)
+            if r is None:
+                raise ToolInputError(f"no record {cite} in case '{case}'")
+            return cc.case_time(r.source_id, r.seg, r.ts, r.ts_src)
+
     def clock_summary(self, case: str) -> tuple[str, dict[str, str]]:
         """(case clock name, short clock text per source id) for list_sources; exact sources omitted."""
         with self._case(case) as ctx:
