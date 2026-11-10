@@ -48,6 +48,9 @@ class Config:
     # Tool results with structuredContent and output schemas; off by default because some clients
     # (Claude Code) then forward only the JSON to the model, at 1.5-2x the bytes of the text.
     structured_output: bool = False
+    # One call-log file per round (and a report next to it), to hand over for analysis.
+    rounds_dir: Path | None = None
+    round_gap_minutes: int = 10
 
     def case_db(self, case: str) -> Path:
         """Path of a case's DB file (D7). ``case`` must already be validated."""
@@ -59,7 +62,16 @@ def default_home() -> Path:
     return Path(env).expanduser() if env else Path.home() / ".automotive-log-mcp"
 
 
-_TOP_KEYS = {"cases_dir", "policy_file", "call_log", "caps", "rule_dirs", "structured_output"}
+_TOP_KEYS = {
+    "cases_dir",
+    "policy_file",
+    "call_log",
+    "caps",
+    "rule_dirs",
+    "structured_output",
+    "rounds_dir",
+    "round_gap_minutes",
+}
 _CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars", "regex_scan_rows"}
 
 
@@ -131,6 +143,17 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
     else:
         call_log = home / "calllog.jsonl"
 
+    rounds_dir: Path | None
+    if "rounds_dir" in data and data["rounds_dir"] is None:
+        rounds_dir = None  # explicitly disabled
+    elif "rounds_dir" in data:
+        rounds_dir = _path(data["rounds_dir"], "rounds_dir", base)
+    else:
+        rounds_dir = home / "rounds" if call_log is not None else None  # no logging: no rounds either
+    gap = data.get("round_gap_minutes", 10)
+    if isinstance(gap, bool) or not isinstance(gap, int) or gap <= 0:
+        raise ConfigError(f"config key 'round_gap_minutes' must be a positive integer, got {gap!r}")
+
     return Config(
         home=home,
         cases_dir=_path(data["cases_dir"], "cases_dir", base) if "cases_dir" in data else home / "cases",
@@ -141,4 +164,6 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
         caps=caps,
         rule_dirs=tuple(_path(d, "rule_dirs[]", base) for d in rule_dirs_data),
         structured_output=structured,
+        rounds_dir=rounds_dir,
+        round_gap_minutes=gap,
     )

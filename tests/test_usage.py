@@ -279,3 +279,69 @@ def test_analysis_reads_old_call_log_lines(home: Path, capsys: pytest.CaptureFix
     out = capsys.readouterr().out
     assert "session s-old" in out and "repeat of #1" in out and "1 tool errors" in out
     assert cli_main(["calls", "--session", "nope"]) == 1
+
+
+# -- one log file per round ------------------------------------------------------------------------------
+
+
+def test_round_files_split_after_a_pause(tmp_path: Path) -> None:
+    from automotive_log_mcp.calllog import CallLog
+
+    now = [0.0]
+    log = CallLog(
+        tmp_path / "calllog.jsonl",
+        "s1",
+        rounds_dir=tmp_path / "rounds",
+        round_gap=600,
+        reporter=lambda f: f"report of {f.name}",
+        clock=lambda: now[0],
+    )
+    info = {"version": "x"}
+    for t in (0, 10, 700, 710):  # 690 s pause before the third call: a new round
+        now[0] = t
+        log.write("search", {"case": "c", "query": "q"}, "ok", 1.0, 10, None, None, lambda: info)
+    files = sorted((tmp_path / "rounds").glob("*.jsonl"))
+    assert [f.name.rsplit("_", 1)[-1] for f in files] == ["r1.jsonl", "r2.jsonl"]
+    assert all(":" not in f.name for f in files)  # valid file names on Windows
+    rounds = [[json.loads(x) for x in f.read_text(encoding="utf-8").splitlines()] for f in files]
+    assert [len(r) for r in rounds] == [2, 2]
+    assert [("server" in e, e["round"]) for r in rounds for e in r] == [
+        (True, 1),
+        (False, 1),
+        (True, 2),
+        (False, 2),
+    ]
+    main = (tmp_path / "calllog.jsonl").read_text(encoding="utf-8").splitlines()
+    assert [json.loads(x) for x in main] == rounds[0] + rounds[1]  # the same lines as the call log
+    assert files[1].with_suffix(".txt").read_text(encoding="utf-8") == f"report of {files[1].name}\n"
+
+
+def test_server_writes_round_file_with_report(
+    config: Config, case_zip: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    async def main() -> None:
+        async with Client(build_server(config, Policy())) as client:
+            await client.call_tool("add_source", {"case": "T-1", "path": str(case_zip)})
+            await client.call_tool("list_artifacts", {"case": "T-1"})
+            await client.call_tool("list_artifacts", {"case": "T-1"})
+
+    anyio.run(main)
+    assert config.rounds_dir == config.home / "rounds"
+    (f,) = config.rounds_dir.glob("*_r1.jsonl")
+    report = f.with_suffix(".txt").read_text(encoding="utf-8")
+    assert "3 calls" in report and "repeat of #2" in report and "problems:" in report
+    assert "NullPointerException" not in f.read_text(encoding="utf-8")  # no log content
+    assert cli_main(["calls", "--log", str(f)]) == 0
+    assert "repeat of #2" in capsys.readouterr().out
+
+
+def test_rounds_follow_call_log_setting(home: Path) -> None:
+    home.mkdir(parents=True)
+    (home / "config.yaml").write_text("call_log: null\n", encoding="utf-8")
+    assert load_config().rounds_dir is None
+    (home / "config.yaml").write_text("rounds_dir: null\nround_gap_minutes: 30\n", encoding="utf-8")
+    cfg = load_config()
+    assert cfg.rounds_dir is None and cfg.call_log is not None and cfg.round_gap_minutes == 30
+    (home / "config.yaml").write_text("round_gap_minutes: 0\n", encoding="utf-8")
+    with pytest.raises(ConfigError, match="round_gap_minutes"):
+        load_config()

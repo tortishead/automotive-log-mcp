@@ -135,7 +135,7 @@ def _call(e: dict[str, Any], n: int) -> Call:
     ac = e.get("answer_cites")
     sb = e.get("structured_bytes")
     return Call(
-        seq=int(e.get("seq") or n),
+        seq=n,  # position in the round (the logged seq counts over the whole server session)
         ts=str(e.get("ts", "")),
         tool=tool,
         args=args,
@@ -170,6 +170,8 @@ def read_calllog(path: Path) -> list[Session]:
             if not isinstance(e, dict) or "tool" not in e:
                 continue
             sid = str(e.get("session", "?"))
+            if isinstance(e.get("round"), int):
+                sid = f"{sid}-r{e['round']}"  # one report per round
             s = sessions.setdefault(sid, Session(sid))
             if isinstance(e.get("server"), dict):
                 s.server = e["server"]
@@ -480,7 +482,12 @@ def analyse(
 
     out_tok = sum(est_tokens(c.model_bytes(reads)) for c in calls)
     text_tok = sum(est_tokens(c.text_bytes) for c in calls)
-    how = "as the client passed them" if any(c.seen_bytes is not None for c in calls) else f"reads={reads}"
+    if any(c.seen_bytes is not None for c in calls):
+        how = "as the client passed them"
+    elif any(c.structured_bytes for c in calls):
+        how = f"reads={reads}"
+    else:
+        how = "text results"
     lines.append(
         f"tool output: ~{_tok(out_tok)} tokens est. (~tok: bytes/{BYTES_PER_TOKEN}, {how}); "
         f"as text only ~{_tok(text_tok)}"

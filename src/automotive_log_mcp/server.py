@@ -24,6 +24,7 @@ import time
 import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Annotated, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
@@ -311,7 +312,14 @@ class LogServer:
         self.app = App.create(config, policy)
         self.tools = Tools(self.app)
         self.session = session or uuid.uuid4().hex[:12]
-        self.calllog = CallLog(config.call_log, self.session, redact=self.app.redactor.redact)
+        self.calllog = CallLog(
+            config.call_log,
+            self.session,
+            redact=self.app.redactor.redact,
+            rounds_dir=config.rounds_dir,
+            round_gap=config.round_gap_minutes * 60.0,
+            reporter=_round_report,
+        )
         self.budget = ByteBudget(policy.byte_budget)
         self.structured = config.structured_output
         self._seq = 0
@@ -336,6 +344,9 @@ class LogServer:
             self._fixed = fixed_cost(INSTRUCTIONS, tools)
         return self._fixed
 
+    def _server_info(self) -> dict[str, Any]:
+        return {"version": __version__, "structured": self.structured, "fixed": self.fixed_cost().as_log()}
+
     def _next_seq(self) -> int:
         with self._seq_lock:
             self._seq += 1
@@ -353,12 +364,6 @@ class LogServer:
             bound = sig.bind_partial(*args, **kwargs)
             log_args = _jsonable(dict(bound.arguments))
             base: dict[str, Any] = {"seq": seq}
-            if seq == 1:
-                base["server"] = {
-                    "version": __version__,
-                    "structured": self.structured,
-                    "fixed": self.fixed_cost().as_log(),
-                }
             if name == "check_citations" and isinstance(log_args.get("text"), str):
                 text = log_args["text"]  # an answer quotes log content: keep only its size and hash
                 digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
@@ -381,6 +386,7 @@ class LogServer:
                     n,
                     error,
                     {**base, **(extra or {})},
+                    self._server_info,
                 )
 
             if self.budget.exhausted():
@@ -729,6 +735,15 @@ def slim_schema(node: Any) -> Any:
     if "default" in out and out["default"] is None:
         del out["default"]
     return out
+
+
+def _round_report(path: Path) -> str:
+    """The report for one round file (the same as ``calls --log <file>``)."""
+    from .callreport import analyse, read_calllog
+
+    sessions = read_calllog(path)
+    head = f"# automotive-log-mcp round report, rewritten after every call; analysed from {path.name}"
+    return "\n\n".join([head, *(analyse(s).text() for s in sessions if s.calls)])
 
 
 def _sync(coro: Any) -> Any:

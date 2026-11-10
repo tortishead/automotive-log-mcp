@@ -245,11 +245,13 @@ All state lives under `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MC
 
 | Path | What |
 | --- | --- |
-| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false) |
+| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false), `rounds_dir` (default `<home>/rounds`, null disables), `round_gap_minutes` (default 10) |
 | `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors` |
 | `cases/<case>.db` | one SQLite DB per case; originals are referenced by path and SHA-256, never copied |
 | `secret.key` | redaction key, created on first run; deleting it changes every token of later imports |
 | `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes, and for token analysis call number, text and structured bytes, estimated tokens, argument hashes, caps hit, result counts and the citation ids in the output; the first call of a session also records the server's fixed cost. Never log content (the text given to `check_citations` is logged as its length, hash and the citation ids it contains) |
+
+| `rounds/<date>_<time>_<session>_r<n>.jsonl` | the call-log lines of one round (see [Token use](#token-use)), and `….txt` next to it: its report, rewritten after every call |
 
 Example `policy.yaml`:
 
@@ -261,7 +263,19 @@ byte_budget: 500000
 ## Token use
 
 Where an agent session spends its tokens, and what to change, from the call log the server
-writes anyway (nothing to switch on):
+writes anyway (nothing to switch on).
+
+**One log file per round.** Besides `calllog.jsonl`, the server writes every round to a file of
+its own in `~/.automotive-log-mcp/rounds/` (Windows: `%USERPROFILE%\.automotive-log-mcp\rounds\`),
+named `<date>_<time>_<session>_r<n>.jsonl` (local time), with a readable report `….txt` next to it
+that is rewritten after every call. A round starts with the server and again after
+`round_gap_minutes` (default 10) without a tool call: VS Code keeps the server running between
+chats, so a pause is the only boundary the server can see; leave a pause, or restart the server,
+between questions you want to compare. To have a round checked, hand over its `.jsonl` (and the
+`.txt` if you like); for a Claude Code run also the session transcript (below). The files hold
+what `calllog.jsonl` holds: tool names, redacted arguments (queries, file paths), sizes, hashes
+and citation ids, no log lines; look at the arguments before you send a file outside your team.
+Whoever gets it runs `automotive-log-mcp calls --log <file>.jsonl [--transcript <session>.jsonl]`.
 
 ```powershell
 # Windows (PowerShell)
