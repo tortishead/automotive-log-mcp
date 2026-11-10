@@ -126,7 +126,7 @@ def test_fit_finds_drift() -> None:
     assert fit is not None
     p = fit.pieces[0]
     assert p.drift_ppm == pytest.approx(ppm, rel=0.01)
-    assert fit.error_ns < MS
+    assert fit.error_ns <= MS  # whole-second test times: the error is floored at 1 ms resolution
     # Without the drift term the error would be ~140 ms at the end.
     assert max(abs(p.map(x) - y) for x, y in pairs) < MS
 
@@ -462,3 +462,14 @@ def test_timeline_and_align_over_mcp(config: Config, tmp_path: Path) -> None:
             assert r.is_error
 
     anyio.run(main)
+
+
+def test_error_is_at_least_the_time_resolution() -> None:
+    """Offsets that agree exactly still leave the resolution of the coarser clock (logcat: 1 ms)."""
+    us = 1000
+    pairs = [(x * NS + 123 * us, x * NS + 5 * NS) for x in range(1, 20)]  # µs side against ms side
+    fit = al.fit_pairs(pairs)
+    assert fit is not None and fit.error_ns == MS
+    pairs = [(x * NS + 7, x * NS + 5 * NS + 7) for x in range(1, 20)]  # both in ns
+    fit = al.fit_pairs(pairs)
+    assert fit is not None and fit.error_ns == 1

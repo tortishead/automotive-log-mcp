@@ -390,7 +390,19 @@ def fit_pairs(
                     piece, resid = drifted, d_resid
         pieces.append(piece)
         err = max(err, resid)
-    return Fit(pieces, err, inliers, n)
+    # Agreement within the pairs is no better than the times' resolution: logcat prints
+    # milliseconds, so offsets that agree exactly still leave up to 1 ms (found by the M6 eval,
+    # where 12 paired lines gave '±0 ns').
+    res = max(_resolution([x for r in kept for x, _ in r]), _resolution([x + o for r in kept for x, o in r]))
+    return Fit(pieces, max(err, res), inliers, n)
+
+
+def _resolution(values: list[int]) -> int:
+    """1 ms when every value is a whole millisecond, 1 µs for whole microseconds, else 1 ns."""
+    for step in (1_000_000, 1000):
+        if all(v % step == 0 for v in values):
+            return step
+    return 1
 
 
 def _insort(a: list[int], v: int) -> None:
