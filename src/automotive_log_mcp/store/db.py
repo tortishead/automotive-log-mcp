@@ -18,8 +18,9 @@ from pathlib import Path
 from typing import Any
 
 from ..core.words import camel_parts
+from . import textblocks
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BATCH_ROWS = 50_000
 
 
@@ -52,7 +53,19 @@ def _schema_sql(name: str = "schema.sql") -> str:
 
 # Steps from version n-1 to n, in order. Version 1 is schema.sql; later steps never edit it, so a
 # case DB of any older version opens and is brought up to date.
-MIGRATIONS: dict[int, str] = {1: "schema.sql", 2: "schema_v2.sql", 3: "schema_v3.sql"}
+# A step is a SQL file or a function run inside the step's transaction.
+MIGRATIONS: dict[int, str | Callable[[sqlite3.Connection], None]] = {
+    1: "schema.sql",
+    2: "schema_v2.sql",
+    3: "schema_v3.sql",
+    4: textblocks.migrate_v4,
+}
+
+
+class CaseConnection(sqlite3.Connection):
+    """A case DB connection: ``blocks`` reads record messages (``rmsg`` in SQL)."""
+
+    blocks: textblocks.BlockReader
 
 
 def _migrate(conn: sqlite3.Connection, path: Path) -> None:
@@ -68,13 +81,25 @@ def _migrate(conn: sqlite3.Connection, path: Path) -> None:
         )
     if version == SCHEMA_VERSION:
         return
+    had_records = version > 0 and conn.execute("SELECT 1 FROM records LIMIT 1").fetchone() is not None
     for step in range(version + 1, SCHEMA_VERSION + 1):
-        # executescript commits first; each step and its version bump are one transaction.
-        conn.executescript(
-            "BEGIN;\n"
-            + _schema_sql(MIGRATIONS[step])
-            + f"\nINSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{step}');\nCOMMIT;"
-        )
+        mig = MIGRATIONS[step]
+        bump = f"INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', '{step}')"
+        if isinstance(mig, str):
+            # executescript commits first; each step and its version bump are one transaction.
+            conn.executescript("BEGIN;\n" + _schema_sql(mig) + f"\n{bump};\nCOMMIT;")
+            continue
+        conn.commit()
+        conn.execute("BEGIN")
+        try:
+            mig(conn)
+            conn.execute(bump)
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+    if had_records and version < 4:
+        conn.execute("VACUUM")  # schema 4 drops the message column: give the space back
 
 
 def connect(path: Path, create: bool = False) -> sqlite3.Connection:
@@ -84,11 +109,12 @@ def connect(path: Path, create: bool = False) -> sqlite3.Connection:
             raise StoreError(f"case DB {path} does not exist")
         path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        conn = sqlite3.connect(path, check_same_thread=False)
+        conn = sqlite3.connect(path, check_same_thread=False, factory=CaseConnection)
     except sqlite3.Error as e:
         raise StoreError(f"cannot open case DB {path}: {e}") from e
     try:
         conn.create_function("camel_parts", 2, camel_parts, deterministic=True)
+        conn.blocks = textblocks.attach(conn)
         conn.execute("PRAGMA busy_timeout=10000")
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
@@ -135,6 +161,7 @@ class BatchWriter:
         self.batch_rows = batch_rows or BATCH_ROWS
         self.rows: list[tuple[Any, ...]] = []
         self.fts: list[tuple[int, str, str | None, str]] = []
+        self.texts = textblocks.BlockWriter()
         self.tags: dict[str, int] = dict(conn.execute("SELECT name, id FROM tags").fetchall())
         self._templates: dict[str, int] = dict(conn.execute("SELECT text, id FROM templates").fetchall())
         self._new_templates: list[tuple[int, str]] = []
@@ -167,9 +194,12 @@ class BatchWriter:
         return tid
 
     def add(self, row: tuple[Any, ...], tag: str | None) -> None:
-        """Row: (id, ts, ts_src, ts_raw, level, tag_id, pid, tid, msg, template_id, seg, attrs)."""
-        self.rows.append(row)
-        self.fts.append((row[0], row[8], tag, camel_parts(row[8], tag)))
+        """Row: (id, ts, ts_src, ts_raw, level, tag_id, pid, tid, msg, template_id, seg, attrs); the
+        message goes to the text blocks, the rest to ``records``."""
+        msg = row[8]
+        self.rows.append(row[:8] + row[9:])
+        self.texts.add(row[0], msg)
+        self.fts.append((row[0], msg, tag, camel_parts(msg, tag)))
         if len(self.rows) >= self.batch_rows:
             self.flush()
 
@@ -186,11 +216,16 @@ class BatchWriter:
             extra,
         )
         self._write(batch)
-        self.discard()
+        self._clear()
 
-    def discard(self) -> None:
+    def _clear(self) -> None:
         self.rows, self.fts = [], []
         self._new_tags, self._new_templates, self._template_counts = [], [], {}
+
+    def discard(self) -> None:
+        """Drop everything not written (after a failed import), the open text blocks included."""
+        self._clear()
+        self.texts.discard()
 
     def _write(self, batch: tuple[Any, ...]) -> None:
         new_tags, new_templates, counts, rows, fts, extra = batch
@@ -206,10 +241,11 @@ class BatchWriter:
                 )
             if rows:
                 conn.executemany(
-                    "INSERT INTO records(id, ts, ts_src, ts_raw, level, tag_id, pid, tid, msg, template_id, "
-                    "seg, attrs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                    "INSERT INTO records(id, ts, ts_src, ts_raw, level, tag_id, pid, tid, template_id, "
+                    "seg, attrs) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                     rows,
                 )
+                self.texts.write(conn)
                 conn.executemany("INSERT INTO records_fts(rowid, msg, tag, parts) VALUES (?,?,?,?)", fts)
             for sql, params in extra:
                 conn.execute(sql, params)
@@ -235,9 +271,11 @@ def delete_sources(conn: sqlite3.Connection, source_ids: list[int]) -> None:
             conn.executemany("UPDATE templates SET count = count - ? WHERE id = ?", [(n, t) for t, n in rows])
             conn.execute("DELETE FROM records WHERE id BETWEEN ? AND ?", (lo, hi))
             conn.execute("DELETE FROM segments WHERE source_id = ?", (sid,))
+            conn.execute("DELETE FROM msg_blocks WHERE source_id = ?", (sid,))
             delete_artifacts(conn, "source_id = ?", (sid,))
             conn.execute("DELETE FROM sources WHERE id = ?", (sid,))
         conn.execute("DELETE FROM templates WHERE count <= 0")
+    textblocks.readers_clear(conn)
 
 
 ARTIFACT_COLS = (

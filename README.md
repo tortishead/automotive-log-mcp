@@ -13,9 +13,10 @@ record on the timeline. Eleven tools work over MCP: the P0 tools `add_source`, `
 all with capped, cited output. An evaluation harness ([eval/](eval/)) checks evidence recall
 without an agent and gives a checklist for agent runs. Everything is verified on synthetic
 fixtures and synthetic evaluation cases only, not yet on real bugreports or real closed defects;
-ingest (about 33–42k lines/s before the CamelCase index of schema 3, which costs about 18% of
-that and 7% more DB; DB 1.9× the input) misses the M1 targets. A case DB of schema 2 is migrated
-on first open by rebuilding its text index (about 3 s per 400k records), without a re-import. DLT is not read yet (M5):
+ingest (about 29k lines/s on a generated 200 MiB log) misses the M1 target of 100k lines/s; the
+case DB (schema 4) is 1.34× the input there, within the 1.5× target: record messages are kept
+compressed in blocks, not as a column (see [Storage](#storage)). A case DB of an older schema is
+migrated on first open, without a re-import (7.5 s for 1.9M records). DLT is not read yet (M5):
 see [docs/dlt.md](docs/dlt.md). See [docs/design.md](docs/design.md) and
 [docs/implementation-plan.md](docs/implementation-plan.md).
 
@@ -233,6 +234,26 @@ automotive-log-mcp rules                                             # detector 
 - In a bugreport zip the main entry is read first, so the fingerprint, time zone and process list
   apply to the other members; the process list fills a missing process name.
 - Not parsed yet (M5): tombstone `.pb`, `dumpsys` sections, kernel panics / `pstore`.
+
+## Storage
+
+One SQLite file per case (`<home>/cases/<case>.db`), schema 4:
+
+- `records`: the parsed fields of each record (time, level, tag, pid, tid, template, attributes),
+  without its message. Indexes on time, per-source monotonic time and tag only; filters and counts
+  by pid, level or template scan the records the time or tag index selects (or all of them).
+- `msg_blocks`: the redacted messages of each source, about 64 KB of text per block, zlib
+  compressed. SQL reads a message with `rmsg(id)` (`records_v.msg`); a reader caches decoded
+  blocks, so scans in id order decompress each block once.
+- `records_fts`: the full-text index (message, tag, CamelCase parts), external content, no copy of
+  the text.
+
+Measured on a generated 200 MiB logcat (1.9M records), against schema 3 (message column, five
+indexes): DB 423 → 268 MiB (2.11× → 1.34× the input), same tool output. Reading text costs
+decompression: regex searches and `detect` take 2–3× longer (`detect` 0.9 → 2.6 s, whole-case
+`overview` 2.5 → 4.8 s, regex search 0.5 → 1.1 s), `count by template` 0.1 → 0.6 s; text search and
+`context` are unchanged. The generated log repeats few templates, so its text compresses better
+(about 5×) than real logs will.
 
 ## Formats
 

@@ -200,7 +200,7 @@ class Rec:
 
 
 REC_COLS = (
-    "r.id, r.ts, r.ts_src, r.ts_raw, r.level, t.name, r.pid, r.tid, r.msg, r.template_id, r.seg, r.attrs"
+    "r.id, r.ts, r.ts_src, r.ts_raw, r.level, t.name, r.pid, r.tid, rmsg(r.id), r.template_id, r.seg, r.attrs"
 )
 REC_FROM = "records r LEFT JOIN tags t ON t.id = r.tag_id"
 
@@ -612,7 +612,7 @@ def regex_prefilter(pattern: str) -> tuple[list[str], list[Any]]:
         where.append(FTS_MATCH)
         params.append(lit_fts)
     for lit in lits:
-        where.append("(instr(r.msg, ?) > 0 OR instr(coalesce(t.name, ''), ?) > 0)")
+        where.append("(instr(rmsg(r.id), ?) > 0 OR instr(coalesce(t.name, ''), ?) > 0)")
         params.extend([lit, lit])
     return where, params
 
@@ -1158,7 +1158,8 @@ def regex_tally(
     if step:
         cond.append("r.ts IS NULL AND r.ts_src IS NOT NULL" if mono else "r.ts IS NOT NULL")
     sql = (
-        f"SELECT r.id, r.msg, t.name, {kcol}, {tcol} FROM {REC_FROM}{_where_sql(cond)} ORDER BY r.id LIMIT ?"
+        f"SELECT r.id, rmsg(r.id), t.name, {kcol}, {tcol} FROM {REC_FROM}{_where_sql(cond)} "
+        "ORDER BY r.id LIMIT ?"
     )
     out: dict[tuple[int | None, Any], list[int]] = {}
     search = rx.search

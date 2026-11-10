@@ -106,7 +106,7 @@ Status (Nov 8, 2026): done. Checked with Claude Code (`claude -p` with `examples
 
 ## M1 Ingest core (5–6 days)
 
-1. **Schema**: `sources`, `segments`, `records`, `templates`, `records_fts` (external content on `msg`, `tag` and, from schema version 3, `parts`: the words inside CamelCase names), `artifacts`, `artifact_sections`, `artifact_fts`, `meta` (schema version); indexes on `(source_id, seq)`, `(ts)`, `(source_id, ts_src)`, `tag`, `pid`, `template_id`, `level`; migration on open.
+1. **Schema**: `sources`, `segments`, `records`, `templates`, `records_fts` (external content on `msg`, `tag` and, from schema version 3, `parts`: the words inside CamelCase names), `artifacts`, `artifact_sections`, `artifact_fts`, `meta` (schema version); indexes on `(source_id, seq)`, `(ts)`, `(source_id, ts_src)`, `tag`, `pid`, `template_id`, `level`; migration on open. Schema 4 moves `msg` out of `records` into zlib-compressed blocks (`msg_blocks`, read with `rmsg(id)`) and keeps only the `(ts)`, `(source_id, ts_src)` and `tag` indexes (README, Storage).
 2. **Batch writer**: 50k rows per transaction, WAL, `synchronous=NORMAL`, FTS in the same transaction.
 3. **Pipeline**: sniff → container → connector → levels → redact → templates → segments → writer; redaction before templates so no raw value reaches the `templates` table; progress per source.
 4. **Registry**: built-in, YAML and entry-point connectors (D13). Highest `sniff()` score above 0.5 wins, else "unknown format" with the top 3 guesses.

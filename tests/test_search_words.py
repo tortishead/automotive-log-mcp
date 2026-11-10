@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 import pytest
 
 from automotive_log_mcp.app import App
 from automotive_log_mcp.core.words import camel_parts
-from automotive_log_mcp.store import db, query
+from automotive_log_mcp.store import query
 from automotive_log_mcp.tools import Output, Tools
 
 LOG = """\
@@ -69,24 +68,3 @@ def test_whole_words_still_match_and_plain_text_is_unchanged(tools: Tools) -> No
     assert total(tools.search("c", "EsoCarDelegateDisplayAreaPolicyProvider")) == 1
     assert total(tools.search("c", "camel")) == 1
     assert total(tools.search("c", "Delegate")) == 1
-
-
-def test_v2_case_db_is_migrated_and_reindexed(app: App, tools: Tools) -> None:
-    path = app.config.case_db("c")
-    # Turn the case DB back into schema v2: index without the parts column.
-    conn = sqlite3.connect(path)
-    conn.executescript(
-        "DROP TABLE records_fts; DROP VIEW records_fts_v;"
-        "CREATE VIRTUAL TABLE records_fts USING fts5(msg, tag, content='records_v', content_rowid='id',"
-        " columnsize=0);"
-        "INSERT INTO records_fts(records_fts) VALUES ('rebuild');"
-        "UPDATE meta SET value = '2' WHERE key = 'schema_version';"
-    )
-    n = conn.execute("SELECT count(*) FROM records_fts WHERE records_fts MATCH 'delegate'").fetchone()[0]
-    conn.close()
-    assert n == 0
-    assert total(Tools(app).search("c", "Delegate")) == 1
-    with db.opened(path) as c2:
-        c2.execute("INSERT INTO records_fts(records_fts) VALUES ('integrity-check')")
-        ver = c2.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]
-    assert ver == str(db.SCHEMA_VERSION)

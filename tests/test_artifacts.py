@@ -222,7 +222,7 @@ def test_bugreport_artifacts_are_on_the_timeline(br: App) -> None:
     with db.opened(br.config.case_db("br")) as conn:
         for a in arts:
             assert a.ts is not None, a.name
-            row = conn.execute("SELECT ts, attrs, msg FROM records WHERE id = ?", (a.record_id,)).fetchone()
+            row = conn.execute("SELECT ts, attrs, msg FROM records_v WHERE id = ?", (a.record_id,)).fetchone()
             assert row is not None and row[0] == a.ts
             assert f'"art":{a.id}' in row[1]
             if a.record_cite != "log:3#1":  # the crash-buffer record is the crash itself

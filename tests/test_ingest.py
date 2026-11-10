@@ -136,7 +136,7 @@ def test_after_indexing_no_rule_matches_records_templates_or_meta(app: App, tmp_
     r = app.redactor
     with db.opened(app.config.case_db("br")) as conn:
         texts = [t for (t,) in conn.execute("SELECT text FROM templates")]
-        texts += [m for (m,) in conn.execute("SELECT msg FROM records")]
+        texts += [m for (m,) in conn.execute("SELECT msg FROM records_v")]
         texts += [a for (a,) in conn.execute("SELECT attrs FROM records WHERE attrs IS NOT NULL")]
         texts += [m for (m,) in conn.execute("SELECT meta FROM sources WHERE meta IS NOT NULL")]
         texts += [n for (n,) in conn.execute("SELECT name FROM processes")]
