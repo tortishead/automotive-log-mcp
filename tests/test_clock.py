@@ -423,3 +423,42 @@ def test_alignment_is_recomputed_when_sources_change(app: App, tools: Tools, tmp
     with db.opened(app.config.case_db("x")) as conn:
         assert ck.stored_sig(conn) != sig
         assert {sid for sid, _ in ck.load(conn).segs} == {1}
+
+
+def test_timeline_and_align_over_mcp(config: Config, tmp_path: Path) -> None:
+    import anyio
+    from mcp import Client
+
+    from automotive_log_mcp.server import build_server
+
+    src = FIXTURES / "bugreport/bugreport-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt"
+    path = _write(tmp_path / src.name, src.read_text().splitlines())
+    dmesg = _write(tmp_path / "dmesg.txt", [_dmesg_line(*e) for e in _kernel_events(5)])
+
+    async def main() -> None:
+        async with Client(build_server(config, Policy())) as client:
+            for p in (path, dmesg):
+                r = await client.call_tool("add_source", {"case": "mc", "path": str(p)})
+                assert not r.is_error, r
+            r = await client.call_tool("list_sources", {"case": "mc"})
+            text = r.content[0].text  # type: ignore[union-attr]
+            assert "clock ~estimate ±60 s" in text and "clock not placed" in text, text
+            r = await client.call_tool("timeline", {"case": "mc", "filter": {"level": "E", "from": "art:1"}})
+            text = r.content[0].text  # type: ignore[union-attr]
+            assert (
+                not r.is_error and "log:3#1  01-01 00:00:01.000" in text and "~01-01 00:00:03.456" in text
+            ), text
+            r = await client.call_tool(
+                "align", {"case": "mc", "mode": "anchor", "at": "log:8#1", "ref": "log:5#1"}
+            )
+            assert not r.is_error and "8  estimate" in r.content[0].text  # type: ignore[union-attr]
+            r = await client.call_tool(
+                "context", {"case": "mc", "at": "log:8#1", "scope": "all", "before": 2}
+            )
+            assert not r.is_error and "> log:8#1" in r.content[0].text  # type: ignore[union-attr]
+            r = await client.call_tool(
+                "align", {"case": "mc", "mode": "offset", "source": "1", "offset": "1s"}
+            )
+            assert r.is_error
+
+    anyio.run(main)

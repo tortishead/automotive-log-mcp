@@ -3,22 +3,27 @@
 An MCP server that lets any agent analyse a defect from automotive logs (Android bugreport,
 logcat, kernel logs), with every finding cited to a log line or artifact.
 
-Status: **M4 P1 tools + evaluation**. Logcat (all `-v` formats), kernel logs (`dmesg`,
-`/dev/kmsg`), Android bugreports (zip or text), archives (zip, tar, gz) and YAML-defined text
-formats are indexed into one SQLite DB per case, with redaction at index time. Tombstones, ANR
+Status: **M5 multi-source (without DLT)**. Logcat (all `-v` formats), kernel logs (`dmesg`,
+`/dev/kmsg`), Android bugreports (zip or text), archives (zip, tar, gz), YAML-defined text
+formats and `command` connectors (an external decoder writing JSON lines, for company-specific
+formats) are indexed into one SQLite DB per case, with redaction at index time. Tombstones, ANR
 traces, Java crashes and dropbox entries become artifacts with a summary, a crash signature and a
-record on the timeline. Eleven tools work over MCP: the P0 tools `add_source`, `list_sources`,
-`search`, `context`, `list_artifacts`, `read_artifact`, `get_records` and the P1 tools `overview`,
-`count`, `detect` (10 default detector rules, more from rule directories) and `check_citations`,
-all with capped, cited output. An evaluation harness ([eval/](eval/)) checks evidence recall
-without an agent and gives a checklist for agent runs. Everything is verified on synthetic
-fixtures and synthetic evaluation cases only, not yet on real bugreports or real closed defects;
-ingest (about 29k lines/s on a generated 200 MiB log) misses the M1 target of 100k lines/s; the
-case DB (schema 4) is 1.34× the input there, within the 1.5× target: record messages are kept
-compressed in blocks, not as a column (see [Storage](#storage)). A case DB of an older schema is
-migrated on first open, without a re-import (7.5 s for 1.9M records). DLT is not read yet (M5):
-see [docs/dlt.md](docs/dlt.md). See [docs/design.md](docs/design.md) and
-[docs/implementation-plan.md](docs/implementation-plan.md).
+record on the timeline. All sources of a case are aligned on one case clock (same lines in two
+sources, UTC times in kernel lines, marker rules, the bugreport boot time, manual anchors).
+Thirteen tools work over MCP: the P0 tools `add_source`, `list_sources`, `search`, `context`,
+`list_artifacts`, `read_artifact`, `get_records`, the P1 tools `overview`, `count`, `detect` (10
+default detector rules, more from rule directories) and `check_citations`, and the M5 tools
+`timeline` and `align`, all with capped, cited output. An evaluation harness ([eval/](eval/))
+checks evidence recall without an agent and gives a checklist for agent runs. Everything is
+verified on synthetic fixtures and synthetic evaluation cases only, not yet on real bugreports or
+real closed defects; ingest (about 29k lines/s on a generated 200 MiB log) misses the M1 target of
+100k lines/s; the case DB (schema 5) is 1.34× the input there, within the 1.5× target: record
+messages are kept compressed in blocks, not as a column (see [Storage](#storage)). A case DB of an
+older schema is migrated on first open, without a re-import (7.5 s for 1.9M records). DLT is not
+read (not part of this M5; a company DLT setup can use a `command` connector or
+[docs/dlt.md](docs/dlt.md)). See [docs/design.md](docs/design.md),
+[docs/implementation-plan.md](docs/implementation-plan.md) and
+[docs/connectors.md](docs/connectors.md) (own formats and clock alignment).
 
 ## Install
 
@@ -59,13 +64,15 @@ py -m automotive_log_mcp index T-1 C:\logs\bugreport.zip     # Windows; waits un
 | `add_source(case, path, format?, reindex?)` | indexes a file, directory or zip (background thread; waits up to 10 s) and the new source ids; a file already indexed, in this or another case, is not indexed again |
 | `list_sources(case)` | sources with format, record count, time range, fingerprint, stale/missing flags |
 | `search(case, query, mode, filter, collapse, count_only, limit, cursor)` | matching records in time order; FTS5 words or a regex over message and tag |
-| `context(case, at, before, after, scope)` | lines around `log:<s>#<n>` or an artifact's record `art:<id>`; `scope='pid'` follows one process through all buffers of the same file, merged by time |
+| `context(case, at, before, after, scope)` | lines around `log:<s>#<n>` or an artifact's record `art:<id>`; `scope='pid'` follows one process through all buffers of the same file, merged by time; `scope='all'` shows every source on the case clock |
 | `list_artifacts(case, type?)` | tombstones, ANRs, Java crashes, dropbox entries grouped by crash signature, in time order; copies of one crash marked `same crash as art:<id>` |
 | `read_artifact(case, id, section?, start_line?, end_line?)` | summary, signature and section list; then a section or a line range, lines numbered `L<n>` |
 | `get_records(case, ids)` | full records: untruncated message, timestamp as written, attributes, template text |
 | `overview(case, filter?)` | records and levels, top tags, pids and messages (templates), clock segments, gaps over 30 s, error bursts, a histogram, detector and artifact counts |
 | `count(case, by, query?, mode, filter?, bucket?, limit)` | records by `tag`, `level`, `pid`, `source` or `template`, optionally matching a query, optionally per time bucket (`'1m'`, at most 60 buckets, empty ones shown) |
 | `detect(case, rules?, filter?, examples)` | hits of the detector rules by severity and time, collapsed by message (or pid), each with a hint what to read next |
+| `timeline(case, filter?, query?, limit, cursor)` | records of all sources merged on the case clock in time order; `~` marks times aligned from another clock; `from`/`to` are case-clock times or citations |
+| `align(case, mode, source?, seg?, offset?, at?, ref?)` | how each source maps onto the case clock (confidence, offset or boot time, error, what it rests on); `mode='anchor'`/`'offset'`/`'reference'`/`'reset'` set it by hand |
 | `check_citations(case, text)` | checks a Markdown answer: every `log:`/`art:` citation must be well-formed and resolve (errors); uncited paragraphs and quotes not in the cited lines are warnings; `PASS`/`FAIL` |
 
 A search hit looks like the design's line format; collapsed repeats add a count and the last
@@ -122,6 +129,22 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
   inside fenced code blocks are not checked; paragraphs that say they are a guess ("probably",
   "unknown", "the logs do not show", …) or are shorter than 8 words need no citation. The call log
   keeps only the text's length and hash.
+
+### Multi-source tools (M5)
+
+- **timeline** merges every source (bugreport buffers, kernel logs, logs of other devices and
+  ECUs) on one case clock. Times of the reference clock print as written; times mapped from
+  another clock print with `~`, and the footer says how each was aligned and how far it can be
+  off. Records of a clock without an anchor are left out and named. Filters as in `search`; a
+  text `query` narrows it.
+- **align** shows the alignment and sets it by hand; how sources are aligned automatically (and
+  marker rules for company logs) is in [docs/connectors.md](docs/connectors.md#clock-alignment-m5).
+  The mapping is stored in the case DB and recomputed after every import; records keep their
+  times as written, so the other tools and their `from`/`to` are unchanged.
+- **context(scope='all')** shows the lines of every source around an event on the case clock.
+
+An order across sources that rests on `~` times closer than their error is a guess; the server
+instructions tell agents to say so.
 
 ### Detector rules
 
@@ -187,6 +210,10 @@ automotive-log-mcp detect T-1 --rule anr --examples 5                # as the de
 automotive-log-mcp count T-1 --by level --bucket 1m --search "setProperty failed"
 automotive-log-mcp check T-1 answer.md                               # check_citations; exit 1 on errors
 automotive-log-mcp rules                                             # detector rules and their origin
+automotive-log-mcp timeline T-1 --level W --from "01-01 00:00:00"    # all sources on the case clock
+automotive-log-mcp align T-1                                         # how each source is aligned
+automotive-log-mcp align T-1 --anchor log:8#4=log:1#120              # same moment on two clocks
+automotive-log-mcp align T-1 --offset 8=+1.5s                        # or a fixed offset (8:2=... per segment)
 ```
 
 - `index` options: `--format <connector>` forces a format instead of sniffing; `--force`
@@ -266,13 +293,13 @@ decompression: regex searches and `detect` take 2–3× longer (`detect` 0.9 →
 | `archive` | zip, tar (plain, gz, bz2, xz), single-file gzip; nested up to depth 4 |
 | `syslog` | BSD syslog / `journalctl -o short` (a YAML connector shipped in the package) |
 
-Own text formats are added as YAML files in a directory listed under `rule_dirs` in
-`config.yaml` (an example for a DLT Viewer text export is in
-[examples/rules/](examples/rules/dlt_viewer_ascii.yaml)); the format is documented in
-[src/automotive_log_mcp/connectors/regex_yaml.py](src/automotive_log_mcp/connectors/regex_yaml.py).
-Python connectors can be registered as entry points (`automotive_log_mcp.connectors`); they are
-loaded only when the policy sets `allow_code_connectors: true`. Lines a connector cannot parse are
-kept as records with no level, never dropped.
+Own formats ([docs/connectors.md](docs/connectors.md)): YAML regex connectors and `command`
+connectors (an external program that writes JSON lines: records, artifacts, source metadata) as
+files in a directory listed under `rule_dirs` in `config.yaml` (examples: a DLT Viewer text export
+in [examples/rules/](examples/rules/dlt_viewer_ascii.yaml), an MCU trace decoder in
+[examples/connectors/](examples/connectors/)), or Python connectors registered as entry points
+(`automotive_log_mcp.connectors`), loaded only when the policy sets `allow_code_connectors: true`.
+Lines a connector cannot parse are kept as records with no level, never dropped.
 
 ## Redaction
 

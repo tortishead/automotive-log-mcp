@@ -26,7 +26,7 @@ Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision
 | D6 | Citations `log:<source>#<seq>` (seq 1-based per source) and `art:<id>[/section][:L<line>]` | Global row id | M3 |
 | D7 | Cases in `~/.automotive-log-mcp/cases/<case>.db`; originals referenced by path and hash, not copied; `relink` for moved files | Copy into a case folder | M1 |
 | D8 | Default detector rules and regex connectors ship in the package; extra rule directories from config override rules by name | Rules only in the package | M4 |
-| D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`, run through the generic `command` connector | PyO3 binding; DLT Viewer export; own parser | M5 |
+| D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`, run through the generic `command` connector | PyO3 binding; DLT Viewer export; own parser | M5 (deferred: company-specific connectors) |
 | D10 | Single process; background indexing in one worker thread per case | Worker processes | M1 |
 | D11 | Tool names and parameters, and the connector interface, follow semver; breaking changes only in a major version | No API stability promise | all |
 | D12 | First release without DLT; DLT and alignment in M5 | DLT before the first evaluation | M4, M5 |
@@ -51,14 +51,14 @@ automotive-log-mcp/
     core/
       ingest.py               # sniff -> container -> connector -> pipeline -> store
       levels.py, templates.py, redact.py, segments.py
-      clock.py, align.py      # M5
+      clock.py, align.py      # M5 (done)
       format.py               # text + structured output, truncation, citations
     connectors/
       base.py                 # protocols, registry
       archive.py              # zip / tar / gz
       bugreport.py            # container
       logcat.py, kernel.py, regex_yaml.py
-      command.py              # M5
+      command.py              # M5 (done)
       artifacts/              # M2: tombstone, anr, java_crash, dropbox; M5: dumpsys, kernel_panic, tombstone .pb, dlt_file
       dlt.py                  # M5, drives dlt2jsonl
     detect/
@@ -244,6 +244,17 @@ Status: built and measured with Claude Code only; Copilot not verified. Trigger:
 Tests: synthetic log pairs with known offset and drift (error < 10 ms for paired timestamps, < 500 ms for marker anchors); DLT fixtures per argument type; a non-verbose sample with FIBEX once available.
 
 Done when: a case with a bugreport and a DLT trace shows both on one timeline with confidence, and an agent orders a cross-source event pair correctly in one eval case.
+
+Status (Nov 10, 2026): items 1, 2, 3 and 5 built (multi-source without DLT, as requested: DLT connectors are developed separately as company-specific connectors, through `command` or entry points); items 4, 6, 7 and 9 (`dlt2jsonl`, DLT connector, file transfer, DLT benchmark) and item 8 (remaining artifact parsers) not started. Verified on synthetic data only; the done criterion (a DLT trace, an agent ordering a cross-source pair in an eval case) is not met.
+
+- **Clock model** (schema 5, `core/clock.py`): per segment a piecewise mapping `case = native + offset + drift·(native − start)` (`b` = offset, `a` = 1 + drift), with confidence `exact | manual | paired | marker | estimate | assumed`, an error bound and what it rests on. Deviation: `ts` is **not** recomputed in the records; the mapping is applied at query time. Records keep their times as written, so citations, printed times and `from`/`to` of the other tools are unchanged (D11), `ts_raw` stays reproducible from `ts`, and a new alignment costs no rewrite of millions of rows. Piecewise because a monotonic kernel clock stops during suspend.
+- **Automatic alignment** (`core/align.py`), recomputed after each import and when sources, manual entries or marker rules change (signature in `meta`): clocks are the wall clock of each file and each monotonic segment; the reference is the largest wall clock (or one chosen with `align`). Anchors: (1) manual offsets and anchors (two or more fit a drift); (2) paired timestamps: lines unique in both clocks with the same text (a `tag: ` prefix ignored, as dmesg and `logcat -b kernel` differ there) and UTC times printed in kernel lines, converted with the file's time zone; (3) YAML marker rules in rule directories (`marker:`: two regexes with the same named groups as key, `delay`, `tolerance`); (4) the bugreport boot-time estimate (dumpstate time − uptime, ±1 min). Pairs are fitted in order: one piece per stretch where the offset agrees within 500 ms (a new piece where the next pair confirms a new offset), at least 3 pairs and half of the candidates; drift fitted over ≥ 5 pairs spanning ≥ 60 s. Clocks are joined by a shortest path from the reference (worst confidence, then summed error). Two segments of monotonic clocks are never paired with each other (two boots print the same lines at the same uptime). Wall clocks without an anchor are `assumed` as written (shifted by the time-zone difference when both zones are known); monotonic ones without an anchor are not placed.
+- **Tools:** `timeline(case, filter, query, limit, cursor)` (per clock group a query on the `ts` or `(source_id, ts_src)` index over the native windows of the requested case-time range, merged; `~` for times not `exact`; legend with confidence and error; unplaced sources named); `context(scope='all')`; `align(case, mode=auto|offset|anchor|reference|reset, …)`; `list_sources` flags sources that are not exact and names the case clock. CLI `timeline` and `align`. Server instructions: use timeline for several files or devices, say when an order rests on `~` times within their error.
+- **`command` connector** (`connectors/command.py`): a YAML file with `command` (placeholders `{path}`, `{python}`, `{dir}`, `{name}`; stdin when there is no `{path}`; archive members via a temporary file), sniffing by file name, magic bytes and head regex (the program never runs to sniff), timeout; the program writes JSON lines: records (`ts`, `mono`/`mono_ns`, `level`, `tag`, `pid`, `tid`, `attrs`, `stream`, `boot`, `lines`), artifacts and source metadata (`timezone` feeds the alignment). Non-JSON lines become unparsed records; a non-zero exit or timeout fails the import with the end of standard error. Allowed without `allow_code_connectors` (the policy file already said so). Guide for company connectors (regex, command, entry point) and alignment: `docs/connectors.md`; example MCU decoder in `examples/connectors/`, marker rule in `examples/rules/`.
+- **Tests** (`tests/test_clock.py`, `tests/test_command_connector.py`): fitting (offset with jitter, drift 40 ppm, suspend pieces, outliers, random offsets rejected, invert/compose); a dmesg and a logcat with the same kernel lines, ±0.5 ms jitter: every kernel record within 10 ms of the truth, `paired` (also across a 30 s suspend: two pieces); a marker rule between two devices with +3.2 s and 40 ppm drift: within 10 ms (plan target for markers < 500 ms); UTC kernel line in a bugreport (Europe/Berlin) beating the boot estimate; two boots of one dmesg not paired; manual offset, anchor, reference, reset and their errors; timeline paging (every record exactly once, in order), `from` as a citation, text query; `context(scope='all')`; recompute after a source is deleted; timeline, align and context over MCP. Command connector: records, artifacts, metadata, redaction, unparsed lines, stdin and `{path}`, archive member, non-zero exit, timeout, missing program, definition errors, sniffing, the example connector with the example marker rule.
+- **Performance** (one core, generated 150 MB threadtime logcat, 1.42M records, plus a 20k-line dmesg with no common lines): alignment after the dmesg import about 0.8 s (unique-template scan of both clocks; the same for a forced recompute); `timeline` first page 0.24 s, with tag and text query from `-5m` 0.38 s (CLI wall time, start-up included). Not measured on a multi-GB case.
+- **Not verified:** real multi-device cases, real `logcat -b kernel` next to dmesg (the tag-prefix rule follows how logd splits kernel lines), suspend lines on current kernels, time zones other than in a bugreport, a non-UTC device whose kernel prints local time.
+- Not done: `blocked_ecus` (policy) is still not enforced; it belongs to the DLT connector.
 
 ## M6 Finish (2–3 days)
 

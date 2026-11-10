@@ -1,8 +1,12 @@
-# DLT until M5
+# DLT
 
-automotive-log-mcp does not read DLT (AUTOSAR Diagnostic Log and Trace) files yet: the DLT
-connector, through `dlt-core` in a sidecar binary, is planned for M5 (plan, D9 and D12). Until
-then there are two ways to work on a defect whose evidence is partly in DLT.
+automotive-log-mcp does not read DLT (AUTOSAR Diagnostic Log and Trace) files itself: the DLT
+connector through `dlt-core` (plan, D9 and D12) was left out of M5, which built the multi-source
+parts (clock alignment, `timeline`, the `command` connector) without it. A DLT decoder you
+already have can be plugged in as a `command` connector that writes JSON lines (ECU, APID and CTID
+as `attrs`, ECU ticks as `mono`), see [connectors.md](connectors.md); its sources then share the
+case clock with the Android logs. Without such a connector there are two ways to work on a defect
+whose evidence is partly in DLT.
 
 ## 1. dlt-mcp-server in DLT Viewer, next to this server
 
@@ -28,7 +32,7 @@ What to expect:
   their DLT Viewer index (and ECU, APID, CTID) and check those by hand in DLT Viewer.
 - **Time:** the two sides are not aligned. DLT storage time, ECU timestamps (ticks since ECU
   start) and the Android wall clock can be seconds or more apart; cross-source alignment is the
-  M5 clock model. Have the agent pair events by content (a request and its answer), not by time
+  clock model, which needs the DLT side indexed by this server. Have the agent pair events by content (a request and its answer), not by time
   alone, and say when an order between the two sides is a guess.
 - **Redaction:** the DLT side is whatever the plugin returns. This server's redaction (D5) does
   not apply to it; check the plugin's behaviour before using an agent on traces with personal data
@@ -57,8 +61,9 @@ its lines get `log:` citations.
    python -m automotive_log_mcp index T-4711 ~/defects/T-4711/ecu1_dlt.txt --format dlt_viewer_ascii
    ```
 
-Limits of the export route: the storage time printed by DLT Viewer is the wall-clock time, so
-it is not aligned with the Android clock (as above); ECU ticks are kept as an attribute but no
-clock model uses them; DLT file transfers, control messages and non-verbose payloads without
+Limits of the export route: the storage time printed by DLT Viewer is the wall-clock time of the
+logger, not of the head unit (it is `assumed` on the case clock until an anchor places it); ECU
+ticks are kept as an attribute but not used as a clock; DLT file transfers, control messages and non-verbose payloads without
 FIBEX are not decoded; a multi-GB trace exported as text is slow to index (about 30–40k lines/s,
-see the M1 status). All of these are M5 work.
+see the M1 status). Marker rules or `align` anchors place the export on the case clock
+([connectors.md](connectors.md#clock-alignment-m5)).

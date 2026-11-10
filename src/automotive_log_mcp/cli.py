@@ -30,7 +30,7 @@ from .detect.engine import BUILTIN_DIR
 from .policy import Policy, load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
-from .tools import Filter, ToolInputError, Tools
+from .tools import Filter, Output, ToolInputError, Tools
 
 
 def _case(value: str) -> str:
@@ -96,6 +96,30 @@ def _parser() -> argparse.ArgumentParser:
     ch = sub.add_parser("check", help="check the citations of a Markdown answer (exit 1 on errors)")
     ch.add_argument("case", type=_case)
     ch.add_argument("file", type=Path, help="Markdown file; '-' reads standard input")
+
+    tl = sub.add_parser("timeline", help="records of all sources merged on the case clock (~: aligned)")
+    tl.add_argument("case", type=_case)
+    tl.add_argument("--search", "-s", help="only records with these words (full-text query)")
+    _filter_args(tl)
+    tl.add_argument("--limit", "-n", type=int, default=50)
+    tl.add_argument("--cursor", help="next page, as a previous result printed it")
+
+    al = sub.add_parser("align", help="show or set how the sources map onto the case clock")
+    al.add_argument("case", type=_case)
+    al.add_argument(
+        "--offset",
+        metavar="SOURCE=OFFSET",
+        help="case time minus source time, e.g. 5=+1.5s (5:2=... for segment 2); for a kernel log also "
+        "its boot time, 5='2026-01-01 07:59:58.000'",
+    )
+    al.add_argument(
+        "--anchor",
+        metavar="AT=REF[+DELAY]",
+        help="two citations of the same moment, e.g. log:5#120=log:1#3400 (log:5#120=log:1#3400+2ms: ref "
+        "is 2 ms after at)",
+    )
+    al.add_argument("--reference", metavar="SOURCE", help="use this source's clock as the case clock")
+    al.add_argument("--reset", nargs="?", const="all", metavar="SOURCE", help="remove manual settings")
 
     ru = sub.add_parser("rules", help="list the detector rules (package and configured rule_dirs)")
     ru.add_argument("--show", metavar="NAME", help="print one rule's definition")
@@ -264,7 +288,7 @@ def _query(app: App, args: argparse.Namespace) -> int:
 
 
 def _tool(app: App, args: argparse.Namespace) -> int:
-    """overview, count, detect and check: print the MCP tool's text."""
+    """overview, count, detect, check, timeline and align: print the MCP tool's text."""
     tools = Tools(app)
     try:
         if args.command == "overview":
@@ -284,6 +308,10 @@ def _tool(app: App, args: argparse.Namespace) -> int:
             )
         elif args.command == "detect":
             out = tools.detect(args.case, args.rule, _filter(args), max(1, min(args.examples, 10)))
+        elif args.command == "timeline":
+            out = tools.timeline(args.case, _filter(args), args.search, max(1, args.limit), args.cursor)
+        elif args.command == "align":
+            out = _align(tools, args)
         else:
             text = sys.stdin.read() if str(args.file) == "-" else args.file.read_text(encoding="utf-8")
             out = tools.check_citations(args.case, text)
@@ -294,6 +322,32 @@ def _tool(app: App, args: argparse.Namespace) -> int:
     if args.command == "check":
         return 0 if out.data.ok else 1  # type: ignore[attr-defined]
     return 0
+
+
+def _align(tools: Tools, args: argparse.Namespace) -> Output:
+    given = [x for x in (args.offset, args.anchor, args.reference, args.reset) if x is not None]
+    if len(given) > 1:
+        raise ToolInputError("give one of --offset, --anchor, --reference, --reset")
+    if args.offset is not None:
+        src, sep, off = args.offset.partition("=")
+        if not sep:
+            raise ToolInputError("--offset takes SOURCE=OFFSET, e.g. 5=+1.5s")
+        sid, _, seg = src.partition(":")
+        return tools.align(
+            args.case, "offset", source=sid, seg=int(seg) if seg.isdigit() else None, offset=off
+        )
+    if args.anchor is not None:
+        m = re.fullmatch(r"\s*(\S+?)\s*=\s*(log:\d+#\d+|art:\d+)\s*([+-]\s*\S+)?\s*", args.anchor)
+        if m is None:
+            raise ToolInputError("--anchor takes AT=REF[+DELAY], e.g. log:5#120=log:1#3400")
+        return tools.align(
+            args.case, "anchor", at=m[1], ref=m[2], offset=m[3].replace(" ", "") if m[3] else None
+        )
+    if args.reference is not None:
+        return tools.align(args.case, "reference", source=args.reference)
+    if args.reset is not None:
+        return tools.align(args.case, "reset", source=None if args.reset == "all" else args.reset)
+    return tools.align(args.case)
 
 
 def _rules(app: App, show: str | None) -> int:
@@ -413,7 +467,7 @@ def _run(app: App, args: argparse.Namespace) -> int:
         return 0
     if args.command == "query":
         return _query(app, args)
-    if args.command in ("overview", "count", "detect", "check"):
+    if args.command in ("overview", "count", "detect", "check", "timeline", "align"):
         return _tool(app, args)
     if args.command == "rules":
         return _rules(app, args.show)

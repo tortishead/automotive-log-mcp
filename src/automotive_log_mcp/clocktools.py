@@ -595,9 +595,8 @@ class ClockTools:
         lines = [f"case clock: {self.clock_name(ctx, cc)}"]
         exact = [int(r.source) for r in rows if r.conf == "exact"]
         if exact:
-            lines.append(
-                f"{_id_ranges(exact)}  exact  [the reference clock: wall-clock sources of the same file]"
-            )
+            what = "wall-clock sources of the reference file" if cc.kind == "wall" else "the reference clock"
+            lines.append(f"{_id_ranges(exact)}  exact  [{what}]")
         for r in rows:
             if r.conf == "exact":
                 continue

@@ -145,3 +145,25 @@ def test_p1_commands(home: Path, tmp_path: Path, secret: None, capsys: pytest.Ca
     bad.write_text("The app crashed (log:3#9).\n", encoding="utf-8")
     code, out, _ = run(capsys, "check", "T-1", str(bad))
     assert code == 1 and "does not resolve" in out
+
+
+def test_timeline_and_align_commands(
+    home: Path, tmp_path: Path, secret: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    z = make_bugreport_zip(tmp_path)
+    dmesg = copy_fixture("kernel/dmesg.txt", tmp_path)
+    assert run(capsys, "index", "-q", "T-1", str(z))[0] == 0
+    assert run(capsys, "index", "-q", "T-1", str(dmesg))[0] == 0
+    code, out, _ = run(capsys, "align", "T-1")
+    assert code == 0 and "case clock: wall clock of source 1" in out and "not placed" in out, out
+    sid = max(int(ln.split()[0]) for ln in out.splitlines()[2:] if ln[:1].isdigit())
+    code, out, _ = run(capsys, "align", "T-1", "--anchor", f"log:{sid}#1=log:1#1+1s")
+    assert code == 0 and "1 anchor(s) set with align" in out, out
+    code, out, _ = run(capsys, "timeline", "T-1", "--source", str(sid), "--limit", "2")
+    assert code == 0 and f"log:{sid}#1  ~" in out and "more: cursor=" in out, out
+    code, _, err = run(capsys, "align", "T-1", "--offset", "1=1s")
+    assert code == 2 and "reference clock" in err
+    code, _, err = run(capsys, "align", "T-1", "--offset", "1")
+    assert code == 2 and "SOURCE=OFFSET" in err
+    code, out, _ = run(capsys, "align", "T-1", "--reset")
+    assert code == 0 and "manual entr" not in out

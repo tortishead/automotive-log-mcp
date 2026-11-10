@@ -7,7 +7,7 @@ no byte budget. Keys:
   never see them. Omitted or null means all tools.
 - ``blocked_sources``: glob patterns matched against source paths and source ids; matching
   sources are refused by ``add_source`` and hidden from every tool (enforced from M1).
-- ``blocked_ecus``: DLT ECU ids hidden from every tool (enforced from M5).
+- ``blocked_ecus``: DLT ECU ids hidden from every tool (not enforced yet; planned with the DLT connector).
 - ``byte_budget``: total bytes of tool output per server session; calls beyond it are refused.
 - ``allow_code_connectors``: whether Python entry-point connectors may be loaded (D13).
   Default false; YAML and ``command`` connectors are always allowed.
