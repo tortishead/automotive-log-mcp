@@ -23,6 +23,7 @@ import hashlib
 import json
 import posixpath
 import queue
+import sqlite3
 import threading
 from collections.abc import Callable, Iterator
 from concurrent.futures import Future
@@ -84,7 +85,8 @@ class FileResult:
     path: str
     sha256: str
     source_ids: list[int]
-    existing: bool = False  # the file was already in the case; nothing was indexed
+    existing: bool = False  # the file was already indexed; nothing was indexed
+    other_case: str | None = None  # ... in this other case (source_ids are that case's)
     notes: list[str] = field(default_factory=list)
     records: int = 0
     lines: int = 0
@@ -203,7 +205,16 @@ class Ingestor:
 
     # -- import ---------------------------------------------------------------------------------
 
-    def add(self, case_db: Path, path_str: str, format: str | None = None, force: bool = False) -> AddResult:
+    def add(
+        self,
+        case_db: Path,
+        path_str: str,
+        format: str | None = None,
+        force: bool = False,
+        other_cases: bool = True,
+    ) -> AddResult:
+        """Index a file or directory. ``other_cases``: a file already indexed in another case of the
+        same cases directory is not indexed again; the result names that case instead."""
         path = self.check(path_str, format)
         result = AddResult()
         if path.is_dir():
@@ -212,13 +223,17 @@ class Ingestor:
                     result.skipped.append(f"{p}: blocked by policy")
                     continue
                 try:
-                    result.files.append(self._add_file(case_db, p, format, force, optional=True))
+                    result.files.append(
+                        self._add_file(case_db, p, format, force, optional=True, other_cases=other_cases)
+                    )
                 except IngestError as e:
                     result.skipped.append(f"{p}: {e}")
             if not result.files:
                 raise IngestError(f"no indexable files in {path}: " + "; ".join(result.skipped[:5]))
             return result
-        result.files.append(self._add_file(case_db, path, format, force, optional=False))
+        result.files.append(
+            self._add_file(case_db, path, format, force, optional=False, other_cases=other_cases)
+        )
         return result
 
     def reindex(self, case_db: Path, source_id: int) -> AddResult:
@@ -241,12 +256,29 @@ class Ingestor:
             self.progress(msg)
 
     def _add_file(
-        self, case_db: Path, path: Path, format: str | None, force: bool, optional: bool
+        self,
+        case_db: Path,
+        path: Path,
+        format: str | None,
+        force: bool,
+        optional: bool,
+        other_cases: bool = False,
     ) -> FileResult:
         start = datetime.now(UTC)
         size = path.stat().st_size
         self._say(f"hashing {path} ({size / 1e6:.1f} MB)")
         sha = file_sha256(path)
+        here = self._indexed_in(case_db, sha) if case_db.exists() else []
+        if other_cases and not force and not here:
+            # The same file in another case: point there instead of indexing it again (a new chat
+            # often picks a new case name for the same bugreport).
+            for other in sorted(case_db.parent.glob("*.db")):
+                if other.name == case_db.name:
+                    continue
+                rows = self._indexed_in(other, sha)
+                if rows and all(st == "done" for _, st in rows):
+                    ids = [sid for sid, _ in rows]
+                    return FileResult(str(path), sha, ids, existing=True, other_case=other.stem)
         conn = db.connect(case_db, create=True)
         try:
             existing = conn.execute(
@@ -254,6 +286,7 @@ class Ingestor:
             ).fetchall()
             if existing and not force and all(st == "done" for _, st in existing):
                 return FileResult(str(path), sha, [sid for sid, _ in existing], existing=True)
+            unfinished = [st for _, st in existing if st == "indexing"]
             if existing:
                 db.delete_sources(conn, [sid for sid, _ in existing])
                 with conn:
@@ -282,6 +315,13 @@ class Ingestor:
                 self._fail(conn, origin, e)
                 raise
             self._finish(conn, origin)
+            if unfinished and not force:
+                origin.notes.insert(
+                    0,
+                    "an earlier import of this file did not finish (the server was probably stopped "
+                    "while indexing), so it was indexed again from the start; index large files once "
+                    "with the CLI ('index <case> <path>') to avoid this",
+                )
         finally:
             conn.close()
         secs = (datetime.now(UTC) - start).total_seconds()
@@ -290,6 +330,22 @@ class Ingestor:
         return FileResult(
             str(path), sha, ids, notes=origin.notes, records=origin.records, lines=origin.lines, seconds=secs
         )
+
+    @staticmethod
+    def _indexed_in(case_db: Path, sha: str) -> list[tuple[int, str]]:
+        """(source id, status) of the sources of file ``sha`` in a case DB, read-only; [] if the DB
+        cannot be read (another version, locked, not a case DB)."""
+        try:
+            conn = sqlite3.connect(f"{case_db.resolve().as_uri()}?mode=ro", uri=True, timeout=2)
+        except (sqlite3.Error, ValueError, OSError):
+            return []
+        try:
+            rows = conn.execute("SELECT id, status FROM sources WHERE sha256 = ? ORDER BY id", (sha,))
+            return [(int(i), str(st)) for i, st in rows.fetchall()]
+        except sqlite3.Error:
+            return []
+        finally:
+            conn.close()
 
     def _fail(self, conn: Any, origin: _Origin, e: BaseException) -> None:
         ids = [sid for sid, _, _ in origin.created]

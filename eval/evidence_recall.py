@@ -179,7 +179,7 @@ def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
         return CaseResult(case, "skipped", note="files missing: " + ", ".join(missing))
     db = app.config.case_db(case.id)
     for f in case.files:
-        app.ingestor.add(db, str(f))
+        app.ingestor.add(db, str(f), other_cases=False)  # one bugreport can serve several cases
     res = CaseResult(case, "ok")
     plan: list[tuple[str, dict[str, Any]]] = [("detect", {}), ("list_artifacts", {})]
     plan += [(q["tool"], q.get("args", {})) for q in case.queries]

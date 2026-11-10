@@ -375,7 +375,12 @@ def _run(app: App, args: argparse.Namespace) -> int:
             app.ingestor.progress = lambda m: print(m, file=sys.stderr)
         result = app.ingestor.add(app.config.case_db(args.case), str(args.path), args.format, args.force)
         for f in result.files:
-            if f.existing:
+            if f.other_case:
+                print(
+                    f"{f.path}: already indexed in case '{f.other_case}' (sources "
+                    f"{', '.join(map(str, f.source_ids))}); use that case, or --force to index it here too"
+                )
+            elif f.existing:
                 print(
                     f"{f.path}: already in case '{args.case}' (sources {', '.join(map(str, f.source_ids))})"
                 )

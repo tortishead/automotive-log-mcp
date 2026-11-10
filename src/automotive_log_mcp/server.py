@@ -173,10 +173,17 @@ def _source_info(s: query.SourceRow) -> SourceInfo:
     )
 
 
-def _describe_add(result: AddResult) -> str:
+def _describe_add(result: AddResult, case: str) -> str:
     lines = []
     for f in result.files:
         ids = ", ".join(map(str, f.source_ids)) or "none"
+        if f.other_case:
+            lines.append(
+                f"{f.path} is already indexed in case '{f.other_case}' (sources {ids}); nothing was "
+                f"indexed. Use case='{f.other_case}' for this file; only if the user wants a separate "
+                f"copy in '{case}', call add_source again with reindex=true."
+            )
+            continue
         if f.existing:
             lines.append(f"{f.path} is already in the case: sources {ids}.")
         else:
@@ -438,14 +445,19 @@ class LogServer:
                 str | None,
                 Field(description="Connector name to force, e.g. 'logcat'; omit to sniff the format."),
             ] = None,
+            reindex: Annotated[
+                bool,
+                Field(description="Index again although already indexed; only when the user asks."),
+            ] = False,
         ) -> CallToolResult:
             """Index a log file, directory or zip (e.g. a bugreport) into a case; lists the new sources.
-            Tombstones, ANRs and crashes become artifacts. The original is referenced, not copied."""
+            Tombstones, ANRs and crashes become artifacts. A file already indexed, in this case or
+            another, is not indexed again: the reply names the case to use."""
             try:
                 self.app.ingestor.check(path, format)
             except IngestError as e:
                 raise ToolError(str(e)) from None
-            future = self.app.workers.submit(case, config.case_db(case), path, format)
+            future = self.app.workers.submit(case, config.case_db(case), path, format, reindex)
             try:
                 result = future.result(timeout=ADD_WAIT_S)
             except TimeoutError:
@@ -455,7 +467,7 @@ class LogServer:
                 )
             except (IngestError, ValueError) as e:
                 raise ToolError(str(e)) from None
-            return _text(_describe_add(result))
+            return _text(_describe_add(result, case))
 
         def list_sources(case: Case) -> Annotated[CallToolResult, ListSourcesResult]:
             """List the sources of a case: format, record count, time range and build fingerprint."""

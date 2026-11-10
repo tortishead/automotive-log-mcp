@@ -345,3 +345,47 @@ def test_rounds_follow_call_log_setting(home: Path) -> None:
     (home / "config.yaml").write_text("round_gap_minutes: 0\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="round_gap_minutes"):
         load_config()
+
+
+# -- the same file in a new session ---------------------------------------------------------------------
+
+
+def test_same_file_in_another_case_is_not_indexed_again(config: Config, case_zip: Path) -> None:
+    texts: list[str] = []
+
+    async def main() -> None:
+        async with Client(build_server(config, Policy())) as client:
+            for args in (
+                {"case": "T-1", "path": str(case_zip)},
+                {"case": "bugreport-analysis", "path": str(case_zip)},  # a new chat, a new case name
+                {"case": "bugreport-analysis", "path": str(case_zip), "reindex": True},
+            ):
+                r = await client.call_tool("add_source", args)
+                assert not r.is_error, r.content
+                texts.append(r.content[0].text)  # type: ignore[union-attr]
+
+    anyio.run(main)
+    assert texts[0].startswith("Indexed")
+    assert "already indexed in case 'T-1'" in texts[1] and "case='T-1'" in texts[1]
+    assert texts[2].startswith("Indexed")  # reindex=true: a separate copy, as asked
+    assert config.case_db("bugreport-analysis").exists()
+
+
+def test_redirect_creates_no_empty_case(app: Any, case_zip: Path) -> None:
+    r1 = app.ingestor.add(app.config.case_db("T-1"), str(case_zip))
+    r2 = app.ingestor.add(app.config.case_db("T-2"), str(case_zip))
+    assert r2.files[0].other_case == "T-1" and r2.files[0].source_ids == r1.source_ids
+    assert not app.config.case_db("T-2").exists()
+
+
+def test_interrupted_import_is_redone_with_a_note(app: Any, case_zip: Path) -> None:
+    from automotive_log_mcp.store import db
+
+    path = app.config.case_db("T-1")
+    app.ingestor.add(path, str(case_zip))
+    with db.opened(path) as conn, conn:
+        conn.execute("UPDATE sources SET status = 'indexing'")  # as if the server was stopped
+    again = app.ingestor.add(path, str(case_zip)).files[0]
+    assert not again.existing and again.records > 0
+    assert "did not finish" in again.notes[0]
+    assert app.ingestor.add(path, str(case_zip)).files[0].existing  # done now: not indexed again

@@ -37,11 +37,23 @@ The server speaks MCP over stdio. Client configuration snippets are in
 schemas, at a token cost (see [Token use](#token-use)). `add_source` indexes in a background thread per
 case: it waits up to 10 s, then reports that indexing continues; `list_sources` shows progress.
 
+**A file is indexed once.** Adding a file that is already indexed (same content, by SHA-256) is a
+no-op, also under another case name: then `add_source` names the case that holds it and the agent
+uses that one (a new chat often picks a new case name for the same bugreport). `reindex=true`
+(MCP) or `index --force` (CLI) indexes it again anyway. An import that did not finish, because
+the server was stopped while indexing in the background (chat or VS Code closed), is started
+again from the beginning next time; the reply says so. To avoid that for large files, index
+them once before the chat and tell the agent the case name:
+
+```powershell
+py -m automotive_log_mcp index T-1 C:\logs\bugreport.zip     # Windows; waits until done
+```
+
 ## Tools
 
 | Tool | What it returns |
 | --- | --- |
-| `add_source(case, path, format?)` | indexes a file, directory or zip (background thread; waits up to 10 s) and the new source ids |
+| `add_source(case, path, format?, reindex?)` | indexes a file, directory or zip (background thread; waits up to 10 s) and the new source ids; a file already indexed, in this or another case, is not indexed again |
 | `list_sources(case)` | sources with format, record count, time range, fingerprint, stale/missing flags |
 | `search(case, query, mode, filter, collapse, count_only, limit, cursor)` | matching records in time order; FTS5 words or a regex over message and tag |
 | `context(case, at, before, after, scope)` | lines around `log:<s>#<n>` or an artifact's record `art:<id>`; `scope='pid'` follows one process through all buffers of the same file, merged by time |
@@ -168,7 +180,8 @@ automotive-log-mcp rules                                             # detector 
 ```
 
 - `index` options: `--format <connector>` forces a format instead of sniffing; `--force`
-  reindexes a file that is already in the case (adding the same file again is otherwise a no-op).
+  reindexes a file that is already in the case, or indexes it here although another case holds it
+  (adding the same file again is otherwise a no-op).
 - `query` runs the `search` tool and prints its text: `--search` (FTS5 over message and tag) or
   `--regex` (neither: every record that passes the filter), `--level` (minimum), `--tag` and
   `--not-tag` (glob, repeatable), `--source` (id, repeatable), `--pid`, `--from`/`--to` (forms as
