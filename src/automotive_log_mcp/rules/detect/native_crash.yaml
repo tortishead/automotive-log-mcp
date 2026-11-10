@@ -1,0 +1,13 @@
+# A native process received a fatal signal (libc / debuggerd lines, or a parsed tombstone).
+rule: native_crash
+version: "1"
+severity: high
+description: Native crash (fatal signal, tombstone)
+any:
+  - match: 'Fatal signal \d+ \(SIG'
+    tags: [libc]
+  - match: '\*\*\* \*\*\* \*\*\* \*\*\*'
+    tags: [DEBUG, crash_dump*]
+  - match: '^\[art:\d+\] Native crash'
+    tags: [tombstone]
+note: read the tombstone's backtrace (read_artifact(id='art:<id>/backtrace')); list_artifacts(type='tombstone')

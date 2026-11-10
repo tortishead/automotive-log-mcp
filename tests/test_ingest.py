@@ -309,7 +309,8 @@ continuation: '^\\s+'
 def test_yaml_connector_from_rule_dir(home: Path, tmp_path: Path) -> None:
     rules = tmp_path / "rules"
     write_yaml(rules, "vendor.yaml", VENDOR)
-    write_yaml(rules, "detector.yaml", "rule: not_a_connector\n")  # other rule files are ignored
+    # detector rules in the same directory are not connectors
+    write_yaml(rules, "detector.yaml", "rule: not_a_connector\nseverity: low\ndescription: x\nmatch: x\n")
     from automotive_log_mcp.config import load_config
 
     cfg_file = tmp_path / "c.yaml"

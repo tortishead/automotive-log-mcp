@@ -11,6 +11,7 @@ import fnmatch
 import json
 import re
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -577,15 +578,36 @@ class ScanResult:
     last_scanned: int | None  # record id where a capped scan stopped
 
 
+def regex_prefilter(pattern: str) -> tuple[list[str], list[Any]]:
+    """SQL conditions (on ``records r`` joined with ``tags t``) that every record matching the regex
+    ``pattern`` over message or tag passes: its literal parts as ``instr`` and an FTS superset."""
+    lits = required_literals(pattern)
+    where: list[str] = []
+    params: list[Any] = []
+    lit_fts = literals_fts(lits)
+    if lit_fts:
+        where.append(FTS_MATCH)
+        params.append(lit_fts)
+    for lit in lits:
+        where.append("(instr(r.msg, ?) > 0 OR instr(coalesce(t.name, ''), ?) > 0)")
+        params.extend([lit, lit])
+    return where, params
+
+
+# A record test for regex_scan: (msg, tag, level, tag_id) -> match.
+RecordTest = Callable[[str, str | None, str | None, int | None], bool]
+
+
 def regex_scan(
     conn: sqlite3.Connection,
     where: list[str],
     params: list[Any],
-    rx: re.Pattern[str],
+    rx: re.Pattern[str] | RecordTest,
     max_rows: int,
     window: int,
 ) -> ScanResult:
-    """Scan candidate records (``where``, in id order) with ``rx`` over message and tag.
+    """Scan candidate records (``where``, in id order) with ``rx`` over message and tag (or with a
+    record test, e.g. a detector rule's conditions).
 
     Stops after ``max_rows`` candidates. Returns groups like :func:`aggregate` and the first
     ``window`` matches in time order."""
@@ -597,14 +619,18 @@ def regex_scan(
     heap: list[tuple[tuple[int, int, int], int, Rec]] = []  # max-heap by negated key
     scanned = 0
     last: int | None = None
-    search = rx.search
+    search = rx.search if isinstance(rx, re.Pattern) else None
+    test = None if isinstance(rx, re.Pattern) else rx
     for row in conn.execute(sql, [*params, max_rows + 1]):
         if scanned >= max_rows:
             return ScanResult(_sorted(groups), _heap_sorted(heap), scanned, False, last)
         scanned += 1
         last = row[0]
         msg, tag = row[8], row[5]
-        if not (search(msg) or (tag and search(tag))):
+        if search is not None:
+            if not (search(msg) or (tag and search(tag))):
+                continue
+        elif test is not None and not test(msg, tag, row[4], row[12]):
             continue
         rec = _rec(row[:12])
         key = (rec.source_id, rec.template_id, row[12], rec.level)
@@ -938,3 +964,211 @@ def artifact_lines(conn: sqlite3.Connection, a: ArtifactRow, cite: ArtCitation) 
             if lo <= n <= hi:
                 out.append((n, line))
     return out
+
+
+# -- counts, buckets and gaps (count, overview) -----------------------------------------------
+
+# Group keys for count(by=...): SQL over ``records r``.
+COUNT_KEYS = {
+    "level": "r.level",
+    "tag": "r.tag_id",
+    "pid": "r.pid",
+    "source": "r.id >> 40",
+    "template": "r.template_id",
+}
+
+
+def _where_sql(where: list[str]) -> str:
+    return (" WHERE " + " AND ".join(where)) if where else ""
+
+
+def group_counts(
+    conn: sqlite3.Connection, key: str, where: list[str], params: list[Any]
+) -> list[tuple[Any, int, int]]:
+    """(key, count, smallest record id) per value of ``key`` (a COUNT_KEYS name), most frequent
+    first. Tag conditions need ``tags t``: they join it."""
+    join = " LEFT JOIN tags t ON t.id = r.tag_id" if any("t.name" in w for w in where) else ""
+    sql = (
+        f"SELECT {COUNT_KEYS[key]} AS k, count(*), min(r.id) FROM records r{join}{_where_sql(where)} "
+        "GROUP BY k ORDER BY 2 DESC, 3"
+    )
+    return [(k, n, i) for k, n, i in conn.execute(sql, params)]
+
+
+def bucket_counts(
+    conn: sqlite3.Connection,
+    step: int,
+    where: list[str],
+    params: list[Any],
+    key: str | None = None,
+    mono: bool = False,
+) -> list[tuple[int, Any, int, int]]:
+    """(bucket start ns, key value or None, count, smallest record id) per time bucket of ``step``
+    ns; on the wall clock (``ts``), or with ``mono`` on the monotonic clock of records without one."""
+    col = "r.ts_src" if mono else "r.ts"
+    clock = "r.ts IS NULL AND r.ts_src IS NOT NULL" if mono else "r.ts IS NOT NULL"
+    kexpr = COUNT_KEYS[key] if key else "NULL"
+    join = " LEFT JOIN tags t ON t.id = r.tag_id" if any("t.name" in w for w in where) else ""
+    sql = (
+        f"SELECT {col} / ? AS b, {kexpr} AS k, count(*), min(r.id) FROM records r{join}"
+        f"{_where_sql([clock, *where])} GROUP BY b, k"
+    )
+    return [(b * step, k, n, i) for b, k, n, i in conn.execute(sql, [step, *params])]
+
+
+def level_bucket_counts(
+    conn: sqlite3.Connection, step: int, where: list[str], params: list[Any]
+) -> list[tuple[int, str | None, int]]:
+    """(bucket start, level, count) on the wall clock: histogram and level counts in one pass."""
+    sql = (
+        f"SELECT r.ts / ? AS b, r.level, count(*) FROM records r{_where_sql(['r.ts IS NOT NULL', *where])} "
+        "GROUP BY b, r.level"
+    )
+    return [(b * step, lvl, n) for b, lvl, n in conn.execute(sql, [step, *params])]
+
+
+@dataclass
+class Gap:
+    before_id: int  # last record before the gap
+    before_ts: int
+    after_id: int  # first record after it
+    after_ts: int
+
+
+def gaps(
+    conn: sqlite3.Connection,
+    where: list[str],
+    params: list[Any],
+    lo: int,
+    hi: int,
+    min_gap: int,
+    max_steps: int = 50_000,
+) -> tuple[list[Gap], bool]:
+    """Stretches of more than ``min_gap`` ns without a record (wall clock) between ``lo`` and
+    ``hi``. Walks the ts index in jumps of ``min_gap``: about (hi - lo) / min_gap lookups. The
+    flag is False when ``max_steps`` stopped the walk early."""
+    cond = " AND ".join(where) if where else "1"
+    last_in = (
+        f"SELECT r.ts FROM records r INDEXED BY records_ts WHERE r.ts BETWEEN ? AND ? AND {cond} "
+        "ORDER BY r.ts DESC LIMIT 1"
+    )
+    next_after = (
+        f"SELECT r.ts FROM records r INDEXED BY records_ts WHERE r.ts > ? AND r.ts <= ? AND {cond} "
+        "ORDER BY r.ts LIMIT 1"
+    )
+    id_at = f"SELECT min(r.id), max(r.id) FROM records r WHERE r.ts = ? AND {cond}"
+    out: list[Gap] = []
+    row = conn.execute(
+        f"SELECT r.ts FROM records r INDEXED BY records_ts WHERE r.ts >= ? AND r.ts <= ? AND {cond} "
+        "ORDER BY r.ts LIMIT 1",
+        [lo, hi, *params],
+    ).fetchone()
+    if row is None:
+        return out, True
+    t = row[0]
+    for _ in range(max_steps):
+        r = conn.execute(last_in, [t, min(t + min_gap, hi), *params]).fetchone()
+        if r is not None and r[0] > t:
+            t = r[0]
+            continue
+        r = conn.execute(next_after, [t, hi, *params]).fetchone()
+        if r is None:
+            return out, True
+        if r[0] - t > min_gap:
+            before = conn.execute(id_at, [t, *params]).fetchone()[1]
+            after = conn.execute(id_at, [r[0], *params]).fetchone()[0]
+            out.append(Gap(before, t, after, r[0]))
+        t = r[0]
+    return out, False
+
+
+def segments(
+    conn: sqlite3.Connection, sources: list[int]
+) -> list[tuple[int, int, str, int, int, int | None, int | None]]:
+    """(source, seg, reason, first_seq, count, ts_first, ts_src_first) of the given sources."""
+    if not sources:
+        return []
+    rows = conn.execute(
+        "SELECT source_id, seg, reason, first_seq, count, ts_first, ts_src_first FROM segments "
+        f"WHERE source_id IN ({','.join('?' * len(sources))}) ORDER BY source_id, seg",
+        sources,
+    )
+    return [tuple(r) for r in rows]
+
+
+def process_names(conn: sqlite3.Connection, pids: list[int]) -> dict[int, str]:
+    """Process names from bugreport process lists (the main thread's name when known)."""
+    pids = [p for p in set(pids) if p is not None]
+    if not pids:
+        return {}
+    out: dict[int, str] = {}
+    marks = ",".join("?" * len(pids))
+    for pid, name in conn.execute(
+        f"SELECT pid, name FROM processes WHERE pid IN ({marks}) ORDER BY tid != pid", pids
+    ):
+        out.setdefault(pid, name)
+    return out
+
+
+def regex_tally(
+    conn: sqlite3.Connection,
+    where: list[str],
+    params: list[Any],
+    rx: re.Pattern[str],
+    max_rows: int,
+    key: str | None,
+    step: int | None,
+    mono: bool = False,
+) -> tuple[dict[tuple[int | None, Any], list[int]], bool]:
+    """Regex matches counted per (bucket start or None, key value): [count, smallest id].
+    Scans at most ``max_rows`` candidates; the flag is False when it stopped early."""
+    kcol = COUNT_KEYS[key] if key else "NULL"
+    tcol = "r.ts_src" if mono else "r.ts"
+    cond = list(where)
+    if step:
+        cond.append("r.ts IS NULL AND r.ts_src IS NOT NULL" if mono else "r.ts IS NOT NULL")
+    sql = (
+        f"SELECT r.id, r.msg, t.name, {kcol}, {tcol} FROM {REC_FROM}{_where_sql(cond)} ORDER BY r.id LIMIT ?"
+    )
+    out: dict[tuple[int | None, Any], list[int]] = {}
+    search = rx.search
+    for n, (rid, msg, tag, k, t) in enumerate(conn.execute(sql, [*params, max_rows + 1])):
+        if n >= max_rows:
+            return out, False
+        if not (search(msg) or (tag and search(tag))):
+            continue
+        b = (t // step) * step if step and t is not None else None
+        cell = out.get((b, k))
+        if cell is None:
+            out[(b, k)] = [1, rid]
+        else:
+            cell[0] += 1
+    return out, True
+
+
+def ts_bounds(
+    conn: sqlite3.Connection, where: list[str], params: list[Any], mono: bool = False
+) -> tuple[int | None, int | None]:
+    """First and last time of the records passing ``where``: wall clock, or with ``mono`` the
+    monotonic clock of records without a wall-clock time. Walks the index from both ends."""
+    cond = " AND ".join(where) if where else "1"
+    if mono:
+        base = f"SELECT r.ts_src FROM records r WHERE r.ts IS NULL AND r.ts_src IS NOT NULL AND {cond}"
+        lo = conn.execute(f"{base} ORDER BY r.ts_src LIMIT 1", params).fetchone()
+        hi = conn.execute(f"{base} ORDER BY r.ts_src DESC LIMIT 1", params).fetchone()
+    else:
+        base = f"SELECT r.ts FROM records r INDEXED BY records_ts WHERE r.ts IS NOT NULL AND {cond}"
+        lo = conn.execute(f"{base} ORDER BY r.ts LIMIT 1", params).fetchone()
+        hi = conn.execute(f"{base} ORDER BY r.ts DESC LIMIT 1", params).fetchone()
+    return (lo[0] if lo else None), (hi[0] if hi else None)
+
+
+def first_by_time(conn: sqlite3.Connection, where: list[str], params: list[Any]) -> int | None:
+    """Id of the earliest wall-clock record passing ``where``."""
+    cond = " AND ".join(where) if where else "1"
+    row = conn.execute(
+        f"SELECT r.id FROM records r INDEXED BY records_ts WHERE r.ts IS NOT NULL AND {cond} "
+        "ORDER BY r.ts, r.id LIMIT 1",
+        params,
+    ).fetchone()
+    return row[0] if row else None

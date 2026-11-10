@@ -1,0 +1,13 @@
+# Boot started (boot_progress_start) but neither the boot screen nor boot completion followed.
+rule: boot_not_completed
+version: "1"
+severity: high
+description: Boot did not complete within 3 minutes of boot_progress_start
+tags: [boot_progress_start]
+followed_by:
+  any:
+    - tags: [boot_progress_enable_screen, sf_stop_bootanim, boot_completed]
+    - match: 'sys\.boot_completed[=: ]+\[?1|BOOT_COMPLETED'
+  within: 3m
+  absent: true
+note: look for crashes, service restarts and watchdogs between boot_progress_start and the end of the log

@@ -1,0 +1,11 @@
+# An app or system_server died with an uncaught Java exception (crash buffer, or a dropbox entry).
+rule: java_crash
+version: "1"
+severity: high
+description: Java crash (uncaught exception)
+any:
+  - match: 'FATAL EXCEPTION'
+    tags: [AndroidRuntime]
+  - match: '^\[art:\d+\] Java crash'
+    tags: [java_crash]
+note: read_artifact(id='art:<id>') on the crash shown with → for the exception and its root cause

@@ -1,0 +1,10 @@
+# The low memory killer (lmkd) or the kernel OOM killer ended a process to free memory.
+rule: lmk
+version: "1"
+severity: medium
+description: Low memory kill (lmkd or kernel OOM killer)
+any:
+  - match: "^Kill(?:ing)? '"
+    tags: [lowmemorykiller, lmkd]
+  - match: 'Out of memory: Kill(?:ed)? process'
+note: the killed process and its oom_score_adj are in the message; check memory pressure before it

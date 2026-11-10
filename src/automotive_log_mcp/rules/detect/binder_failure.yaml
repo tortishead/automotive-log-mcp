@@ -1,0 +1,11 @@
+# A binder call failed: the peer died (DeadObjectException), the transaction buffer was full, or the
+# kernel driver rejected it.
+rule: binder_failure
+version: "1"
+severity: medium
+description: Binder failure (dead peer, failed transaction)
+any:
+  - match: '!!! FAILED BINDER TRANSACTION !!!'
+  - match: 'android\.os\.DeadObjectException'
+  - match: 'binder: \d+:\d+ transaction failed '
+note: the peer process of the call is the next place to look; search for it around the same time

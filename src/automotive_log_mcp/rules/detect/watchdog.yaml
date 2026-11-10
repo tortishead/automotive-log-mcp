@@ -1,0 +1,8 @@
+# The system_server watchdog found a blocked thread or monitor; it kills system_server after ~60 s.
+rule: watchdog
+version: "1"
+severity: high
+description: System watchdog (blocked system_server thread, or kill)
+match: 'WATCHDOG KILLING SYSTEM PROCESS|Blocked in (?:handler|monitor)|\*\*\* WATCHDOG'
+tags: [Watchdog]
+note: the blocked thread is named in the message; context(at=...) and the ANR traces show its stack

@@ -1,0 +1,11 @@
+# Application not responding: the main thread did not answer an input event or broadcast in time.
+rule: anr
+version: "1"
+severity: high
+description: ANR (application not responding)
+any:
+  - match: '^ANR in '
+    tags: [ActivityManager]
+  - match: '^\[art:\d+\] ANR in'
+    tags: [anr]
+note: read the ANR trace's main thread and the lock holder or binder peer it names (read_artifact)

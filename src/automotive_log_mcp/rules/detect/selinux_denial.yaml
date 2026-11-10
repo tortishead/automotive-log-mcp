@@ -1,0 +1,8 @@
+# An SELinux access denial (avc: denied). Often harmless; matters when the denied access is the failing one.
+rule: selinux_denial
+version: "1"
+severity: low
+description: SELinux denial (avc denied)
+match: 'audit\([0-9.:]+\): avc: +denied'
+group_by: pid
+note: compare scontext/tcontext/tclass with the failing component; permissive=0 means enforced

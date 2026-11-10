@@ -10,6 +10,7 @@ from .config import Config
 from .connectors.base import ConnectorError, Registry, build_registry
 from .core.ingest import CaseWorkers, IngestError, Ingestor, Progress, file_sha256
 from .core.redact import Redactor, redactor_for_home
+from .detect.engine import RuleSet, load_rules
 from .policy import Policy
 from .store import db, query
 
@@ -21,6 +22,7 @@ class App:
     registry: Registry
     redactor: Redactor
     ingestor: Ingestor
+    rules: RuleSet = field(default_factory=lambda: load_rules())
     workers: CaseWorkers = field(init=False)
 
     def __post_init__(self) -> None:
@@ -34,8 +36,11 @@ class App:
             from .config import ConfigError
 
             raise ConfigError(str(e)) from e
+        rules = load_rules(config.rule_dirs)  # ConfigError for an invalid rule file
         redactor = redactor_for_home(config.home)
-        return cls(config, policy, registry, redactor, Ingestor(config, policy, registry, redactor, progress))
+        return cls(
+            config, policy, registry, redactor, Ingestor(config, policy, registry, redactor, progress), rules
+        )
 
     def versions(self) -> dict[str, str]:
         return {p.name: p.version for p in self.registry.plugins()}

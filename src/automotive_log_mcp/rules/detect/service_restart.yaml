@@ -1,0 +1,13 @@
+# A native service managed by init, or an app process, died (and is usually restarted).
+rule: service_restart
+version: "1"
+severity: medium
+description: Service or process died (init service exit, process death)
+any:
+  - match: "Service '[^']+' \\(pid \\d+\\) (?:exited|killed|received signal|crashed)"
+    tags: [init]
+  - match: 'Process \S+ \(pid \d+\) has died'
+    tags: [ActivityManager]
+  - match: 'Scheduling restart of crashed service'
+    tags: [ActivityManager]
+note: a crash or ANR of the same pid just before explains the death; repeated deaths are a restart loop

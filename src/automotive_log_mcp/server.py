@@ -1,15 +1,15 @@
 """MCP tools, server instructions and prompts.
 
-Every P0 tool is registered with its full parameter schema and annotations. From M1,
-``add_source`` indexes files into the case DB (in a background thread per case) and
-``list_sources`` reports what a case holds; the other tools fail with a clear "not implemented
-yet" error naming the milestone that brings them (M3). Every call passes through the policy
-(byte budget) and is written to the call log with redacted arguments (D5).
+Every tool is registered with its full parameter schema, an output schema and annotations; the
+tool logic is in ``tools.py``. Every call passes through the policy (allowed tools, byte budget)
+and is written to the call log with redacted arguments (D5); the text given to
+``check_citations`` is logged only as its length and hash (it quotes log content).
 """
 
 from __future__ import annotations
 
 import functools
+import hashlib
 import inspect
 import re
 import time
@@ -31,11 +31,15 @@ from .policy import ByteBudget, Policy
 from .store import query
 from .store.db import StoreError
 from .tools import (
+    CheckCitationsResult,
     ContextResult,
+    CountResult,
+    DetectResult,
     Filter,
     GetRecordsResult,
     ListArtifactsResult,
     Output,
+    OverviewResult,
     ReadArtifactResult,
     SearchResult,
     ToolInputError,
@@ -51,16 +55,22 @@ The server parses, indexes and searches; it never interprets. Reasoning is your 
 Analysis order:
 1. list_sources(case): what is in the case (sources, time ranges, build fingerprint). If it is \
 empty, add_source(case, path) with the bugreport zip or log file.
-2. list_artifacts(case): tombstones (native crashes), ANRs, Java crashes and dropbox entries, \
+2. overview(case): levels, top tags, processes and messages, gaps, error bursts, a histogram, \
+detector and artifact counts: where to look first.
+3. detect(case): known failure patterns (crashes, ANRs, watchdog, low memory kills, SELinux \
+denials, binder failures, VHAL errors, service restarts, boot not completed) with cited lines.
+4. list_artifacts(case): tombstones (native crashes), ANRs, Java crashes and dropbox entries, \
 grouped by crash signature, in time order. Copies of one crash are marked 'same crash as'.
-3. read_artifact(case, id='art:<id>') for the summary and section list, then the section it \
+5. read_artifact(case, id='art:<id>') for the summary and section list, then the section it \
 suggests (backtrace, exception, the main thread of an ANR) for the stack trace.
-4. context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before a crash; \
+6. context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before a crash; \
 scope='pid' follows one process across the buffers of a bugreport.
-5. search(case, query, filter) for errors around the defect: start with filter level 'W' or 'E' \
+7. search(case, query, filter) for errors around the defect: start with filter level 'W' or 'E' \
 and a time window (from/to), keep collapse on, narrow with tags or pid. Use mode='regex' only for \
-patterns; text mode matches whole words.
-6. get_records(case, ids) for full messages that other tools cut with '…'.
+patterns; text mode matches whole words. count(case, by, query, filter, bucket) counts records by \
+tag, level, pid, source or template, optionally per time bucket.
+8. get_records(case, ids) for full messages that other tools cut with '…'.
+9. check_citations(case, text) with your answer before you give it: every citation must resolve.
 
 Citation rule: every finding in your answer cites the line or artifact it comes from, exactly as \
 the tools print it: log:<source>#<seq> for a log line, art:<id>[/section][:L<line>] for an \
@@ -70,7 +80,8 @@ Outputs are capped (about 50 lines / 8 KB, messages cut at 200 characters with �
 says it was capped, narrow the query instead of paging through everything. Timestamps printed in \
 outputs can be passed back as from/to unchanged; from/to also take '-5m' (before the end of the \
 case), '+30s' (after from) and citations such as 'log:3#120-30s'. Values like MAC addresses and \
-VINs are redacted to tokens (<MAC:3fa2c1d0>); the same value always has the same token.
+VINs are redacted to tokens (<MAC:3fa2c1d0>); the same value always has the same token. Counts \
+marked ≈ are estimated from a sample of a very broad query.
 """
 
 TRIAGE_PROMPT = """\
@@ -79,15 +90,21 @@ Triage the defect in case '{case}' with the automotive-log-mcp tools.
 {symptom}Work in this order and stop as soon as the evidence is clear:
 1. list_sources(case='{case}'). Note the build fingerprint and each source's time range. If the case \
 has no sources, ask for the log files and add them with add_source.
-2. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
+2. overview(case='{case}') and detect(case='{case}'): where the errors are, and which known failure \
+patterns (crash, ANR, watchdog, low memory kill, VHAL error, service restart, …) occur and when.
+3. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
 read_artifact the first artifact, then the section it suggests: the backtrace of a tombstone, the \
 exception of a Java crash, the main thread (and lock holder or binder peer) of an ANR.
-3. context(case='{case}', at='art:<id>', before=30, after=10) for what happened just before the \
+4. context(case='{case}', at='art:<id>', before=30, after=10) for what happened just before the \
 crash; scope='pid' to follow the crashing process across buffers.
-4. search(case='{case}', query=..., filter={{'level': 'W', 'from': ..., 'to': ...}}) for errors \
+5. search(case='{case}', query=..., filter={{'level': 'W', 'from': ..., 'to': ...}}) for errors \
 and warnings in the minutes before the defect: start from the component or process in the \
-symptom, then widen. Keep collapse on; repeated messages show ×count.
-5. get_records for any message cut with '…' that matters.
+symptom, then widen. Keep collapse on; repeated messages show ×count. count(..., bucket='1m') shows \
+when a message starts or stops.
+6. get_records for any message cut with '…' that matters.
+7. Before you answer: check_citations(case='{case}', text=<your answer in Markdown>). Fix every \
+error it reports (a citation that is malformed or does not resolve) and either cite or mark as a \
+guess every paragraph it warns about; run it again until it passes. Only then give the answer.
 
 Answer with:
 - What failed (component, process) and when (timestamp as printed).
@@ -250,6 +267,10 @@ class LogServer:
             start = time.perf_counter()
             bound = sig.bind_partial(*args, **kwargs)
             log_args = _jsonable(dict(bound.arguments))
+            if name == "check_citations" and isinstance(log_args.get("text"), str):
+                text = log_args["text"]  # an answer quotes log content: keep only its size and hash
+                digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+                log_args["text"] = f"<{len(text)} chars, sha256 {digest}>"
 
             def log(status: Literal["ok", "error", "refused"], n: int, error: str | None = None) -> None:
                 self.calllog.write(name, log_args, status, (time.perf_counter() - start) * 1000, n, error)
@@ -467,6 +488,82 @@ class LogServer:
             as written, all attributes and the template's constant text for a code search."""
             return _output(lambda: tools.get_records(case, ids))
 
+        def overview(
+            case: Case,
+            filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
+        ) -> Annotated[CallToolResult, OverviewResult]:
+            """Orientation for a case: record and level counts, top tags, processes and messages
+            (templates), clock segments, gaps over 30 s, error bursts (E/F per 10 s above 5× the median),
+            a histogram of up to 60 buckets, detector hit counts and artifact counts. Each item is cited.
+            """
+            return _output(lambda: tools.overview(case, filter))
+
+        def count(
+            case: Case,
+            by: Annotated[
+                Literal["tag", "level", "pid", "source", "template"] | None,
+                Field(description="Field to group by; null for totals only (with bucket: a time series)."),
+            ] = "tag",
+            query: Annotated[
+                str | None,
+                Field(
+                    min_length=1,
+                    description="Optional: count only records matching this query (as in search: words, or a "
+                    "regex with mode='regex').",
+                ),
+            ] = None,
+            mode: Annotated[Literal["text", "regex"], Field(description="How to read 'query'.")] = "text",
+            filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
+            bucket: Annotated[
+                str | None,
+                Field(
+                    description="Optional time bucket, e.g. '10s', '1m', '1h': counts per bucket (at most 60 "
+                    "buckets, empty ones included), each with its most frequent values."
+                ),
+            ] = None,
+            limit: Annotated[int, Field(ge=1, le=100, description="Maximum values to list.")] = 20,
+        ) -> Annotated[CallToolResult, CountResult]:
+            """Count records by tag, level, pid, source or message template, optionally per time bucket.
+
+            Each value comes with an example citation. Broad text queries are counted from a sample (≈);
+            a capped regex scan gives lower bounds ('at least').
+            """
+            return _output(lambda: tools.count(case, by, query, mode, filter, bucket, limit))
+
+        def detect(
+            case: Case,
+            rules: Annotated[
+                list[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,47}$")]] | None,
+                Field(description="Rule names to run (see the result's 'no hits' list); omit for all rules."),
+            ] = None,
+            filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
+            examples: Annotated[
+                int, Field(ge=1, le=10, description="Example lines per rule (collapsed by message or pid).")
+            ] = 3,
+        ) -> Annotated[CallToolResult, DetectResult]:
+            """Run detector rules for known failure patterns: Java and native crashes, ANRs, watchdog, low
+            memory kills, SELinux denials, binder failures, VHAL errors, service restarts, boot not completed
+            (plus rules from the configured rule directories). Hits by severity and time, with citations and
+            a hint what to read next."""
+            return _output(lambda: tools.detect(case, rules, filter, examples))
+
+        def check_citations(
+            case: Case,
+            text: Annotated[
+                str,
+                Field(
+                    min_length=1,
+                    max_length=200_000,
+                    description="The answer in Markdown, with citations as the tools print them.",
+                ),
+            ],
+        ) -> Annotated[CallToolResult, CheckCitationsResult]:
+            """Check an answer before giving it: every log:<source>#<seq> and art:<id>[/section][:L<n>]
+            citation must be well-formed and resolve in the case (errors); paragraphs with findings but no
+            citation, and quoted text not found in the cited lines, are warnings. 'PASS' when there are no
+            errors."""
+            return _output(lambda: tools.check_citations(case, text))
+
         self._tool(add_source, WRITES_CASE, "Add a log source")
         self._tool(list_sources, READ_ONLY, "List sources")
         self._tool(search, READ_ONLY, "Search records")
@@ -474,6 +571,10 @@ class LogServer:
         self._tool(list_artifacts, READ_ONLY, "List artifacts")
         self._tool(read_artifact, READ_ONLY, "Read an artifact")
         self._tool(get_records, READ_ONLY, "Get full records")
+        self._tool(overview, READ_ONLY, "Case overview")
+        self._tool(count, READ_ONLY, "Count records")
+        self._tool(detect, READ_ONLY, "Detect known failure patterns")
+        self._tool(check_citations, READ_ONLY, "Check the citations of an answer")
 
     # -- prompts ----------------------------------------------------------------------------
 
@@ -498,6 +599,10 @@ TOOL_NAMES = (
     "list_artifacts",
     "read_artifact",
     "get_records",
+    "overview",
+    "count",
+    "detect",
+    "check_citations",
 )
 
 

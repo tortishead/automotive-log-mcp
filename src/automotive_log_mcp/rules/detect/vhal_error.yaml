@@ -1,0 +1,11 @@
+# Errors from the vehicle HAL, or vehicle property calls that returned an error status.
+rule: vhal_error
+version: "1"
+severity: medium
+description: Vehicle HAL error (VHAL tag, or a property call with an error status)
+any:
+  - level: E
+    tags: ['*VehicleHal*', '*Vhal*', '*VHAL*', 'android.hardware.automotive.vehicle*']
+  - match: 'status(?:Code)?[=:] ?(?:NOT_AVAILABLE|TRY_AGAIN|INTERNAL_ERROR|ACCESS_DENIED|INVALID_ARG)'
+    level: W
+note: the property id and status are in the message; the code search text finds the caller

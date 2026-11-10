@@ -5,7 +5,9 @@ Without an agent: ``index <case> <path>`` indexes a log file, archive or directo
 ``relink <case> <source> <path>`` points a case at a moved original (the hash must match);
 ``reindex <case> <source>`` indexes an original again; ``artifacts <case>`` lists tombstones,
 ANR traces, Java crashes and dropbox entries, ``artifacts <case> --show art:<id>[/section][:L<n>]``
-prints one. ``rules`` arrives with M4.
+prints one. ``overview``, ``count``, ``detect`` and ``check`` print the output of the MCP tools of
+the same names (``check`` runs check_citations on a Markdown file); ``rules`` lists the detector
+rules and where they come from.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from .config import CASE_NAME_RE, ConfigError, load_config
 from .connectors.base import ConnectorError
 from .core.ingest import IngestError
 from .core.levels import LEVEL_RANK
+from .detect.engine import BUILTIN_DIR
 from .policy import load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
@@ -57,19 +60,37 @@ def _parser() -> argparse.ArgumentParser:
     qu.add_argument("case", type=_case)
     qu.add_argument("--search", "-s", help="full-text query (FTS5) over message and tag")
     qu.add_argument("--regex", "-r", help="regular expression over message and tag")
-    qu.add_argument("--level", "-l", choices=list(LEVEL_RANK), help="minimum level")
-    qu.add_argument("--tag", "-t", action="append", help="tag (glob); repeatable")
-    qu.add_argument("--source", type=int, action="append", help="source id; repeatable")
-    qu.add_argument("--not-tag", action="append", help="tag to exclude (glob); repeatable")
-    qu.add_argument("--pid", type=int)
-    qu.add_argument(
-        "--from", dest="from_", metavar="TIME", help="start time, as printed, relative or a citation"
-    )
-    qu.add_argument("--to", metavar="TIME", help="end time (inclusive)")
+    _filter_args(qu)
     qu.add_argument("--collapse", "-c", action="store_true", help="one line per repeated message")
     qu.add_argument("--limit", "-n", type=int, default=50)
     qu.add_argument("--cursor", help="next page, as a previous result printed it")
     qu.add_argument("--count", action="store_true", help="print only the number of matches")
+
+    ov = sub.add_parser("overview", help="levels, top tags and messages, gaps, bursts, detector counts")
+    ov.add_argument("case", type=_case)
+    _filter_args(ov)
+
+    co = sub.add_parser("count", help="count records by tag, level, pid, source or template")
+    co.add_argument("case", type=_case)
+    co.add_argument("--by", choices=["tag", "level", "pid", "source", "template", "none"], default="tag")
+    co.add_argument("--search", "-s", help="count only records matching this full-text query")
+    co.add_argument("--regex", "-r", help="count only records matching this regular expression")
+    co.add_argument("--bucket", "-b", help="time bucket, e.g. 10s, 1m, 1h (at most 60 buckets)")
+    co.add_argument("--limit", "-n", type=int, default=20)
+    _filter_args(co)
+
+    de = sub.add_parser("detect", help="run the detector rules over a case")
+    de.add_argument("case", type=_case)
+    de.add_argument("--rule", action="append", help="rule name; repeatable (default: all rules)")
+    de.add_argument("--examples", type=int, default=3, help="example lines per rule (1-10)")
+    _filter_args(de)
+
+    ch = sub.add_parser("check", help="check the citations of a Markdown answer (exit 1 on errors)")
+    ch.add_argument("case", type=_case)
+    ch.add_argument("file", type=Path, help="Markdown file; '-' reads standard input")
+
+    ru = sub.add_parser("rules", help="list the detector rules (package and configured rule_dirs)")
+    ru.add_argument("--show", metavar="NAME", help="print one rule's definition")
 
     ar = sub.add_parser("artifacts", help="list artifacts (tombstones, ANRs, crashes, dropbox) or show one")
     ar.add_argument("case", type=_case)
@@ -90,6 +111,32 @@ def _parser() -> argparse.ArgumentParser:
     ri.add_argument("source", type=int)
     ri.add_argument("-q", "--quiet", action="store_true")
     return p
+
+
+def _filter_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--level", "-l", choices=list(LEVEL_RANK), help="minimum level")
+    p.add_argument("--tag", "-t", action="append", help="tag (glob); repeatable")
+    p.add_argument("--not-tag", action="append", help="tag to exclude (glob); repeatable")
+    p.add_argument("--source", type=int, action="append", help="source id; repeatable")
+    p.add_argument("--pid", type=int)
+    p.add_argument(
+        "--from", dest="from_", metavar="TIME", help="start time, as printed, relative or a citation"
+    )
+    p.add_argument("--to", metavar="TIME", help="end time (inclusive)")
+
+
+def _filter(args: argparse.Namespace) -> Filter | None:
+    flt = {
+        "sources": [str(x) for x in args.source] if args.source else None,
+        "from": args.from_,
+        "to": args.to,
+        "level": args.level,
+        "tags": args.tag,
+        "not_tags": args.not_tag,
+        "pid": args.pid,
+    }
+    values = {k: v for k, v in flt.items() if v is not None}
+    return Filter.model_validate(values) if values else None
 
 
 def _err(msg: str) -> None:
@@ -164,22 +211,13 @@ def _query(app: App, args: argparse.Namespace) -> int:
     if args.search and args.regex:
         _err("give --search or --regex, not both")
         return 2
-    flt = {
-        "sources": [str(x) for x in args.source] if args.source else None,
-        "from": args.from_,
-        "to": args.to,
-        "level": args.level,
-        "tags": args.tag,
-        "not_tags": args.not_tag,
-        "pid": args.pid,
-    }
     tools = Tools(app)
     try:
         out = tools.search(
             args.case,
             args.regex or args.search,
             mode="regex" if args.regex else "text",
-            filter=Filter.model_validate({k: v for k, v in flt.items() if v is not None}),
+            filter=_filter(args) or Filter.model_validate({}),
             collapse=args.collapse,
             count_only=args.count,
             limit=args.limit,
@@ -192,6 +230,56 @@ def _query(app: App, args: argparse.Namespace) -> int:
         print(out.data.total)  # type: ignore[attr-defined]
     else:
         print(out.text)
+    return 0
+
+
+def _tool(app: App, args: argparse.Namespace) -> int:
+    """overview, count, detect and check: print the MCP tool's text."""
+    tools = Tools(app)
+    try:
+        if args.command == "overview":
+            out = tools.overview(args.case, _filter(args))
+        elif args.command == "count":
+            if args.search and args.regex:
+                _err("give --search or --regex, not both")
+                return 2
+            out = tools.count(
+                args.case,
+                None if args.by == "none" else args.by,
+                args.regex or args.search,
+                "regex" if args.regex else "text",
+                _filter(args),
+                args.bucket,
+                args.limit,
+            )
+        elif args.command == "detect":
+            out = tools.detect(args.case, args.rule, _filter(args), max(1, min(args.examples, 10)))
+        else:
+            text = sys.stdin.read() if str(args.file) == "-" else args.file.read_text(encoding="utf-8")
+            out = tools.check_citations(args.case, text)
+    except (ToolInputError, OSError) as e:
+        _err(str(e))
+        return 1 if "does not exist" in str(e) else 2
+    print(out.text)
+    if args.command == "check":
+        return 0 if out.data.ok else 1  # type: ignore[attr-defined]
+    return 0
+
+
+def _rules(app: App, show: str | None) -> int:
+    rs = app.rules
+    if show:
+        r = rs.rules.get(show)
+        if r is None:
+            _err(f"no rule '{show}'; rules: {', '.join(sorted(rs.rules))}")
+            return 2
+        print(f"# {r.origin}")
+        print(Path(r.origin).read_text(encoding="utf-8").rstrip())
+        return 0
+    for r in rs.ordered():
+        where = "package" if Path(r.origin).is_relative_to(BUILTIN_DIR) else r.origin
+        extra = f"  (replaces {rs.overridden[r.name]})" if r.name in rs.overridden else ""
+        print(f"{r.name:<20} {r.severity:<7} {r.description}  [{where}]{extra}")
     return 0
 
 
@@ -234,11 +322,28 @@ def _run(app: App, args: argparse.Namespace) -> int:
         return 0
     if args.command == "query":
         return _query(app, args)
+    if args.command in ("overview", "count", "detect", "check"):
+        return _tool(app, args)
+    if args.command == "rules":
+        return _rules(app, args.show)
     raise AssertionError(args.command)
+
+
+def _utf8_stdout() -> None:
+    """Tool texts use ×, …, ⏎ and block characters; a Windows console or pipe in a legacy code
+    page cannot encode them, so print UTF-8 there."""
+    try:
+        "×…⏎▁█·".encode(sys.stdout.encoding or "ascii")
+    except (UnicodeEncodeError, LookupError):
+        reconfigure = getattr(sys.stdout, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.command != "serve":
+        _utf8_stdout()
     try:
         check_fts5()
         config = load_config(args.config)
