@@ -120,3 +120,28 @@ def test_artifacts_command(
     assert code == 2 and "no section 'nope'" in err
     code, _, err = run(capsys, "artifacts", "nope")
     assert code == 1 and "does not exist" in err
+
+
+def test_p1_commands(home: Path, tmp_path: Path, secret: None, capsys: pytest.CaptureFixture[str]) -> None:
+    z = make_bugreport_zip(tmp_path)
+    assert run(capsys, "index", "-q", "T-1", str(z))[0] == 0
+    code, out, _ = run(capsys, "rules")
+    assert code == 0 and "java_crash" in out and "[package]" in out and len(out.strip().splitlines()) == 10
+    code, out, _ = run(capsys, "rules", "--show", "anr")
+    assert code == 0 and "rule: anr" in out
+    code, out, _ = run(capsys, "detect", "T-1", "--rule", "java_crash", "--examples", "1")
+    assert code == 0 and "[high] java_crash ×3" in out and "… 2 more messages" in out
+    code, out, _ = run(capsys, "overview", "T-1", "--level", "E")
+    assert code == 0 and "levels: F 4, E 4" in out
+    code, out, _ = run(capsys, "count", "T-1", "--by", "level", "--bucket", "5m", "--search", "hvac")
+    assert code == 0 and "bucket 5m" in out
+    code, _, err = run(capsys, "count", "T-1", "--bucket", "1s")
+    assert code == 2 and "use bucket=" in err
+    good = tmp_path / "good.md"
+    good.write_text("The app crashed (log:3#1).\n", encoding="utf-8")
+    code, out, _ = run(capsys, "check", "T-1", str(good))
+    assert code == 0 and out.startswith("PASS")
+    bad = tmp_path / "bad.md"
+    bad.write_text("The app crashed (log:3#9).\n", encoding="utf-8")
+    code, out, _ = run(capsys, "check", "T-1", str(bad))
+    assert code == 1 and "does not resolve" in out

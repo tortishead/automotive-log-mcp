@@ -1,0 +1,568 @@
+{
+ "by level per minute": {
+  "args": {
+   "bucket": "1m",
+   "by": "level"
+  },
+  "structured": {
+   "bucket": "1m",
+   "buckets": [
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "2025-12-31 23:50:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:51:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:52:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:53:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:54:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:55:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:56:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2025-12-31 23:57:00.000"
+    },
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "2025-12-31 23:58:00.000"
+    },
+    {
+     "count": 2,
+     "top": [
+      {
+       "count": 1,
+       "key": "E",
+       "label": "E"
+      },
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "2025-12-31 23:59:00.000"
+    },
+    {
+     "count": 5,
+     "top": [
+      {
+       "count": 2,
+       "key": "F",
+       "label": "F"
+      },
+      {
+       "count": 1,
+       "key": "E",
+       "label": "E"
+      },
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "2026-01-01 00:00:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2026-01-01 00:01:00.000"
+    },
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "F",
+       "label": "F"
+      }
+     ],
+     "ts": "2026-01-01 00:02:00.000"
+    },
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "W",
+       "label": "W"
+      }
+     ],
+     "ts": "2026-01-01 00:03:00.000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "2026-01-01 00:04:00.000"
+    },
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "E",
+       "label": "E"
+      }
+     ],
+     "ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "F",
+       "label": "F"
+      }
+     ],
+     "ts": "2026-01-01 00:06:00.000"
+    }
+   ],
+   "by": "level",
+   "case": "br",
+   "distinct": 4,
+   "exact": true,
+   "groups": [
+    {
+     "count": 4,
+     "example": "log:1#1",
+     "key": "I",
+     "label": "I"
+    },
+    {
+     "count": 4,
+     "example": "log:7#1",
+     "key": "F",
+     "label": "F"
+    },
+    {
+     "count": 3,
+     "example": "log:1#2",
+     "key": "E",
+     "label": "E"
+    },
+    {
+     "count": 2,
+     "example": "log:2#1",
+     "key": "W",
+     "label": "W"
+    }
+   ],
+   "total": 13,
+   "warnings": [
+    "records of source 5 have only a monotonic clock and are not in the buckets; count them with filter sources and from='0.0'"
+   ]
+  },
+  "text": [
+   "13 records by level, 4 distinct values; bucket 1m (wall clock), 17 buckets:",
+   "  12-31 23:50:00.000  1  ████                  I 1",
+   "  12-31 23:51:00.000  0",
+   "  12-31 23:52:00.000  0",
+   "  12-31 23:53:00.000  0",
+   "  12-31 23:54:00.000  0",
+   "  12-31 23:55:00.000  0",
+   "  12-31 23:56:00.000  0",
+   "  12-31 23:57:00.000  0",
+   "  12-31 23:58:00.000  1  ████                  I 1",
+   "  12-31 23:59:00.000  2  ████████              E 1, I 1",
+   "  01-01 00:00:00.000  5  ████████████████████  F 2, E 1, I 1",
+   "  01-01 00:01:00.000  0",
+   "  01-01 00:02:00.000  1  ████                  F 1",
+   "  01-01 00:03:00.000  1  ████                  W 1",
+   "  01-01 00:04:00.000  0",
+   "  01-01 00:05:00.000  1  ████                  E 1",
+   "  01-01 00:06:00.000  1  ████                  F 1",
+   "overall by level: I 4, F 4, E 3, W 2",
+   "warning: records of source 5 have only a monotonic clock and are not in the buckets; count them with filter sources and from='0.0'"
+  ]
+ },
+ "by tag": {
+  "args": {},
+  "structured": {
+   "by": "tag",
+   "case": "br",
+   "distinct": 13,
+   "exact": true,
+   "groups": [
+    {
+     "count": 2,
+     "example": "log:1#1",
+     "key": 1,
+     "label": "HvacCtrl"
+    },
+    {
+     "count": 2,
+     "example": "log:7#1",
+     "key": 9,
+     "label": "java_crash"
+    },
+    {
+     "count": 2,
+     "example": "log:11#1",
+     "key": 12,
+     "label": "tombstone"
+    },
+    {
+     "count": 1,
+     "example": "log:2#1",
+     "key": 2,
+     "label": "ActivityManager"
+    },
+    {
+     "count": 1,
+     "example": "log:3#1",
+     "key": 3,
+     "label": "AndroidRuntime"
+    },
+    {
+     "count": 1,
+     "example": "log:4#1",
+     "key": 4,
+     "label": "boot_progress_start"
+    },
+    {
+     "count": 1,
+     "example": "log:4#2",
+     "key": 5,
+     "label": "am_proc_died"
+    },
+    {
+     "count": 1,
+     "example": "log:5#1",
+     "label": "-"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": 6,
+     "label": "init"
+    },
+    {
+     "count": 1,
+     "example": "log:5#3",
+     "key": 7,
+     "label": "wlan0"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 8,
+     "label": "anr"
+    },
+    {
+     "count": 1,
+     "example": "log:8#1",
+     "key": 10,
+     "label": "PersistLog"
+    },
+    {
+     "count": 1,
+     "example": "log:10#1",
+     "key": 11,
+     "label": "dropbox"
+    }
+   ],
+   "total": 16,
+   "warnings": []
+  },
+  "text": [
+   "16 records by tag, 13 distinct values:",
+   "            2  HvacCtrl  e.g. log:1#1",
+   "            2  java_crash  e.g. log:7#1",
+   "            2  tombstone  e.g. log:11#1",
+   "            1  ActivityManager  e.g. log:2#1",
+   "            1  AndroidRuntime  e.g. log:3#1",
+   "            1  boot_progress_start  e.g. log:4#1",
+   "            1  am_proc_died  e.g. log:4#2",
+   "            1  -  e.g. log:5#1",
+   "            1  init  e.g. log:5#2",
+   "            1  wlan0  e.g. log:5#3",
+   "            1  anr  e.g. log:6#1",
+   "            1  PersistLog  e.g. log:8#1",
+   "            1  dropbox  e.g. log:10#1"
+  ]
+ },
+ "kernel buckets (monotonic)": {
+  "args": {
+   "bucket": "1m",
+   "by": "level",
+   "filter": {
+    "sources": [
+     "5"
+    ]
+   }
+  },
+  "structured": {
+   "bucket": "1m",
+   "buckets": [
+    {
+     "count": 1,
+     "top": [
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "0.000000"
+    },
+    {
+     "count": 0,
+     "top": [],
+     "ts": "60.000000"
+    },
+    {
+     "count": 2,
+     "top": [
+      {
+       "count": 1,
+       "key": "E",
+       "label": "E"
+      },
+      {
+       "count": 1,
+       "key": "I",
+       "label": "I"
+      }
+     ],
+     "ts": "120.000000"
+    }
+   ],
+   "by": "level",
+   "case": "br",
+   "distinct": 2,
+   "exact": true,
+   "groups": [
+    {
+     "count": 2,
+     "example": "log:5#1",
+     "key": "I",
+     "label": "I"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": "E",
+     "label": "E"
+    }
+   ],
+   "total": 3,
+   "warnings": []
+  },
+  "text": [
+   "3 records by level, 2 distinct values; bucket 1m (seconds since boot), 3 buckets:",
+   "  0.000000  1  ██████████            I 1",
+   "  60.000000  0",
+   "  120.000000  2  ████████████████████  E 1, I 1",
+   "overall by level: I 2, E 1"
+  ]
+ },
+ "regex by source": {
+  "args": {
+   "by": "source",
+   "mode": "regex",
+   "text": "pid \\d+"
+  },
+  "structured": {
+   "by": "source",
+   "case": "br",
+   "distinct": 7,
+   "exact": true,
+   "groups": [
+    {
+     "count": 1,
+     "example": "log:2#1",
+     "key": 2,
+     "label": "2 …ort-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:system"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": 5,
+     "label": "5 …ort-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#KERNEL LOG:kernel"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 6,
+     "label": "6 …sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR"
+    },
+    {
+     "count": 1,
+     "example": "log:7#1",
+     "key": 7,
+     "label": "7 …ar-UAA1.250512.001-2026-01-01-00-10-00.txt#DROPBOX SYSTEM APP CRASHES"
+    },
+    {
+     "count": 1,
+     "example": "log:9#1",
+     "key": 9,
+     "label": "9 data_app_crash@1767222001000.txt"
+    },
+    {
+     "count": 1,
+     "example": "log:11#1",
+     "key": 11,
+     "label": "11 FS/data/tombstones/tombstone_00"
+    },
+    {
+     "count": 1,
+     "example": "log:12#1",
+     "key": 12,
+     "label": "12 FS/data/tombstones/tombstone_01"
+    }
+   ],
+   "query": "pid \\d+",
+   "total": 7,
+   "warnings": []
+  },
+  "text": [
+   "7 records matching 'pid \\\\d+' by source, 7 distinct values:",
+   "            1  2 …ort-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#SYSTEM LOG:system  e.g. log:2#1",
+   "            1  5 …ort-sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#KERNEL LOG:kernel  e.g. log:5#2",
+   "            1  6 …sdk_car-UAA1.250512.001-2026-01-01-00-10-00.txt#VM TRACES AT LAST ANR  e.g. log:6#1",
+   "            1  7 …ar-UAA1.250512.001-2026-01-01-00-10-00.txt#DROPBOX SYSTEM APP CRASHES  e.g. log:7#1",
+   "            1  9 data_app_crash@1767222001000.txt  e.g. log:9#1",
+   "            1  11 FS/data/tombstones/tombstone_00  e.g. log:11#1",
+   "            1  12 FS/data/tombstones/tombstone_01  e.g. log:12#1"
+  ]
+ },
+ "template": {
+  "args": {
+   "by": "template",
+   "limit": 3
+  },
+  "structured": {
+   "by": "template",
+   "case": "br",
+   "distinct": 16,
+   "exact": true,
+   "groups": [
+    {
+     "count": 1,
+     "example": "log:1#1",
+     "key": 1,
+     "label": "setTemp <*> for zone <*>"
+    },
+    {
+     "count": 1,
+     "example": "log:1#2",
+     "key": 2,
+     "label": "setProperty failed, status=NOT_AVAILABLE"
+    },
+    {
+     "count": 1,
+     "example": "log:2#1",
+     "key": 3,
+     "label": "Process com.example.hvac (pid <*>) has died"
+    }
+   ],
+   "total": 16,
+   "warnings": []
+  },
+  "text": [
+   "16 records by template, 16 distinct values:",
+   "            1  setTemp <*> for zone <*>  e.g. log:1#1",
+   "            1  setProperty failed, status=NOT_AVAILABLE  e.g. log:1#2",
+   "            1  Process com.example.hvac (pid <*>) has died  e.g. log:2#1",
+   "… 13 more values; raise limit (now 3) or narrow the filter"
+  ]
+ },
+ "text query by pid": {
+  "args": {
+   "by": "pid",
+   "text": "hvac"
+  },
+  "structured": {
+   "by": "pid",
+   "case": "br",
+   "distinct": 3,
+   "exact": true,
+   "groups": [
+    {
+     "count": 2,
+     "example": "log:2#1",
+     "key": 1000,
+     "label": "1000 system_server"
+    },
+    {
+     "count": 2,
+     "example": "log:3#1",
+     "key": 1234,
+     "label": "1234 hvac worker"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "label": "-"
+    }
+   ],
+   "query": "hvac",
+   "total": 5,
+   "warnings": []
+  },
+  "text": [
+   "5 records matching 'hvac' by pid, 3 distinct values:",
+   "            2  1000 system_server  e.g. log:2#1",
+   "            2  1234 hvac worker  e.g. log:3#1",
+   "            1  -  e.g. log:5#2"
+  ]
+ },
+ "totals only": {
+  "args": {
+   "by": null,
+   "filter": {
+    "level": "W"
+   }
+  },
+  "structured": {
+   "case": "br",
+   "distinct": 1,
+   "exact": true,
+   "groups": [],
+   "total": 10,
+   "warnings": []
+  },
+  "text": [
+   "10 records."
+  ]
+ }
+}

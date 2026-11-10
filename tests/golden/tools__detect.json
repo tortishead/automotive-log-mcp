@@ -1,0 +1,312 @@
+{
+ "all rules": {
+  "args": {},
+  "structured": {
+   "case": "br",
+   "no_hits": [
+    "watchdog",
+    "binder_failure",
+    "lmk",
+    "selinux_denial"
+   ],
+   "results": [
+    {
+     "count": 1,
+     "description": "Boot did not complete within 3 minutes of boot_progress_start",
+     "exact": true,
+     "first_ts": "2025-12-31 23:58:00.000",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "cite": "log:4#1",
+        "level": "I",
+        "msg": "1234",
+        "pid": 500,
+        "tag": "boot_progress_start",
+        "tid": 520,
+        "ts": "2025-12-31 23:58:00.000"
+       }
+      }
+     ],
+     "last_ts": "2025-12-31 23:58:00.000",
+     "more_groups": 0,
+     "note": "look for crashes, service restarts and watchdogs between boot_progress_start and the end of the log",
+     "rule": "boot_not_completed",
+     "severity": "high"
+    },
+    {
+     "count": 3,
+     "description": "Java crash (uncaught exception)",
+     "exact": true,
+     "first_ts": "2026-01-01 00:00:01.000",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "art": "art:1",
+        "cite": "log:3#1",
+        "level": "E",
+        "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+        "pid": 1234,
+        "tag": "AndroidRuntime",
+        "tid": 1250,
+        "ts": "2026-01-01 00:00:01.000"
+       }
+      },
+      {
+       "count": 1,
+       "record": {
+        "art": "art:4",
+        "cite": "log:9#1",
+        "level": "F",
+        "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+        "pid": 1234,
+        "tag": "java_crash",
+        "ts": "2026-01-01 00:00:01.000"
+       }
+      },
+      {
+       "count": 1,
+       "record": {
+        "art": "art:3",
+        "cite": "log:7#1",
+        "cut": true,
+        "level": "F",
+        "msg": "[art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+        "pid": 1600,
+        "tag": "java_crash",
+        "ts": "2026-01-01 00:06:00.000"
+       }
+      }
+     ],
+     "last_ts": "2026-01-01 00:06:00.000",
+     "more_groups": 0,
+     "note": "read_artifact(id='art:<id>') on the crash shown with → for the exception and its root cause",
+     "rule": "java_crash",
+     "severity": "high"
+    },
+    {
+     "count": 2,
+     "description": "Native crash (fatal signal, tombstone)",
+     "exact": true,
+     "first_ts": "2026-01-01 00:00:05.123",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "art": "art:6",
+        "cite": "log:11#1",
+        "level": "F",
+        "msg": "[art:6] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+        "pid": 812,
+        "tag": "tombstone",
+        "tid": 830,
+        "ts": "2026-01-01 00:00:05.123"
+       }
+      },
+      {
+       "count": 1,
+       "record": {
+        "art": "art:7",
+        "cite": "log:12#1",
+        "cut": true,
+        "level": "F",
+        "msg": "[art:7] Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example…",
+        "pid": 900,
+        "tag": "tombstone",
+        "tid": 915,
+        "ts": "2026-01-01 00:02:30.250"
+       }
+      }
+     ],
+     "last_ts": "2026-01-01 00:02:30.250",
+     "more_groups": 0,
+     "note": "read the tombstone's backtrace (read_artifact(id='art:<id>/backtrace')); list_artifacts(type='tombstone')",
+     "rule": "native_crash",
+     "severity": "high"
+    },
+    {
+     "count": 1,
+     "description": "ANR (application not responding)",
+     "exact": true,
+     "first_ts": "2026-01-01 00:05:00.000",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "art": "art:2",
+        "cite": "log:6#1",
+        "cut": true,
+        "level": "E",
+        "msg": "[art:2] ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"Radio…",
+        "pid": 1500,
+        "tag": "anr",
+        "ts": "2026-01-01 00:05:00.000"
+       }
+      }
+     ],
+     "last_ts": "2026-01-01 00:05:00.000",
+     "more_groups": 0,
+     "note": "read the ANR trace's main thread and the lock holder or binder peer it names (read_artifact)",
+     "rule": "anr",
+     "severity": "high"
+    },
+    {
+     "count": 1,
+     "description": "Vehicle HAL error (VHAL tag, or a property call with an error status)",
+     "exact": true,
+     "first_ts": "2025-12-31 23:59:59.412",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "cite": "log:1#2",
+        "level": "E",
+        "msg": "setProperty failed, status=NOT_AVAILABLE",
+        "pid": 1234,
+        "tag": "HvacCtrl",
+        "tid": 1250,
+        "ts": "2025-12-31 23:59:59.412"
+       }
+      }
+     ],
+     "last_ts": "2025-12-31 23:59:59.412",
+     "more_groups": 0,
+     "note": "the property id and status are in the message; the code search text finds the caller",
+     "rule": "vhal_error",
+     "severity": "medium"
+    },
+    {
+     "count": 2,
+     "description": "Service or process died (init service exit, process death)",
+     "exact": true,
+     "first_ts": "2026-01-01 00:00:02.000",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "cite": "log:2#1",
+        "level": "W",
+        "msg": "Process com.example.hvac (pid 1234) has died",
+        "pid": 1000,
+        "tag": "ActivityManager",
+        "tid": 1100,
+        "ts": "2026-01-01 00:00:02.000"
+       }
+      },
+      {
+       "count": 1,
+       "record": {
+        "cite": "log:5#2",
+        "level": "E",
+        "msg": "init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+        "tag": "init",
+        "ts": "123.456789"
+       }
+      }
+     ],
+     "last_ts": "2026-01-01 00:00:02.000",
+     "more_groups": 0,
+     "note": "a crash or ANR of the same pid just before explains the death; repeated deaths are a restart loop",
+     "rule": "service_restart",
+     "severity": "medium"
+    }
+   ],
+   "rules_run": 10,
+   "warnings": []
+  },
+  "text": [
+   "6 of 10 rules with hits, by severity and time:",
+   "[high] boot_not_completed ×1  Boot did not complete within 3 minutes of boot_progress_start  12-31 23:58:00.000",
+   "  log:4#1  12-31 23:58:00.000  I 500/520 boot_progress_start  1234",
+   "  next: look for crashes, service restarts and watchdogs between boot_progress_start and the end of the log",
+   "[high] java_crash ×3  Java crash (uncaught exception)  01-01 00:00:01.000 .. 01-01 00:06:00.000",
+   "  log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "  log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "  log:7#1  01-01 00:06:00.000  F 1600 java_crash  [art:3] Java crash in com.android.car.settings (pid 1600): java.lang.IllegalStateException: Bluetooth device <MAC:abcce245> is not bonded at com.android.car.settings.bluetooth.BluetoothDevicePreferen…",
+   "  next: read_artifact(id='art:<id>') on the crash shown with → for the exception and its root cause",
+   "[high] native_crash ×2  Native crash (fatal signal, tombstone)  01-01 00:00:05.123 .. 01-01 00:02:30.250",
+   "  log:11#1  01-01 00:00:05.123  F 812/830 tombstone  [art:6] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid 812, tid 830 \"VehicleHal\"): null pointer dereference at libvhal_example.so!VehicleHal::setValue",
+   "  log:12#1  01-01 00:02:30.250  F 900/915 tombstone  [art:7] Native crash SIGABRT in vendor.example.audio-service (pid 900, tid 915 \"AudioStream\"): Abort message 'Check failed: stream != nullptr (vehicle <VIN:ba00ddfc>, zone 2) ' at libaudiohal_example…",
+   "  next: read the tombstone's backtrace (read_artifact(id='art:<id>/backtrace')); list_artifacts(type='tombstone')",
+   "[high] anr ×1  ANR (application not responding)  01-01 00:05:00.000",
+   "  log:6#1  01-01 00:05:00.000  E 1500 anr  [art:2] ANR in com.example.radio (pid 1500): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE flg=0x10 cmp=com…; main Blocked at com.example.radio.Tuner.tune, lock held by tid 12 \"Radio…",
+   "  next: read the ANR trace's main thread and the lock holder or binder peer it names (read_artifact)",
+   "[medium] vhal_error ×1  Vehicle HAL error (VHAL tag, or a property call with an error status)  12-31 23:59:59.412",
+   "  log:1#2  12-31 23:59:59.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE",
+   "  next: the property id and status are in the message; the code search text finds the caller",
+   "[medium] service_restart ×2  Service or process died (init service exit, process death)  01-01 00:00:02.000",
+   "  log:2#1  01-01 00:00:02.000  W 1000/1100 ActivityManager  Process com.example.hvac (pid 1234) has died",
+   "  log:5#2  123.456789  E init  init: Service 'vendor.hvac' (pid 1234) exited with status 1",
+   "  next: a crash or ANR of the same pid just before explains the death; repeated deaths are a restart loop",
+   "no hits: watchdog, binder_failure, lmk, selinux_denial"
+  ]
+ },
+ "one rule, filtered": {
+  "args": {
+   "filter": {
+    "to": "00:00:02"
+   },
+   "rules": [
+    "java_crash"
+   ]
+  },
+  "structured": {
+   "case": "br",
+   "no_hits": [],
+   "results": [
+    {
+     "count": 2,
+     "description": "Java crash (uncaught exception)",
+     "exact": true,
+     "first_ts": "2026-01-01 00:00:01.000",
+     "hits": [
+      {
+       "count": 1,
+       "record": {
+        "art": "art:1",
+        "cite": "log:3#1",
+        "level": "E",
+        "msg": "FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)",
+        "pid": 1234,
+        "tag": "AndroidRuntime",
+        "tid": 1250,
+        "ts": "2026-01-01 00:00:01.000"
+       }
+      },
+      {
+       "count": 1,
+       "record": {
+        "art": "art:4",
+        "cite": "log:9#1",
+        "level": "F",
+        "msg": "[art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+        "pid": 1234,
+        "tag": "java_crash",
+        "ts": "2026-01-01 00:00:01.000"
+       }
+      }
+     ],
+     "last_ts": "2026-01-01 00:00:01.000",
+     "more_groups": 0,
+     "note": "read_artifact(id='art:<id>') on the crash shown with → for the exception and its root cause",
+     "rule": "java_crash",
+     "severity": "high"
+    }
+   ],
+   "rules_run": 1,
+   "warnings": [
+    "records of source 5 have only a monotonic clock (seconds since boot) and are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
+   ]
+  },
+  "text": [
+   "1 of 1 rule with hits (filtered), by severity and time:",
+   "[high] java_crash ×2  Java crash (uncaught exception)  01-01 00:00:01.000",
+   "  log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main ⏎ Process: com.example.hvac, PID: 1234 ⏎ java.lang.NullPointerException: boom ⏎ \tat com.example.hvac.Controller.update(Controller.java:42)  → art:1",
+   "  log:9#1  01-01 00:00:01.000  F 1234 java_crash  [art:4] Java crash in com.example.hvac (pid 1234): java.lang.NullPointerException: boom at com.example.hvac.Controller.update(Controller.java:42)",
+   "  next: read_artifact(id='art:<id>') on the crash shown with → for the exception and its root cause",
+   "warning: records of source 5 have only a monotonic clock (seconds since boot) and are left out by a wall-clock from/to; filter them with e.g. from='120.5'"
+  ]
+ }
+}

@@ -1,0 +1,85 @@
+{
+ "answer": {
+  "args": {
+   "text": "# HVAC app crash\n\nThe HVAC app crashed at 01-01 00:00:01.000 with a NullPointerException in Controller.update\n(log:3#1, art:1/exception:L3). Just before, `setProperty failed, status=NOT_AVAILABLE` (log:1#2).\n\n- The process died: log:2#1.\n- A range log:3#1-3 and a missing line log:1#99 and art:9 and art:1/nosuch and log:abc#1.\n- The quote \"Controller crashed on purpose\" log:1#2 is not in the line.\n\nThis paragraph states a finding about the vehicle HAL without any citation at all.\n\nIt is probably a race in the HAL start-up; the logs do not show the HAL side.\n\n```\nlog:42#42 inside a code block is not checked\n```\n"
+  },
+  "structured": {
+   "case": "br",
+   "citations": 10,
+   "distinct": 9,
+   "errors": [
+    {
+     "cite": "log:3#1-3",
+     "line": 7,
+     "message": "malformed: ranges are not citations; cite each line, e.g. log:3#10 and log:3#12"
+    },
+    {
+     "cite": "log:1#99",
+     "line": 7,
+     "message": "does not resolve: source 1 has 2 records"
+    },
+    {
+     "cite": "art:9",
+     "line": 7,
+     "message": "does not resolve: no artifact art:9 in case 'br' (see list_artifacts)"
+    },
+    {
+     "cite": "art:1/nosuch",
+     "line": 7,
+     "message": "does not resolve: art:1 has no section 'nosuch'; sections: header, exception"
+    },
+    {
+     "cite": "log:abc#1",
+     "line": 7,
+     "message": "malformed: expected log:<source>#<seq>, e.g. log:3#120"
+    }
+   ],
+   "ok": false,
+   "paragraphs": 6,
+   "resolved": 4,
+   "uncited": 1,
+   "warnings": [
+    {
+     "cite": "log:1#2",
+     "line": 8,
+     "message": "quote \"Controller crashed on purpose\" is not in the cited lines"
+    },
+    {
+     "line": 10,
+     "message": "no citation in: \"This paragraph states a finding about the vehicle HAL without any citation at all.\" (cite the line it comes from, or say it is a guess)"
+    }
+   ]
+  },
+  "text": [
+   "FAIL: 5 errors, 2 warnings; 10 citations (9 distinct, 4 resolve); 6 paragraphs, 1 without a citation",
+   "error L7: log:3#1-3 malformed: ranges are not citations; cite each line, e.g. log:3#10 and log:3#12",
+   "error L7: log:1#99 does not resolve: source 1 has 2 records",
+   "error L7: art:9 does not resolve: no artifact art:9 in case 'br' (see list_artifacts)",
+   "error L7: art:1/nosuch does not resolve: art:1 has no section 'nosuch'; sections: header, exception",
+   "error L7: log:abc#1 malformed: expected log:<source>#<seq>, e.g. log:3#120",
+   "warning L8: log:1#2: quote \"Controller crashed on purpose\" is not in the cited lines",
+   "warning L10: no citation in: \"This paragraph states a finding about the vehicle HAL without any citation at all.\" (cite the line it comes from, or say it is a guess)",
+   "Fix the citations (copy them exactly as the tools print them) and run check_citations again."
+  ]
+ },
+ "pass": {
+  "args": {
+   "text": "Crash: log:3#1 (art:1/exception:L3).\n"
+  },
+  "structured": {
+   "case": "br",
+   "citations": 2,
+   "distinct": 2,
+   "errors": [],
+   "ok": true,
+   "paragraphs": 1,
+   "resolved": 2,
+   "uncited": 0,
+   "warnings": []
+  },
+  "text": [
+   "PASS: 0 errors, 0 warnings; 2 citations (2 distinct, 2 resolve); 1 paragraph, 0 without a citation",
+   "All citations resolve."
+  ]
+ }
+}

@@ -147,7 +147,7 @@ class ArtifactOut(BaseModel):
 
 class ArtifactGroupOut(BaseModel):
     type: str
-    signature: str | None
+    signature: str | None = None
     count: int
     artifacts: list[ArtifactOut]
     more: int = 0
@@ -202,7 +202,9 @@ class GetRecordsResult(BaseModel):
 
 
 class CountGroup(BaseModel):
-    key: str | int | None = Field(description="The value: tag, level, pid, source id or template id.")
+    key: str | int | None = Field(
+        default=None, description="The value: tag, level, pid, source id or template id (null: none)."
+    )
     label: str = Field(description="As printed: tag name, level, pid and process, source name, template.")
     count: int
     example: str | None = Field(default=None, description="Citation of one record with this value.")
@@ -216,7 +218,7 @@ class CountBucket(BaseModel):
 
 class CountResult(BaseModel):
     case: str
-    by: str | None
+    by: str | None = None
     query: str | None = None
     total: int
     exact: bool = Field(
@@ -1484,9 +1486,7 @@ class Tools:
             procs = query.process_names(ctx.conn, [k for k in keys if k is not None])
             return {k: f"{k} {procs[k]}" if k in procs else ("-" if k is None else str(k)) for k in keys}
         if by == "source":
-            return {
-                k: f"{k} {fmt.clip(ctx.by_id[k].name, 90)[0]}" if k in ctx.by_id else str(k) for k in keys
-            }
+            return {k: f"{k} {_tail(ctx.by_id[k].name, 70)}" if k in ctx.by_id else str(k) for k in keys}
         if by == "template":
             texts = query.template_texts(ctx.conn, [k for k in keys if k is not None])
             return {k: fmt.clip(texts.get(k, "-"), 120)[0] for k in keys}
@@ -1537,8 +1537,7 @@ class Tools:
                     if mono_only and rf.ts_from is None and rf.ts_to is None:
                         warnings.append(
                             f"records of {_sources_word(mono_only)} only a monotonic clock and are not in "
-                            "the "
-                            "buckets; count them with filter sources and from='0.0'"
+                            "the buckets; count them with filter sources and from='0.0'"
                         )
                 if b_lo is None or b_hi is None:
                     raise ToolInputError("the selected sources have no timestamps to put into buckets")
@@ -1611,7 +1610,7 @@ class Tools:
             )
             footer: list[str] = []
             if step is None:
-                lines = [head + ":"] if total else [head + "."]
+                lines = [head + (":" if total and by else ".")]
                 shown = 0
                 for g in groups if by else []:
                     if not page.add(
@@ -2506,3 +2505,9 @@ def _ns(full: str) -> int:
     return wall_ns(
         int(m[1]), int(m[2]), int(m[3]), int(m[4] or 0), int(m[5] or 0), int(m[6] or 0), m[7] or ""
     )
+
+
+def _tail(name: str, n: int) -> str:
+    """The distinguishing end of a source name (after the archive path), cut from the left."""
+    name = name.rsplit("!", 1)[-1]
+    return name if len(name) <= n else fmt.ELLIPSIS + name[-(n - 1) :]

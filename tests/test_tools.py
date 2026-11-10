@@ -93,6 +93,8 @@ def test_tool_golden(br: Tools, tool: str) -> None:
     for label, args in CALLS[tool]:
         o = _call(br, tool, args)
         assert fmt.utf8_len(o.text) <= br.caps.max_bytes
+        # what the MCP output schema check does with the structured content
+        type(o.data).model_validate(o.data.model_dump(mode="json", by_alias=True, exclude_none=True))
         out[label] = {
             "args": args,
             "text": o.text.split("\n"),

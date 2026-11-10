@@ -1,0 +1,814 @@
+{
+ "all": {
+  "args": {},
+  "structured": {
+   "artifacts": {
+    "anr": 1,
+    "dropbox": 1,
+    "java_crash": 3,
+    "tombstone": 2
+   },
+   "bursts": [],
+   "case": "br",
+   "detect": {
+    "anr": 1,
+    "boot_not_completed": 1,
+    "java_crash": 3,
+    "native_crash": 2,
+    "service_restart": 2,
+    "vhal_error": 1
+   },
+   "exact": true,
+   "gaps": [
+    {
+     "after": "log:4#1",
+     "before": "log:8#1",
+     "from_ts": "2025-12-31 23:50:00.000",
+     "seconds": 480.0,
+     "to_ts": "2025-12-31 23:58:00.000"
+    },
+    {
+     "after": "log:1#1",
+     "before": "log:4#1",
+     "from_ts": "2025-12-31 23:58:00.000",
+     "seconds": 118.1,
+     "to_ts": "2025-12-31 23:59:58.100"
+    },
+    {
+     "after": "log:12#1",
+     "before": "log:11#1",
+     "from_ts": "2026-01-01 00:00:05.123",
+     "seconds": 145.127,
+     "to_ts": "2026-01-01 00:02:30.250"
+    },
+    {
+     "after": "log:10#1",
+     "before": "log:12#1",
+     "from_ts": "2026-01-01 00:02:30.250",
+     "seconds": 49.75,
+     "to_ts": "2026-01-01 00:03:20.000"
+    },
+    {
+     "after": "log:6#1",
+     "before": "log:10#1",
+     "from_ts": "2026-01-01 00:03:20.000",
+     "seconds": 100.0,
+     "to_ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "after": "log:7#1",
+     "before": "log:6#1",
+     "from_ts": "2026-01-01 00:05:00.000",
+     "seconds": 60.0,
+     "to_ts": "2026-01-01 00:06:00.000"
+    }
+   ],
+   "gaps_complete": true,
+   "histogram": [
+    {
+     "count": 1,
+     "errors": 0,
+     "ts": "2025-12-31 23:50:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:50:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:51:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:51:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:52:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:52:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:53:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:53:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:54:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:54:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:55:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:55:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:56:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:56:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:57:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:57:30.000"
+    },
+    {
+     "count": 1,
+     "errors": 0,
+     "ts": "2025-12-31 23:58:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:58:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2025-12-31 23:59:00.000"
+    },
+    {
+     "count": 2,
+     "errors": 1,
+     "ts": "2025-12-31 23:59:30.000"
+    },
+    {
+     "count": 5,
+     "errors": 3,
+     "ts": "2026-01-01 00:00:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:00.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:02:30.000"
+    },
+    {
+     "count": 1,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:30.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:30.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:06:00.000"
+    }
+   ],
+   "histogram_step": "30s",
+   "levels": {
+    "E": 4,
+    "F": 4,
+    "I": 6,
+    "W": 2
+   },
+   "mono_from": "0.000000",
+   "mono_to": "124.000000",
+   "records": 16,
+   "segments": [],
+   "sources": 12,
+   "top_processes": [
+    {
+     "count": 4,
+     "example": "log:1#1",
+     "key": 1234,
+     "label": "1234 hvac worker"
+    },
+    {
+     "count": 3,
+     "example": "log:2#1",
+     "key": 1000,
+     "label": "1000 system_server"
+    },
+    {
+     "count": 1,
+     "example": "log:4#1",
+     "key": 500,
+     "label": "500"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 1500,
+     "label": "1500"
+    },
+    {
+     "count": 1,
+     "example": "log:7#1",
+     "key": 1600,
+     "label": "1600"
+    },
+    {
+     "count": 1,
+     "example": "log:11#1",
+     "key": 812,
+     "label": "812"
+    },
+    {
+     "count": 1,
+     "example": "log:12#1",
+     "key": 900,
+     "label": "900"
+    }
+   ],
+   "top_tags": [
+    {
+     "count": 2,
+     "example": "log:1#1",
+     "key": 1,
+     "label": "HvacCtrl"
+    },
+    {
+     "count": 2,
+     "example": "log:7#1",
+     "key": 9,
+     "label": "java_crash"
+    },
+    {
+     "count": 2,
+     "example": "log:11#1",
+     "key": 12,
+     "label": "tombstone"
+    },
+    {
+     "count": 1,
+     "example": "log:2#1",
+     "key": 2,
+     "label": "ActivityManager"
+    },
+    {
+     "count": 1,
+     "example": "log:3#1",
+     "key": 3,
+     "label": "AndroidRuntime"
+    },
+    {
+     "count": 1,
+     "example": "log:4#1",
+     "key": 4,
+     "label": "boot_progress_start"
+    },
+    {
+     "count": 1,
+     "example": "log:4#2",
+     "key": 5,
+     "label": "am_proc_died"
+    },
+    {
+     "count": 1,
+     "example": "log:5#1",
+     "label": "-"
+    }
+   ],
+   "top_templates": [
+    {
+     "count": 1,
+     "example": "log:1#1",
+     "key": 1,
+     "label": "setTemp <*> for zone <*>"
+    },
+    {
+     "count": 1,
+     "example": "log:1#2",
+     "key": 2,
+     "label": "setProperty failed, status=NOT_AVAILABLE"
+    },
+    {
+     "count": 1,
+     "example": "log:2#1",
+     "key": 3,
+     "label": "Process com.example.hvac (pid <*>) has died"
+    },
+    {
+     "count": 1,
+     "example": "log:3#1",
+     "key": 4,
+     "label": "FATAL EXCEPTION: main"
+    },
+    {
+     "count": 1,
+     "example": "log:4#1",
+     "key": 5,
+     "label": "<*>"
+    },
+    {
+     "count": 1,
+     "example": "log:4#2",
+     "key": 6,
+     "label": "[<*>,<*>,com.example.hvac,<*>,<*>]"
+    },
+    {
+     "count": 1,
+     "example": "log:5#1",
+     "key": 7,
+     "label": "Booting Linux on physical CPU <*> [<*>]"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": 8,
+     "label": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>"
+    }
+   ],
+   "ts_from": "2025-12-31 23:50:00.000",
+   "ts_to": "2026-01-01 00:06:00.000",
+   "warnings": []
+  },
+  "text": [
+   "case 'br': 12 sources, 16 records, 12-31 23:50:00.000 .. 01-01 00:06:00.000 (16 min); since boot 0.000000 .. 124.000000",
+   "levels: F 4, E 4, W 2, I 6",
+   "top tags: HvacCtrl 2, java_crash 2, tombstone 2, ActivityManager 1, AndroidRuntime 1, boot_progress_start 1, am_proc_died 1, - 1",
+   "top pids: 1234 hvac worker 4, 1000 system_server 3, 500 1, 1500 1, 1600 1, 812 1, 900 1",
+   "top messages (templates, ×count, an example):",
+   "  ×1  I HvacCtrl  setTemp <*> for zone <*>  e.g. log:1#1",
+   "  ×1  E HvacCtrl  setProperty failed, status=NOT_AVAILABLE  e.g. log:1#2",
+   "  ×1  W ActivityManager  Process com.example.hvac (pid <*>) has died  e.g. log:2#1",
+   "  ×1  E AndroidRuntime  FATAL EXCEPTION: main  e.g. log:3#1",
+   "  ×1  I boot_progress_start  <*>  e.g. log:4#1",
+   "  ×1  I am_proc_died  [<*>,<*>,com.example.hvac,<*>,<*>]  e.g. log:4#2",
+   "  ×1  I  Booting Linux on physical CPU <*> [<*>]  e.g. log:5#1",
+   "  ×1  E init  init: Service 'vendor.hvac' (pid <*>) exited with status <*>  e.g. log:5#2",
+   "gaps > 30 s without a record: 6, longest: 8 min after log:8#1 (12-31 23:50:00.000) until log:4#1; 2.4 min after log:11#1 (01-01 00:00:05.123) until log:12#1; 118.1 s after log:4#1 (12-31 23:58:00.000) until log:1#1; 100 s after log:10#1 (01-01 00:03:20.000) until log:6#1; 60 s after log:6#1 (01-01 00:05:00.000) until log:7#1",
+   "error bursts (E/F per 10 s above 5× the median): none",
+   "histogram from 12-31 23:50:00.000, 33 buckets of 30s (peak 5 records, 3 E/F; count(case, bucket='30s') for numbers):",
+   "  all |▂···············▂··▄█····▂▂···▂·▂|",
+   "  E/F |···················▃█····▃····▃·▃|",
+   "detect: anr 1, boot_not_completed 1, java_crash 3, native_crash 2, service_restart 2, vhal_error 1 (detect(case) shows the lines)",
+   "artifacts: anr 1, dropbox 1, java_crash 3, tombstone 2 (list_artifacts(case))",
+   "next: detect(case) for known failure patterns, list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
+  ]
+ },
+ "filtered: level E": {
+  "args": {
+   "filter": {
+    "level": "E"
+   }
+  },
+  "structured": {
+   "artifacts": {
+    "anr": 1,
+    "dropbox": 1,
+    "java_crash": 3,
+    "tombstone": 2
+   },
+   "bursts": [],
+   "case": "br",
+   "detect": {
+    "anr": 1,
+    "java_crash": 3,
+    "native_crash": 2,
+    "service_restart": 1,
+    "vhal_error": 1
+   },
+   "exact": true,
+   "gaps": [
+    {
+     "after": "log:12#1",
+     "before": "log:11#1",
+     "from_ts": "2026-01-01 00:00:05.123",
+     "seconds": 145.127,
+     "to_ts": "2026-01-01 00:02:30.250"
+    },
+    {
+     "after": "log:6#1",
+     "before": "log:12#1",
+     "from_ts": "2026-01-01 00:02:30.250",
+     "seconds": 149.75,
+     "to_ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "after": "log:7#1",
+     "before": "log:6#1",
+     "from_ts": "2026-01-01 00:05:00.000",
+     "seconds": 60.0,
+     "to_ts": "2026-01-01 00:06:00.000"
+    }
+   ],
+   "gaps_complete": true,
+   "histogram": [
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2025-12-31 23:59:50.000"
+    },
+    {
+     "count": 3,
+     "errors": 3,
+     "ts": "2026-01-01 00:00:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:20.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:00:50.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:20.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:01:50.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:20.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:02:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:02:50.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:20.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:03:50.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:20.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:04:50.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:05:00.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:10.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:20.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:30.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:40.000"
+    },
+    {
+     "count": 0,
+     "errors": 0,
+     "ts": "2026-01-01 00:05:50.000"
+    },
+    {
+     "count": 1,
+     "errors": 1,
+     "ts": "2026-01-01 00:06:00.000"
+    }
+   ],
+   "histogram_step": "10s",
+   "levels": {
+    "E": 4,
+    "F": 4
+   },
+   "mono_from": "123.456789",
+   "mono_to": "123.456789",
+   "records": 8,
+   "segments": [],
+   "sources": 12,
+   "top_processes": [
+    {
+     "count": 3,
+     "example": "log:1#2",
+     "key": 1234,
+     "label": "1234 hvac worker"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 1500,
+     "label": "1500"
+    },
+    {
+     "count": 1,
+     "example": "log:7#1",
+     "key": 1600,
+     "label": "1600"
+    },
+    {
+     "count": 1,
+     "example": "log:11#1",
+     "key": 812,
+     "label": "812"
+    },
+    {
+     "count": 1,
+     "example": "log:12#1",
+     "key": 900,
+     "label": "900"
+    }
+   ],
+   "top_tags": [
+    {
+     "count": 2,
+     "example": "log:7#1",
+     "key": 9,
+     "label": "java_crash"
+    },
+    {
+     "count": 2,
+     "example": "log:11#1",
+     "key": 12,
+     "label": "tombstone"
+    },
+    {
+     "count": 1,
+     "example": "log:1#2",
+     "key": 1,
+     "label": "HvacCtrl"
+    },
+    {
+     "count": 1,
+     "example": "log:3#1",
+     "key": 3,
+     "label": "AndroidRuntime"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": 6,
+     "label": "init"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 8,
+     "label": "anr"
+    }
+   ],
+   "top_templates": [
+    {
+     "count": 1,
+     "example": "log:1#2",
+     "key": 2,
+     "label": "setProperty failed, status=NOT_AVAILABLE"
+    },
+    {
+     "count": 1,
+     "example": "log:3#1",
+     "key": 4,
+     "label": "FATAL EXCEPTION: main"
+    },
+    {
+     "count": 1,
+     "example": "log:5#2",
+     "key": 8,
+     "label": "init: Service 'vendor.hvac' (pid <*>) exited with status <*>"
+    },
+    {
+     "count": 1,
+     "example": "log:6#1",
+     "key": 10,
+     "label": "[art:<*>] ANR in com.example.radio (pid <*>): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE …"
+    },
+    {
+     "count": 1,
+     "example": "log:7#1",
+     "key": 11,
+     "label": "[art:<*>] Java crash in com.android.car.settings (pid <*>): java.lang.IllegalStateException: Bluetooth device…"
+    },
+    {
+     "count": 1,
+     "example": "log:9#1",
+     "key": 13,
+     "label": "[art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.…"
+    },
+    {
+     "count": 1,
+     "example": "log:11#1",
+     "key": 15,
+     "label": "[art:<*>] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"V…"
+    },
+    {
+     "count": 1,
+     "example": "log:12#1",
+     "key": 16,
+     "label": "[art:<*>] Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort messag…"
+    }
+   ],
+   "ts_from": "2025-12-31 23:59:59.412",
+   "ts_to": "2026-01-01 00:06:00.000",
+   "warnings": []
+  },
+  "text": [
+   "case 'br': 12 sources, 8 records (filtered), 12-31 23:59:59.412 .. 01-01 00:06:00.000 (6 min); since boot 123.456789 .. 123.456789",
+   "levels: F 4, E 4",
+   "top tags: java_crash 2, tombstone 2, HvacCtrl 1, AndroidRuntime 1, init 1, anr 1",
+   "top pids: 1234 hvac worker 3, 1500 1, 1600 1, 812 1, 900 1",
+   "top messages (templates, ×count, an example):",
+   "  ×1  E HvacCtrl  setProperty failed, status=NOT_AVAILABLE  e.g. log:1#2",
+   "  ×1  E AndroidRuntime  FATAL EXCEPTION: main  e.g. log:3#1",
+   "  ×1  E init  init: Service 'vendor.hvac' (pid <*>) exited with status <*>  e.g. log:5#2",
+   "  ×1  E anr  [art:<*>] ANR in com.example.radio (pid <*>): Broadcast of Intent { act=android.car.intent.action.RADIO_TUNE …  e.g. log:6#1",
+   "  ×1  F java_crash  [art:<*>] Java crash in com.android.car.settings (pid <*>): java.lang.IllegalStateException: Bluetooth device…  e.g. log:7#1",
+   "  ×1  F java_crash  [art:<*>] Java crash in com.example.hvac (pid <*>): java.lang.NullPointerException: boom at com.example.hvac.…  e.g. log:9#1",
+   "  ×1  F tombstone  [art:<*>] Native crash SIGSEGV in android.hardware.automotive.vehicle@V1-example-service (pid <*>, tid <*> \"V…  e.g. log:11#1",
+   "  ×1  F tombstone  [art:<*>] Native crash SIGABRT in vendor.example.audio-service (pid <*>, tid <*> \"AudioStream\"): Abort messag…  e.g. log:12#1",
+   "gaps > 30 s without a record: 3, longest: 2.5 min after log:12#1 (01-01 00:02:30.250) until log:6#1; 2.4 min after log:11#1 (01-01 00:00:05.123) until log:12#1; 60 s after log:6#1 (01-01 00:05:00.000) until log:7#1",
+   "error bursts (E/F per 10 s above 5× the median): none",
+   "histogram from 12-31 23:59:50.000, 38 buckets of 10s (peak 3 records, 3 E/F; count(case, bucket='10s') for numbers):",
+   "  all |▃█··············▃··············▃·····▃|",
+   "  E/F |▃█··············▃··············▃·····▃|",
+   "detect: anr 1, java_crash 3, native_crash 2, service_restart 1, vhal_error 1 (detect(case) shows the lines)",
+   "artifacts: anr 1, dropbox 1, java_crash 3, tombstone 2 (list_artifacts(case))",
+   "next: detect(case) for known failure patterns, list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
+  ]
+ }
+}
