@@ -15,8 +15,10 @@ Three ways, from least to most code:
 
 Rule directories are listed under `rule_dirs` in `config.yaml`; one directory may hold regex
 and command connectors, detector rules and marker rules side by side (the top-level key decides:
-`connector:`, `rule:`/`rules:`, `marker:`/`markers:`). An invalid file stops the server at
-startup with the file name and the reason.
+`connector:` with `line:` for a regex connector or `command:` for a command connector,
+`rule:`/`rules:`, `marker:`/`markers:`; detector and marker rules are described in
+[rules.md](rules.md)). An invalid file stops the server at startup with the file name and the
+reason.
 
 A connector named like an existing one is an error unless it says `replace: true` (D13). Bump
 `version` whenever the output changes: sources indexed with an older version are flagged
@@ -38,20 +40,42 @@ What a connector produces per record (`RawRecord`, see `src/automotive_log_mcp/m
 | `stream` | sub-source name: records of each stream become their own source (`name:stream`) |
 | `boot` | a boot marker: starts a new segment (own clock for monotonic sources) |
 | `unparsed` | the connector could not parse the line; `msg` holds the raw text |
+| `lines` | physical lines the record stands for (a merged multi-line message), default 1 |
+| `artifact` | this record *is* an artifact's line (as a crash-buffer `FATAL EXCEPTION` is); no extra record is added for it |
 
 Artifacts (`RawArtifact`): a document that is not a line stream (a crash dump, a coredump
-summary, a fault record) with `type`, `headline`, `summary`, `sections` (named line lists),
-`signature` (groups copies of one crash), `ts`, `pid`, `process`, `level`, `fields`. Each gets a
-record on the timeline and is read with `read_artifact`.
+summary, a fault record) with `type`, `headline`, `summary`, `sections` (named line lists that
+cover the text in order, so `art:<id>:L<n>` is line `n` of the original), `signature` (groups
+copies of one crash), `ts`, `ts_raw`, `pid`, `tid`, `process`, `level` (default `F`), `fields`.
+Each gets a record on the timeline (`[art:<id>] <headline>` in the current source, unless a
+record carries it) and is read with `read_artifact`.
 
 Everything is redacted at index time (D5), so a connector never needs to redact.
 
 ## YAML regex connector
 
-See the docstring of `src/automotive_log_mcp/connectors/regex_yaml.py` and the examples
-`src/automotive_log_mcp/rules/connectors/syslog.yaml` and `examples/rules/dlt_viewer_ascii.yaml`.
-Named groups `ts`, `level`, `tag`, `pid`, `tid`, `msg`; others become attributes.
-`timestamp.format` is a `strptime` format or `epoch`, `epoch_ms`, `epoch_us`, `monotonic`.
+```yaml
+# the shipped syslog.yaml, plus the optional keys it does not use (levels, replace)
+connector: syslog                 # [a-z][a-z0-9_]*, at most 32 characters
+version: "1"
+description: BSD syslog / journalctl short output
+sniff:
+  filenames: ["syslog*", "messages*", "*.syslog", "journal*"]   # optional: +0.05 on a match
+  min_fraction: 0.6                     # share of the first lines that must match `line`
+line: '^(?P<ts>[A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d(?:\.\d+)?) (?P<host>\S+) (?P<tag>[^\s\[:]+)(?:\[(?P<pid>\d+)\])?: ?(?P<msg>.*)$'
+continuation: '^\s'               # optional: such lines are appended to the previous record
+timestamp:
+  format: '%b %d %H:%M:%S'        # strptime format, or epoch | epoch_ms | epoch_us | monotonic
+levels: {err: E, warning: W}      # optional: raw level -> V D I W E F
+attrs: [host]                     # optional: groups to keep as attributes (default: all others)
+replace: false                    # true: replace a connector with the same name
+```
+
+Named groups: `msg` (required), `ts`, `level`, `tag`, `pid`, `tid`; any other group becomes an
+attribute. A format without a year gets one as logcat does (December → January increments it).
+Lines that do not match `line` (and are no continuation) are kept as unparsed records. Examples:
+[src/automotive_log_mcp/rules/connectors/syslog.yaml](../src/automotive_log_mcp/rules/connectors/syslog.yaml)
+and [examples/rules/dlt_viewer_ascii.yaml](../examples/rules/dlt_viewer_ascii.yaml).
 
 ## `command` connector
 
@@ -66,7 +90,8 @@ sniff:
   filenames: ["*.mcutrace"]
   head_regex: '^MCU TRACE v1\b'      # optional; also magic: "<hex bytes>"
   score: 0.9
-timeout: 600
+timeout: 600                       # seconds; default 3600
+replace: false                     # true: replace a connector with the same name
 ```
 
 - Placeholders: `{path}` (the file; an archive member is written to a temporary file first),
@@ -87,8 +112,9 @@ timeout: 600
   ```
 
   `ts` is a string `YYYY-MM-DD hh:mm:ss[.fffffffff]` or an integer (ns); `mono` is seconds since
-  boot (string or number), `mono_ns` an integer. A line that is not a JSON object becomes an
-  unparsed record. A program that exits with a non-zero status (or runs past `timeout`) fails the
+  boot (string or number), `mono_ns` an integer; `ts_raw` optionally keeps the time as the format
+  wrote it; `level` is `V D I W E F` or a name (`error`, `warning`, `info`, …). A line that is not
+  a JSON object becomes an unparsed record. A program that exits with a non-zero status (or runs past `timeout`) fails the
   import with the end of its standard error; the source is listed as `failed` with that error.
 - Example: [examples/connectors/](../examples/connectors/) (`mcu_trace.yaml`, the decoder
   `mcu2jsonl.py` and a sample file). Copy the directory into a rule directory or list it under
@@ -156,7 +182,7 @@ best first:
 | --- | --- |
 | `exact` | the reference clock (wall-clock sources of the reference file) |
 | `manual` | `align` offsets and anchors |
-| `paired` | the same line in two sources (dmesg and `logcat -b kernel`, two captures of one log), or UTC times in kernel lines (`PM: suspend exit … UTC`), agreeing within 10 ms |
+| `paired` | the same line in two sources (dmesg and `logcat -b kernel`, two captures of one log), or UTC times in kernel lines (`PM: suspend exit … UTC`), agreeing within 10 ms (the error is never below the timestamps' resolution: 1 ms for logcat) |
 | `marker` | the same, or marker rules, with a larger spread |
 | `estimate` | a bugreport's kernel log: dumpstate time minus uptime (±1 min) |
 | `assumed` | another device's wall clock as written (shifted by the time-zone difference when both zones are known) |
@@ -169,7 +195,8 @@ the candidates, and `align` prints how many lines a mapping rests on.
 ### Marker rules
 
 For a company log the useful anchors are events that both sides log: a request and its
-reception, a CAN signal sent and received, a sequence number. A marker rule pairs them by key:
+reception, a CAN signal sent and received, a sequence number. A marker rule pairs them by key
+(full reference: [rules.md](rules.md#marker-rules)):
 
 ```yaml
 marker: vhal_set_property
@@ -186,7 +213,8 @@ tolerance: 200ms            # offsets of one stretch must agree within this
 
 Both regexes need the same named groups; a key seen twice on one side is not used. At least two
 pairs are needed (three when there are six or more candidates), and half of the pairs must agree.
-With enough pairs over a minute or more, a drift is fitted. Example:
+With enough pairs over a minute or more, a drift is fitted. Marker patterns run over the redacted
+messages and are not redacted themselves (detector patterns are). Example:
 [examples/rules/markers_vhal_set.yaml](../examples/rules/markers_vhal_set.yaml).
 
 ### Manual alignment
