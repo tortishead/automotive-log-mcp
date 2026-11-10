@@ -39,7 +39,9 @@ automotive-log-mcp/
   pyproject.toml              # deps: mcp, pyyaml; dev: pytest, ruff, mypy, hypothesis
   src/automotive_log_mcp/
     server.py                 # MCP tools, instructions, prompts, arg validation, caps
-    cli.py                    # serve | index | query | rules  (works without an agent)
+    httpserve.py              # M6: serve --http (streamable HTTP, bearer token)
+    tools.py, clocktools.py, difftool.py   # tool logic (difftool: M6 diff)
+    cli.py                    # serve | index | query | diff | rules | ...  (works without an agent)
     config.py                 # paths, caps, rule dirs, policy file
     policy.py                 # allowed tools, blocked sources/ECUs, byte budget
     calllog.py                # JSONL call log
@@ -262,9 +264,104 @@ Status (Nov 10, 2026): items 1, 2, 3 and 5 built (multi-source without DLT, as r
 2. HTTP transport (streamable HTTP, token auth, server-side path policy for `add_source`).
 3. Eval on 10 defects; release 0.1.0 with README, `docs/connectors.md`, `docs/rules.md`, changelog.
 
+Status (Nov 10, 2026): items 1 and 2 built and verified on synthetic data and with a real client;
+item 3 run on **synthetic** cases only: there are no real closed defects here, so the done
+criterion "eval on 10 defects" is **not met** (neither evidence recall on real defects nor any
+agent run, on real or synthetic cases); item 4 prepared as version 0.1.0 (version, changelog,
+docs), **not published to PyPI and not tagged**, as asked. DLT stays out (company-specific
+connectors, as in M5).
+
+- **`diff`** (`difftool.py`, CLI `diff <case> --a SPEC --b SPEC`): each side is a record filter
+  plus `seg` (one segment of a single source), so "per source or segment" covers two files or
+  runs, two boots of a kernel log, and before/after windows of one source. A message is tag +
+  level + template (templates are shared by all sources of a case). Lists: only in B, only in A
+  (most severe, then most frequent first) and changed (largest change first), each item cited by
+  its first record per side; every list gets a share of the byte cap and says how many more
+  there are. Verified (`tests/test_diff.py`): two logcats (only-in-each, a 6× change, shares
+  rather than counts, reversed sides give 1/6×, `min_ratio` above the change lists nothing), every
+  item's citation resolves to a record of its tag, level and template and the output passes
+  `check_citations`; two boots by segment; a dmesg (monotonic, not aligned) against a logcat (wall)
+  with a from/to on each side's own clock; errors (same records, `seg` without exactly one source,
+  unknown segment, empty side, `min_ratio` ≤ 1, a side's filter error names the side); tiny caps
+  (4 lines, 1,500 bytes) and 160 items under the default caps hold; CLI; over MCP with structured
+  output validating against the schema, and a top-level `level` refused with "belongs inside a
+  and b". Performance (generated 150 MiB logcat, 1.42M records, one core, best of 3): first half
+  against second half of the source 0.42 s, two 15-min windows 0.64 s; text 1.7–2.4 KB.
+- Deviations (`diff`): `changed` compares each message's share of its side's records, not raw
+  counts, and needs at least 5 records on the larger side (constant `MIN_CHANGED`); default
+  `min_ratio` 4, `limit` 12 per list; no cursor (narrow with level or tags instead). Times play no
+  part in the comparison, which is why sides on different clocks need no alignment; the output
+  says so when one side is wall-clock and the other monotonic.
+- **HTTP** (`httpserve.py`, `serve --http [--host] [--port]`, config section `http`): the SDK's
+  `streamable_http_app` run with uvicorn; stdio stays the default. Token auth through the SDK's
+  bearer middleware with a static `TokenVerifier` (constant-time compare; `AUTOMOTIVE_LOG_MCP_TOKEN`
+  or `http.token_file`, at least 16 characters; no token: the server does not start). `AuthSettings`
+  without `resource_server_url`, so no OAuth or protected-resource metadata routes are published
+  (`issuer_url` is required by the SDK but never advertised). Path policy: `allowed_roots` in
+  `policy.yaml`; over HTTP an omitted list means no path at all. Paths are checked before they are
+  looked at (a refused path does not reveal whether it exists) and again after symbolic links are
+  resolved; directory imports skip files that link outside; relative paths are refused once roots
+  are set. Loopback keeps the SDK's DNS-rebinding protection; `http.allowed_hosts` turns it on
+  elsewhere; off loopback the server warns that plain HTTP sends the token in clear text. Run
+  instructions and config examples: README "Run over HTTP", `examples/http/`,
+  `examples/mcp-config/*.http.mcp.json`.
+- Verified (HTTP, `tests/test_http.py`, a real uvicorn server on a free port with the SDK's
+  streamable-HTTP client): every tool listed; `add_source` and `search` over HTTP; 401 with no
+  token, a wrong token and a token without `Bearer`; the client fails with a wrong token; paths
+  outside the roots refused for an existing file, a missing file and a `..` path, with the same
+  message; a symbolic link inside a root to a file outside refused, and skipped in a directory
+  import; no roots over HTTP refuses every path while queries still work; Host not in
+  `allowed_hosts` gets 421; the call log has the HTTP calls; `allowed_roots` from the policy file
+  (relative to it) also limits the CLI `index`; token and `http` config errors; `serve --port`
+  without `--http` refused. **Claude Code 2.1.322** (`claude -p --mcp-config` with
+  `examples/mcp-config/claude-code.http.mcp.json`, the token taken from the environment in the
+  header) called `list_sources` over HTTP and printed its output.
+- **Not verified (HTTP):** VS Code Copilot over HTTP (its snippet follows its documented format,
+  not tried); Windows; TLS (none built in: proxy or SSH tunnel); several clients at once and long
+  sessions (the SDK's session idle timeout); the byte budget and call-log session are per server
+  process, so all clients of one server share them (documented, not designed for multi-user use,
+  which stays out of scope).
+- **Evaluation:** `eval/cases.yaml` has 10 synthetic cases (5 new, expected answers written before
+  the first run): `syn-can-busoff` (a head-unit logcat and a dmesg in seconds since boot; the
+  dmesg is placed `paired` on 12 kernel lines both hold, and the cause, a CAN bus-off, appears only
+  on the timeline 248 ms before the VHAL error), `syn-watchdog-audio`, `syn-evs-crash` (a standalone
+  tombstone next to a logcat), `syn-wifi-fw-ota` (two boots of one kernel log; only `diff` shows the
+  missing firmware), `syn-bt-restart`. The harness takes `timeline` and `diff` in recorded queries
+  and an optional `expected.order` (citations on different clocks in the order they happened),
+  checked on the case clock (`Tools.case_time`); a wrong order or an unplaced source fails the run
+  (tested with the order swapped). First run: **19 of 20** root-cause citations surfaced (15
+  exact, 4 through their artifact); every expected citation resolves to a line with its text; the
+  order check holds. The miss is the M4 one (`syn-boot-selinux` `log:1#4`). As in M4 this checks
+  the harness, not the server's value: the expected citations come from how the logs were written.
+- Found by the eval and fixed: the alignment printed `paired ±0 ns` when paired offsets agreed
+  exactly, although logcat times have 1 ms resolution; the error bound is now at least the
+  resolution of the coarser side (`fit_pairs`; test times in whole seconds get the 1 ms floor).
+- **Open (evaluation):** 10 real closed defects with logs and fix commits; agent runs (by hand,
+  `eval/agent_runs/`) on them and, if wanted, on the synthetic cases; the shell-only baseline; the
+  checkpoint decision. Nothing in this repository can close these.
+- **Release 0.1.0:** version in `pyproject.toml` and `__init__.py`; `CHANGELOG.md`; `docs/rules.md`
+  (detector rules and marker rules; every YAML example in it loads through the real parsers);
+  `docs/connectors.md` checked against the code and corrected: regex connectors are told apart
+  from command connectors by `line`/`command`, record fields `lines` and `artifact`, artifact
+  fields `ts_raw` and `tid` and the default level, the regex connector's keys (`continuation`,
+  `levels`, `attrs`, `sniff.min_fraction`, the +0.05 file-name bonus) with the shipped `syslog.yaml`,
+  the command connector's `timeout` default (3600 s), `replace`, `ts_raw` and level names, the
+  resolution floor, and that marker patterns are not redacted (detector patterns are); its regex,
+  command and marker examples and the entry-point example (run through the registry) were checked
+  to load and parse. README status, tool list, `diff` and HTTP sections; server instructions name
+  `diff` in one sentence. A wheel builds (`pip wheel .`, rules and schema files included) and
+  installs in a clean virtualenv from PyPI dependencies (`--version`, `rules`, `index`, `diff`
+  run there). Not done, as asked: no PyPI upload, no git tag, no GitHub release.
+- **Token cost:** the fixed cost per request (definitions and instructions, structured output off)
+  grew from 19,392 to 21,838 bytes (about +600 tokens at bytes/4): `diff`'s schema is 2,340 bytes
+  (it carries the filter twice through `a`/`b`), the instruction sentence 106 bytes. Teams that do
+  not compare runs can hide it with `allowed_tools`.
+- Not done in M6: DLT (by choice, as in M5); the remaining artifact parsers of M5 item 8;
+  `blocked_ecus`; the M1 ingest target.
+
 ## Cross-cutting
 
-- **Privacy:** no network calls in stdio mode; case DBs on the user's disk; call log without log content; only synthetic or fully redacted fixtures in the repo.
+- **Privacy:** no network calls in stdio mode; `serve --http` listens (loopback by default) but makes no outbound calls; case DBs on the user's disk; call log without log content; only synthetic or fully redacted fixtures in the repo.
 - **Versioning:** connector version and redaction-rules hash stored per source; changing either marks sources stale ("reindex recommended"); tool API per D11.
 - **Licences:** repo MIT; `dlt-core` Apache-2.0 (compatible; keep its notice with `dlt2jsonl`); no code from MPL projects.
 - **Portability:** paths, file locking and subprocess handling tested on Windows, since many automotive engineers work there.

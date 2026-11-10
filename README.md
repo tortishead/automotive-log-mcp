@@ -3,27 +3,30 @@
 An MCP server that lets any agent analyse a defect from automotive logs (Android bugreport,
 logcat, kernel logs), with every finding cited to a log line or artifact.
 
-Status: **M5 multi-source (without DLT)**. Logcat (all `-v` formats), kernel logs (`dmesg`,
-`/dev/kmsg`), Android bugreports (zip or text), archives (zip, tar, gz), YAML-defined text
-formats and `command` connectors (an external decoder writing JSON lines, for company-specific
-formats) are indexed into one SQLite DB per case, with redaction at index time. Tombstones, ANR
-traces, Java crashes and dropbox entries become artifacts with a summary, a crash signature and a
-record on the timeline. All sources of a case are aligned on one case clock (same lines in two
-sources, UTC times in kernel lines, marker rules, the bugreport boot time, manual anchors).
-Thirteen tools work over MCP: the P0 tools `add_source`, `list_sources`, `search`, `context`,
-`list_artifacts`, `read_artifact`, `get_records`, the P1 tools `overview`, `count`, `detect` (10
-default detector rules, more from rule directories) and `check_citations`, and the M5 tools
-`timeline` and `align`, all with capped, cited output. An evaluation harness ([eval/](eval/))
-checks evidence recall without an agent and gives a checklist for agent runs. Everything is
-verified on synthetic fixtures and synthetic evaluation cases only, not yet on real bugreports or
-real closed defects; ingest (about 29k lines/s on a generated 200 MiB log) misses the M1 target of
-100k lines/s; the case DB (schema 5) is 1.34× the input there, within the 1.5× target: record
-messages are kept compressed in blocks, not as a column (see [Storage](#storage)). A case DB of an
-older schema is migrated on first open, without a re-import (7.5 s for 1.9M records). DLT is not
-read (not part of this M5; a company DLT setup can use a `command` connector or
-[docs/dlt.md](docs/dlt.md)). See [docs/design.md](docs/design.md),
-[docs/implementation-plan.md](docs/implementation-plan.md) and
-[docs/connectors.md](docs/connectors.md) (own formats and clock alignment).
+Status: **0.1.0** (milestone M6; not published to PyPI). Logcat (all `-v` formats), kernel logs
+(`dmesg`, `/dev/kmsg`), Android bugreports (zip or text), archives (zip, tar, gz), YAML-defined
+text formats and `command` connectors (an external decoder writing JSON lines, for
+company-specific formats) are indexed into one SQLite DB per case, with redaction at index time.
+Tombstones, ANR traces, Java crashes and dropbox entries become artifacts with a summary, a crash
+signature and a record on the timeline. All sources of a case are aligned on one case clock (same
+lines in two sources, UTC times in kernel lines, marker rules, the bugreport boot time, manual
+anchors). Fourteen tools work over MCP, over stdio or streamable HTTP with a bearer token: the P0
+tools `add_source`, `list_sources`, `search`, `context`, `list_artifacts`, `read_artifact`,
+`get_records`, the P1 tools `overview`, `count`, `detect` (10 default detector rules, more from
+rule directories) and `check_citations`, the multi-source tools `timeline` and `align`, and
+`diff` (what only one run, boot or time window has), all with capped, cited output. An evaluation
+harness ([eval/](eval/)) checks evidence recall without an agent (10 synthetic cases) and gives a
+checklist for agent runs.
+
+What is **not** shown yet: everything is verified on synthetic fixtures and synthetic evaluation
+cases only, not on real bugreports or real closed defects, and no agent run of the evaluation has
+been done; ingest (about 26–29k lines/s on generated logs) misses the M1 target of 100k lines/s;
+the case DB (schema 5) is 1.34× the input, within the 1.5× target (see [Storage](#storage)). A
+case DB of an older schema is migrated on first open, without a re-import. DLT is not read (a
+company DLT setup can use a `command` connector or [docs/dlt.md](docs/dlt.md)). Changes per
+release: [CHANGELOG.md](CHANGELOG.md). See [docs/design.md](docs/design.md),
+[docs/implementation-plan.md](docs/implementation-plan.md), [docs/connectors.md](docs/connectors.md)
+(own formats and clock alignment) and [docs/rules.md](docs/rules.md) (detector and marker rules).
 
 ## Install
 
@@ -162,7 +165,7 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
   "unknown", "the logs do not show", …) or are shorter than 8 words need no citation. The call log
   keeps only the text's length and hash.
 
-### Multi-source tools (M5)
+### Multi-source tools
 
 - **timeline** merges every source (bugreport buffers, kernel logs, logs of other devices and
   ECUs) on one case clock. Times of the reference clock print as written; times mapped from
@@ -178,7 +181,7 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
 An order across sources that rests on `~` times closer than their error is a guess; the server
 instructions tell agents to say so.
 
-### diff (M6)
+### diff
 
 `diff(case, a={'sources': ['2']}, b={'sources': ['5']})` compares two sets of records: a good and
 a bad run, `{'sources': ['3'], 'seg': 1}` against `seg: 2` (two boots of a kernel log), or one
@@ -225,8 +228,7 @@ Only in A, most severe first (1):
 | `service_restart` | medium | `init: Service '…' (pid N) exited/killed/received signal`, `Process … has died`, `Scheduling restart of crashed service` |
 | `selinux_denial` | low | `audit(…): avc: denied`, one line per pid |
 
-Rules are YAML files (format in
-[src/automotive_log_mcp/detect/engine.py](src/automotive_log_mcp/detect/engine.py)): `match` (a
+Rules are YAML files (format in [docs/rules.md](docs/rules.md)): `match` (a
 regex over message and tag), `level`, `tags`, or `any:` alternatives of these; `followed_by` a
 second event `within` a time (`absent: true`: a hit when it does not follow); `group_by: pid`;
 `severity`, `description`, `note`. The package rules are in
@@ -327,11 +329,13 @@ automotive-log-mcp diff T-1 --a 2 --a-to log:2#500 --b 2 --b-from log:2#500   # 
   `fields.ts_zone` says `UTC`).
 - In a bugreport zip the main entry is read first, so the fingerprint, time zone and process list
   apply to the other members; the process list fills a missing process name.
-- Not parsed yet (M5): tombstone `.pb`, `dumpsys` sections, kernel panics / `pstore`.
+- Not parsed (planned in M5, not in 0.1.0): tombstone `.pb`, `dumpsys` sections, kernel panics /
+  `pstore`.
 
 ## Storage
 
-One SQLite file per case (`<home>/cases/<case>.db`), schema 4:
+One SQLite file per case (`<home>/cases/<case>.db`), schema 5 (schema 4 below plus the clock
+tables of M5: per-segment mappings onto the case clock and manual `align` settings):
 
 - `records`: the parsed fields of each record (time, level, tag, pid, tid, template, attributes),
   without its message. Indexes on time, per-source monotonic time and tag only; filters and counts
