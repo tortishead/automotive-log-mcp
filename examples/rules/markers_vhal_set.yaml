@@ -1,0 +1,13 @@
+# Example clock marker rule (M5): pairs an event logged on two clocks, so the server can place an
+# ECU trace on the Android timeline. Put it in a directory listed under `rule_dirs`.
+# Both regexes need the same named groups: events with equal values are the same event.
+marker: vhal_set_property
+description: VHAL SET request logged by the head unit and received by the MCU
+a:
+  match: 'setProperty prop=(?P<prop>0x[0-9a-f]+) seq=(?P<seq>\d+)'
+  tags: [VehicleHal*]
+b:
+  match: 'SET prop=(?P<prop>0x[0-9a-f]+) seq=(?P<seq>\d+)'
+  sources: [mcu_trace]        # globs on source name or format
+delay: 2ms                    # b is logged this long after a (bus latency)
+tolerance: 200ms              # offsets of one stretch agree within this

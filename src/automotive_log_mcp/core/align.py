@@ -47,6 +47,7 @@ from ..model import SEQ_BITS
 from ..store import query
 from . import clock as ck
 from .clock import CONF_RANK, Piece, SegClock
+from .templates import mask
 from .timeparse import NS, wall_ns
 
 MS = 1_000_000
@@ -470,12 +471,43 @@ def _unique_templates(conn: sqlite3.Connection, node: Node) -> dict[int, int]:
     return {int(t): int(i) for t, i in rows}
 
 
+def _norm(tag: str | None, msg: str) -> str:
+    """A line's text without a leading 'tag: ' (dmesg keeps 'binder: ...' in the message, logcat's
+    kernel buffer splits it into tag and message)."""
+    if tag and msg.startswith(tag + ": "):
+        return msg[len(tag) + 2 :]
+    return msg
+
+
+def _aliases(conn: sqlite3.Connection, uniq: dict[int, int]) -> dict[int, int]:
+    """For unique lines of a monotonic clock: the template of the line without its tag prefix."""
+    recs = query.records_by_id(conn, list(uniq.values()))
+    want: dict[str, int] = {}
+    for r in recs.values():
+        n = _norm(r.tag, r.msg)
+        if n != r.msg:
+            want.setdefault(mask(n), r.id)
+    out: dict[int, int] = {}
+    texts = list(want)
+    for k in range(0, len(texts), 500):
+        chunk = texts[k : k + 500]
+        for tid, text in conn.execute(
+            f"SELECT id, text FROM templates WHERE text IN ({','.join('?' * len(chunk))})", chunk
+        ):
+            out[int(tid)] = want[text]
+    return out
+
+
 def same_line_edges(conn: sqlite3.Connection, nodes: dict[str, Node]) -> list[Edge]:
     """Edges from lines that occur once in each of two clocks with the same text and tag."""
     keys = [k for k in nodes if nodes[k].records]
     if len(keys) < 2:
         return []
     uniq = {k: _unique_templates(conn, nodes[k]) for k in keys}
+    for k in keys:
+        if nodes[k].native == "mono":
+            for t, rid in _aliases(conn, uniq[k]).items():
+                uniq[k].setdefault(t, rid)
     edges: list[Edge] = []
     for i, ka in enumerate(keys):
         for kb in keys[i + 1 :]:
@@ -485,15 +517,17 @@ def same_line_edges(conn: sqlite3.Connection, nodes: dict[str, Node]) -> list[Ed
             common = uniq[ka].keys() & uniq[kb].keys()
             if len(common) < MIN_PAIRS:
                 continue
-            ids = [uniq[ka][t] for t in common] + [uniq[kb][t] for t in common]
-            recs = query.records_by_id(conn, ids)
+            id_pairs = {(uniq[ka][t], uniq[kb][t]) for t in common}
+            recs = query.records_by_id(conn, [x for p in id_pairs for x in p])
             pairs = []
             via: dict[int, int] = {}
-            for t in common:
-                ra, rb = recs.get(uniq[ka][t]), recs.get(uniq[kb][t])
-                if ra is None or rb is None or ra.msg != rb.msg or ra.tag != rb.tag:
+            for ia, ib in id_pairs:
+                ra, rb = recs.get(ia), recs.get(ib)
+                if ra is None or rb is None or ra.msg.startswith("[art:"):
                     continue
-                if ra.msg.startswith("[art:"):
+                if _norm(ra.tag, ra.msg) != _norm(rb.tag, rb.msg):
+                    continue
+                if ra.tag and rb.tag and ra.tag != rb.tag:
                     continue
                 xa, xb = _native(na.native, ra.ts, ra.ts_src), _native(nb.native, rb.ts, rb.ts_src)
                 if xa is None or xb is None:

@@ -1,0 +1,6 @@
+MCU TRACE v1 ecu=MCU1 tz=UTC
+1200 I CAN: bus up
+5300 E VHAL: SET prop=0x11400400 seq=17 rejected
+FAULT 6000 hardfault pc=0x0800f00d
+  r0=0x00000000 r1=0x20001000
+END

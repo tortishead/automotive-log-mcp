@@ -36,6 +36,7 @@ from ..core.levels import normalize
 from ..core.timeparse import NS, YearTracker, seconds_ns, wall_ns
 from ..model import RawRecord
 from .base import ConnectorError, ParseItem, Registry, SourceContext, TextConnector, head_lines
+from .command import CommandConnector
 
 BUILTIN_DIR = Path(__file__).resolve().parent.parent / "rules"
 
@@ -202,14 +203,17 @@ class RegexConnector(TextConnector):
             yield pending
 
 
-def load_file(path: Path) -> RegexConnector | None:
-    """Load one YAML file; None if it is not a connector definition (e.g. a detector rule)."""
+def load_file(path: Path) -> RegexConnector | CommandConnector | None:
+    """Load one YAML file; None if it is not a connector definition (e.g. a detector rule).
+    A definition with ``command`` is a :class:`~.command.CommandConnector`."""
     try:
         spec = read_yaml_mapping(path, "regex connector")
     except ConfigError as e:
         raise ConnectorError(str(e)) from e
     if "connector" not in spec:
         return None
+    if "command" in spec:
+        return CommandConnector(spec, path)
     return RegexConnector(spec, path)
 
 

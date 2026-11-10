@@ -1,0 +1,13 @@
+# Example `command` connector (M5): an external program decodes a format and writes JSON lines.
+# Copy this file and mcu2jsonl.py into a directory listed under `rule_dirs` in config.yaml (or
+# list examples/connectors itself), then: add_source(case, path='.../mcu_0001.mcutrace').
+# The format is made up for the example; replace the program with your own decoder (any language).
+connector: mcu_trace
+version: "1"
+description: MCU trace (example) decoded by mcu2jsonl.py
+command: ["{python}", "{dir}/mcu2jsonl.py", "{path}"]
+sniff:
+  filenames: ["*.mcutrace"]
+  head_regex: '^MCU TRACE v1\b'
+  score: 0.9
+timeout: 600

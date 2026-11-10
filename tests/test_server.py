@@ -56,7 +56,12 @@ def test_list_sources_on_empty_case(config: Config) -> None:
         async with Client(build_server(structured(config), Policy())) as client:
             result = await client.call_tool("list_sources", {"case": "TICKET-1"})
             assert not result.is_error
-            assert result.structured_content == {"case": "TICKET-1", "exists": False, "sources": [], "case_clock": None}
+            assert result.structured_content == {
+                "case": "TICKET-1",
+                "exists": False,
+                "sources": [],
+                "case_clock": None,
+            }
             assert "No sources" in result.content[0].text  # type: ignore[union-attr]
 
     run(main)
