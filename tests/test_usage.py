@@ -238,6 +238,7 @@ def test_analysis_finds_repeats_uncited_and_rejected_calls(
     assert any("not checked with check_citations" in p for p in report.problems)
     assert all(c.seen_bytes is not None and c.measured for c in sessions[0].calls)
     assert "model (transcript): 7 requests" in text
+    assert "tool results re-sent with later requests" in text and "first request re-sent: 7 x" in text
 
     # the CLI picks the session matching the transcript, and lists sessions
     assert cli_main(["calls", "--transcript", str(tr)]) == 0

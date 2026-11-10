@@ -32,7 +32,9 @@ automotive-log-mcp serve
 ```
 
 The server speaks MCP over stdio. Client configuration snippets are in
-[examples/mcp-config/](examples/mcp-config/). `add_source` indexes in a background thread per
+[examples/mcp-config/](examples/mcp-config/). Tool results are text only by default; `serve
+--structured` (or `structured_output: true` in the config) adds `structuredContent` and output
+schemas, at a token cost (see [Token use](#token-use)). `add_source` indexes in a background thread per
 case: it waits up to 10 s, then reports that indexing continues; `list_sources` shows progress.
 
 ## Tools
@@ -243,11 +245,11 @@ All state lives under `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MC
 
 | Path | What |
 | --- | --- |
-| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs` |
+| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false) |
 | `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors` |
 | `cases/<case>.db` | one SQLite DB per case; originals are referenced by path and SHA-256, never copied |
 | `secret.key` | redaction key, created on first run; deleting it changes every token of later imports |
-| `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes; never log content (the text given to `check_citations` is logged as its length and hash) |
+| `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes, and for token analysis call number, text and structured bytes, estimated tokens, argument hashes, caps hit, result counts and the citation ids in the output; the first call of a session also records the server's fixed cost. Never log content (the text given to `check_citations` is logged as its length, hash and the citation ids it contains) |
 
 Example `policy.yaml`:
 
@@ -255,6 +257,79 @@ Example `policy.yaml`:
 allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records]
 byte_budget: 500000
 ```
+
+## Token use
+
+Where an agent session spends its tokens, and what to change, from the call log the server
+writes anyway (nothing to switch on):
+
+```powershell
+# Windows (PowerShell)
+py -m automotive_log_mcp calls --list            # recent sessions: calls, ~tokens, errors, citation check
+py -m automotive_log_mcp calls                   # the last session in detail
+py -m automotive_log_mcp calls --session 1e9e5c  # one session (id prefix from --list)
+py -m automotive_log_mcp calls --fixed           # what the server adds to every model request, per tool
+```
+
+```bash
+# Linux / macOS
+automotive-log-mcp calls --list
+automotive-log-mcp calls --transcript ~/.claude/projects/<project>/<session-id>.jsonl
+```
+
+The report lists the calls in order with text and JSON bytes, estimated tokens (`~tok`, bytes/4)
+and, with a transcript, the measured tokens each result added (`tok`); then the totals, the fixed
+cost per request, how many input tokens were tool results re-sent with later requests, and
+*problems* (tool errors, calls that never reached the tool, byte budget used up, the run ended
+with an error, answer not checked or failing `check_citations`, exact repeats) and *suggestions*
+(structured content, unused tools to hide with `allowed_tools`, capped outputs to narrow, paging,
+results the answer never cites, the largest results, too many requests). Its output stays short:
+at most 40 call rows.
+
+**What the server cannot see:** the model's real token counts and anything outside its tools
+(the client's own prompt, other servers, the model's reasoning). Estimates at bytes/4 are low:
+Claude Code counted about 2.2 bytes per token for this server's tool definitions and 1.7–2.0 for
+its results (log lines, hex, paths), so real numbers are roughly twice the `~tok` column.
+
+**Real token counts from the client:**
+
+- **Claude Code**: every session is saved as JSONL in `~/.claude/projects/<project>/<session-id>.jsonl`
+  (Windows: `%USERPROFILE%\.claude\projects\...`; `<project>` is named after the working
+  directory, e.g. `-home-me-work` for `/home/me/work`; the newest file there is the last session). Each model response there has `message.usage` (`input_tokens`,
+  `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens`). For a scripted run,
+  `claude -p "<question>" --output-format stream-json --verbose > run.jsonl` gives the same
+  messages plus a final `result` line with totals and `total_cost_usd`; `--output-format json`
+  gives only the totals. Pass either file as `--transcript`: `calls` picks the call-log session
+  whose calls match, shows real tokens per request and per tool result, and reads the citations
+  of the final answer even when `check_citations` was not called. The transcript is only read
+  locally; nothing from it is written.
+- **VS Code Copilot**: not verified here (the VS Code and GitHub docs were not reachable from the
+  environment this was built in, and no Copilot was available to try). Check the current VS Code
+  Copilot docs for a chat debug view or chat log and for chat export (the Command Palette lists
+  what your version has; search it for "chat debug" and "export chat"), and your GitHub Copilot
+  settings for premium-request usage. Whether Copilot sends the text, the structured content or
+  both of a tool result to the model is not verified either; `calls` cannot import a Copilot log
+  yet. Without a transcript, `calls --reads both` gives an upper bound and
+  `--reads text` a lower one when structured output is on.
+
+**What was measured** (Claude Code 2.1.322, Sonnet, `claude -p` with only this server, the
+synthetic bugreport `eval/synthetic/bugreport-*.zip`, two runs per question; input tokens summed
+over all requests of a run):
+
+| | M4 | now |
+| --- | --- | --- |
+| fixed cost per request (definitions + instructions) | 21.9 KB, 10.1k tokens | 14.7 KB, 6.9k tokens |
+| "Which process crashed and why?" | 60.8k / 84.1k tokens, 4–5 requests | 34.0k / 34.0k, 3 requests |
+| root cause, every finding cited and checked | 114.3k / 158.8k, 6–8 requests | 63.3k / 63.0k, 5 requests |
+
+What made the difference: Claude Code passes only `structuredContent` to the model when a result
+has it (as JSON, 1.6–1.7× the bytes of the text, without the text's hints), so results are text
+only now; the published input schemas dropped generated titles and `anyOf`/`null` noise and long
+repeated descriptions (arguments are still validated as before, `null` still accepted); and the
+server instructions steer simple questions to `list_artifacts` → `read_artifact` instead of a
+nine-step walk through every tool. Further savings that need no code: hide tools a team never uses
+with `allowed_tools` in `policy.yaml` (`calls` says how many tokens per request that saves), and
+start a fresh chat per question, since every request re-sends the whole conversation.
 
 ## Evaluation
 

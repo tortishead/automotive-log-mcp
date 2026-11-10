@@ -71,6 +71,7 @@ class Call:
     near_hash: str
     seen_bytes: int | None = None  # bytes the client passed to the model (from a transcript)
     measured: int | None = None  # tokens the result added to the prompt (from a transcript)
+    request: int | None = None  # index of the model request that made the call (from a transcript)
 
     def model_bytes(self, reads: str) -> int:
         """Bytes the model reads: as seen in the transcript, else per ``reads``."""
@@ -365,6 +366,7 @@ def join(t: Transcript, s: Session) -> list[ToolUse]:
             continue
         s.calls[hit].seen_bytes = use.result_bytes
         s.calls[hit].measured = use.measured
+        s.calls[hit].request = use.request
         i = hit + 1
     return unlogged
 
@@ -490,6 +492,10 @@ def analyse(
             "every result stays in the context and is re-read by each later request"
         )
 
+    def cost(c: Call) -> int:
+        """Tokens of a result: measured if the transcript has it, else the estimate."""
+        return c.measured if c.measured is not None else est_tokens(c.model_bytes(reads))
+
     if transcript and transcript.requests:
         rq = transcript.requests
         prompt = sum(r.prompt for r in rq)
@@ -498,14 +504,38 @@ def analyse(
         lines.append(
             f"model (transcript): {len(rq)} requests, input {_tok(prompt)} tokens "
             f"({_tok(cached)} from cache), output {_tok(output)}; "
-            f"largest request {_tok(max(r.prompt for r in rq))}"
+            f"first request {_tok(rq[0].prompt)}, largest {_tok(max(r.prompt for r in rq))}"
         )
+        # A result stays in the context: every later request sends it again.
+        carried = [
+            (c.measured * (len(rq) - 1 - c.request), c)
+            for c in calls
+            if c.measured and c.request is not None and c.request < len(rq) - 1
+        ]
+        carried.sort(key=lambda x: -x[0])
+        base = rq[0].prompt * len(rq)
+        lines.append(
+            f"first request re-sent: {len(rq)} x {_tok(rq[0].prompt)} = {_tok(base)} "
+            f"({100 * base // max(prompt, 1)}% of input; client prompt, server definitions, question)"
+        )
+        if len(rq) >= 5:
+            tips.append(
+                f"{len(rq)} model requests each re-send at least the first request's {_tok(rq[0].prompt)} "
+                "tokens: ask for independent calls in parallel (one request), stop when the evidence "
+                "answers the question"
+            )
+        if carried:
+            total = sum(n for n, _ in carried)
+            lines.append(
+                f"tool results re-sent with later requests: {_tok(total)} input tokens; most: "
+                + ", ".join(f"#{c.seq} {c.tool} {_tok(n)}" for n, c in carried[:3])
+            )
         res = transcript.result or {}
         if res:
-            cost = res.get("total_cost_usd")
+            usd = res.get("total_cost_usd")
             lines.append(
                 f"result: {res.get('subtype', '?')}, {res.get('num_turns', '?')} turns"
-                + (f", ${cost:.3f} (client estimate)" if isinstance(cost, int | float) else "")
+                + (f", ${usd:.3f} (client estimate)" if isinstance(usd, int | float) else "")
             )
             if res.get("is_error") or str(res.get("subtype", "")).startswith("error"):
                 problems.append(f"the run ended with {res.get('subtype')}: the agent did not finish")
@@ -556,17 +586,23 @@ def analyse(
         problems.append("the final answer cites nothing (log:<source>#<seq> / art:<id>)")
     repeats = [c for c in calls if any(f.startswith("repeat") for f in flags.get(c.seq, []))]
     if repeats:
-        wasted = sum(est_tokens(c.model_bytes(reads)) for c in repeats)
+        wasted = sum(cost(c) for c in repeats)
         problems.append(f"{len(repeats)} exact repeats of earlier calls (~{_tok(wasted)} tokens)")
 
     # -- suggestions -----------------------------------------------------------------------------------
     struct_extra = sum((c.structured_bytes or 0) for c in calls)
-    if structured or struct_extra:
+    seen = [c for c in calls if c.seen_bytes is not None and c.status == "ok"]
+    seen_more = sum(c.seen_bytes or 0 for c in seen) > 1.2 * sum(c.text_bytes for c in seen) + 200
+    if structured or struct_extra or seen_more:
         saved = sum(est_tokens(c.model_bytes(reads)) - est_tokens(c.text_bytes) for c in calls)
+        why = (
+            "the client passed more bytes than the text (structured JSON)"
+            if seen_more
+            else "structured content is on: the model may read the JSON instead of (or with) the text"
+        )
         tips.append(
-            "structured content is on: the model may read the JSON instead of (or with) the text; "
-            f"turn it off (config structured_output: false, the default) to save ~{_tok(max(saved, 0))} "
-            "tokens here and the output schemas from the tool list"
+            f"{why}; text only (config structured_output: false, the default now) "
+            f"saves ~{_tok(max(saved, 0))} tokens (bytes/{BYTES_PER_TOKEN}) here"
         )
     per_tool = ((s.server or {}).get("fixed") or {}).get("per_tool") or fixed_now or {}
     used = {c.tool for c in calls}
@@ -595,18 +631,19 @@ def analyse(
     if len(pages) >= 2:
         tips.append(f"{len(pages)} calls paged with a cursor: narrow the query instead")
     if uncited:
-        tok = sum(est_tokens(c.model_bytes(reads)) for c in uncited)
+        tok = sum(cost(c) for c in uncited)
         top = Counter(c.tool for c in uncited).most_common(3)
         tips.append(
             f"{len(uncited)} calls (~{_tok(tok)} tokens) gave output the answer never cites "
             f"({', '.join(f'{t} {n}x' for t, n in top)}): candidates to skip or narrow"
         )
-    big = [c for c in calls if est_tokens(c.model_bytes(reads)) > BIG_CALL_TOKENS]
+    big = sorted((c for c in calls if cost(c) > BIG_CALL_TOKENS), key=lambda c: -cost(c))
     if big:
         tips.append(
             "largest results: "
-            + ", ".join(f"#{c.seq} {c.tool} ~{_tok(est_tokens(c.model_bytes(reads)))}" for c in big[:4])
-            + ": use section=/start_line= for artifacts, smaller before/after for context, limit for search"
+            + ", ".join(f"#{c.seq} {c.tool} {_tok(cost(c))}" for c in big[:4])
+            + ": read an artifact's summary or one section, not all lines; smaller before/after for "
+            "context; a narrower filter or limit for search; detect/overview only for broad questions"
         )
     if any(c.seen_bytes is None for c in calls) and transcript:
         n = sum(c.seen_bytes is None for c in calls)

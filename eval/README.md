@@ -15,7 +15,7 @@ Two levels, on the same cases (implementation plan, M4 item 6 and the checkpoint
 | `cases.yaml` | the 5 synthetic cases (from the test fixtures and `synthetic/`), with expected answers |
 | `cases.local.yaml` | your real closed defects (git-ignored; create it from the example below) |
 | `evidence_recall.py` | evidence recall over one or more case files; Markdown report, optional JSON |
-| `callstats.py` | calls, bytes and tools per session from the server's call log |
+| `callstats.py` | calls, bytes and tools per session from the server's call log (for where the tokens went and why a run was expensive, use `automotive-log-mcp calls`, see the main README "Token use") |
 | `agent_runs/` | the agent-run checklist and template; your run notes go in `agent_runs/local/` (git-ignored) |
 | `results/` | reports you write with `--report` (git-ignored) |
 
@@ -107,7 +107,8 @@ cases and checks their results against the recorded baseline below.
 
 See [agent_runs/README.md](agent_runs/README.md): the checklist, the client setup for VS Code
 Copilot agent mode (Windows, `py -m automotive_log_mcp serve`) and Claude Code, and how to take
-calls and bytes from the call log with `callstats.py`.
+calls and bytes from the call log with `callstats.py`; `automotive-log-mcp calls --session <id>`
+(Windows: `py -m automotive_log_mcp calls ...`) explains the tokens of one run and suggests changes.
 
 ## Write up
 
