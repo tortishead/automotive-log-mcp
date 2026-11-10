@@ -11,20 +11,33 @@ no byte budget. Keys:
 - ``byte_budget``: total bytes of tool output per server session; calls beyond it are refused.
 - ``allow_code_connectors``: whether Python entry-point connectors may be loaded (D13).
   Default false; YAML and ``command`` connectors are always allowed.
+- ``allowed_roots``: directories ``add_source`` (and the CLI ``index``) may read from; a path
+  outside them is refused before the server looks at it, also through a symbolic link. Omitted
+  or null: any path (stdio, where the agent runs as the user). Over HTTP an omitted list means
+  **no** path: ``serve --http`` refuses every ``add_source`` until roots are listed (files can
+  still be indexed with the CLI on the server).
 """
 
 from __future__ import annotations
 
 import fnmatch
+import os
 import threading
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePath
 from typing import Any
 
 from .config import ConfigError, read_yaml_mapping
 
-_KEYS = {"allowed_tools", "blocked_sources", "blocked_ecus", "byte_budget", "allow_code_connectors"}
+_KEYS = {
+    "allowed_tools",
+    "blocked_sources",
+    "blocked_ecus",
+    "byte_budget",
+    "allow_code_connectors",
+    "allowed_roots",
+}
 
 
 @dataclass(frozen=True)
@@ -34,6 +47,17 @@ class Policy:
     blocked_ecus: frozenset[str] = frozenset()
     byte_budget: int | None = None
     allow_code_connectors: bool = False
+    allowed_roots: tuple[Path, ...] | None = None  # None: any path; (): none
+
+    def path_allowed(self, path: Path) -> bool:
+        """Whether ``path`` (absolute, resolved) is inside one of ``allowed_roots``."""
+        if self.allowed_roots is None:
+            return True
+        p = _norm(path)
+        return any(p == r or p.is_relative_to(r) for r in map(_norm, self.allowed_roots))
+
+    def roots_text(self) -> str:
+        return ", ".join(str(r) for r in self.allowed_roots or ()) or "none"
 
     def tool_allowed(self, name: str) -> bool:
         return self.allowed_tools is None or name in self.allowed_tools
@@ -51,6 +75,11 @@ class Policy:
         unknown = self.allowed_tools - set(known)
         if unknown:
             raise ConfigError(f"policy allowed_tools names unknown tools: {', '.join(sorted(unknown))}")
+
+
+def _norm(path: Path) -> PurePath:
+    """Case-folded on Windows, where paths are case-insensitive."""
+    return PurePath(os.path.normcase(str(path)))
 
 
 def _str_list(value: Any, key: str) -> list[str]:
@@ -78,7 +107,14 @@ def load_policy(path: Path) -> Policy:
     if not isinstance(code, bool):
         raise ConfigError("policy key 'allow_code_connectors' must be true or false")
 
+    roots: tuple[Path, ...] | None = None
+    if data.get("allowed_roots") is not None:
+        roots = tuple(
+            (path.parent / Path(r).expanduser()).resolve()
+            for r in _str_list(data["allowed_roots"], "allowed_roots")
+        )
     return Policy(
+        allowed_roots=roots,
         allowed_tools=None if allowed is None else frozenset(_str_list(allowed, "allowed_tools")),
         blocked_sources=tuple(_str_list(data.get("blocked_sources"), "blocked_sources")),
         blocked_ecus=frozenset(_str_list(data.get("blocked_ecus"), "blocked_ecus")),

@@ -47,7 +47,15 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--config", type=Path, help="config file (default: <home>/config.yaml)")
     sub = p.add_subparsers(dest="command", required=True)
-    se = sub.add_parser("serve", help="run the MCP server over stdio")
+    se = sub.add_parser("serve", help="run the MCP server over stdio (default) or streamable HTTP")
+    se.add_argument(
+        "--http",
+        action="store_true",
+        help="streamable HTTP with a bearer token (AUTOMOTIVE_LOG_MCP_TOKEN or http.token_file) instead of "
+        "stdio; add_source reads only from the policy's allowed_roots",
+    )
+    se.add_argument("--host", help="HTTP: address to bind (default: config http.host, 127.0.0.1)")
+    se.add_argument("--port", type=int, help="HTTP: port (default: config http.port, 8765)")
     se.add_argument(
         "--structured",
         action=argparse.BooleanOptionalAction,
@@ -544,6 +552,18 @@ def main(argv: Sequence[str] | None = None) -> int:
 
             if args.structured is not None:
                 config = dataclasses.replace(config, structured_output=args.structured)
+            if args.host or args.port:
+                if not args.http:
+                    raise ConfigError("--host and --port need --http")
+                http = dataclasses.replace(
+                    config.http, host=args.host or config.http.host, port=args.port or config.http.port
+                )
+                config = dataclasses.replace(config, http=http)
+            if args.http:
+                from .httpserve import serve_http
+
+                serve_http(config, policy)
+                return 0
             server = build_server(config, policy)
         else:
             app = App.create(config, policy)

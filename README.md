@@ -39,11 +39,42 @@ pip install -e ".[dev]"
 automotive-log-mcp serve
 ```
 
-The server speaks MCP over stdio. Client configuration snippets are in
+The server speaks MCP over stdio (over HTTP with `--http`, below). Client configuration snippets are in
 [examples/mcp-config/](examples/mcp-config/). Tool results are text only by default; `serve
 --structured` (or `structured_output: true` in the config) adds `structuredContent` and output
 schemas, at a token cost (see [Token use](#token-use)). `add_source` indexes in a background thread per
 case: it waits up to 10 s, then reports that indexing continues; `list_sources` shows progress.
+
+### Run over HTTP
+
+`serve --http` serves the same tools over streamable HTTP (the official MCP SDK's transport, with
+uvicorn), for a server on a shared machine next to the logs. stdio stays the default.
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(32))" > ~/.automotive-log-mcp/token.txt
+cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then edit allowed_roots
+automotive-log-mcp serve --http                       # http://127.0.0.1:8765/mcp
+automotive-log-mcp serve --http --host 0.0.0.0 --port 9000
+```
+
+- **Token:** every request needs `Authorization: Bearer <token>`; the token is
+  `AUTOMOTIVE_LOG_MCP_TOKEN` or the contents of `http.token_file` (at least 16 characters). Without
+  one the server does not start; a missing or wrong token gets 401. One token, no OAuth, no users:
+  whoever holds it may call every tool the policy allows.
+- **Path policy:** `add_source` paths are paths on the server's machine. Over HTTP it reads only
+  below `allowed_roots` in `policy.yaml`; without that key it refuses every path (index files with
+  the CLI on the server instead). A path outside the roots is refused before the server looks at
+  it (the reply does not say whether it exists), also when a symbolic link inside a root points
+  outside; with roots set, relative paths are refused. `allowed_roots` applies over stdio and to
+  the CLI `index` too when it is set.
+- **Network:** on `127.0.0.1` the SDK's DNS-rebinding protection is on; on another address list
+  the Host headers clients use in `http.allowed_hosts`. The server speaks plain HTTP: off loopback
+  the token crosses the network in clear text, so put it behind a TLS proxy or use an SSH tunnel
+  (`ssh -L 8765:127.0.0.1:8765 logs-host`).
+- **Same as stdio:** the call log, rounds, byte budget and `allowed_tools`; the byte budget and
+  the call-log session belong to the server process, so every client of one server shares them.
+- Client snippets: [examples/mcp-config/](examples/mcp-config/README.md#over-http) (Claude Code
+  verified, VS Code not).
 
 **A file is indexed once.** Adding a file that is already indexed (same content, by SHA-256) is a
 no-op, also under another case name: then `add_source` names the case that holds it and the agent
@@ -351,8 +382,8 @@ All state lives under `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MC
 
 | Path | What |
 | --- | --- |
-| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false), `rounds_dir` (default `<home>/rounds`, null disables), `round_gap_minutes` (default 10) |
-| `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors` |
+| `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false), `rounds_dir` (default `<home>/rounds`, null disables), `round_gap_minutes` (default 10), `http` (`host`, `port`, `path`, `token_file`, `allowed_hosts`; see [Run over HTTP](#run-over-http)) |
+| `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors`, `allowed_roots` (directories `add_source` may read; required over HTTP) |
 | `cases/<case>.db` | one SQLite DB per case; originals are referenced by path and SHA-256, never copied |
 | `secret.key` | redaction key, created on first run; deleting it changes every token of later imports |
 | `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes, and for token analysis call number, text and structured bytes, estimated tokens, argument hashes, caps hit, result counts and the citation ids in the output; the first call of a session also records the server's fixed cost. Never log content (the text given to `check_citations` is logged as its length, hash and the citation ids it contains) |

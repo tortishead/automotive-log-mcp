@@ -1,0 +1,9 @@
+# <home>/config.yaml for `automotive-log-mcp serve --http` (all keys optional; defaults shown).
+http:
+  host: 127.0.0.1          # loopback: only this machine (SDK DNS-rebinding protection on)
+  port: 8765
+  path: /mcp
+  token_file: token.txt    # relative to this file; AUTOMOTIVE_LOG_MCP_TOKEN overrides it
+  # On another address (e.g. host: 0.0.0.0 behind a TLS proxy), list the Host headers clients use:
+  # allowed_hosts: ["logs.example.internal:8765"]
+policy_file: policy.yaml

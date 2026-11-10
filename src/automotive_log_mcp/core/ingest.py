@@ -190,10 +190,17 @@ class Ingestor:
 
     def check(self, path_str: str, format: str | None) -> Path:
         path = Path(path_str).expanduser()
+        if not path.is_absolute() and self.policy.allowed_roots is not None:
+            # relative to what? The server's working directory means nothing to a remote client.
+            raise IngestError(f"{path_str}: give an absolute path (policy allowed_roots is set)")
+        # The roots are checked before the path is looked at, so a refused path does not tell
+        # whether it exists; then again after symbolic links are resolved.
+        self._check_root(path.resolve(strict=False), path_str)
         try:
             path = path.resolve(strict=True)
         except OSError:
             raise IngestError(f"no such file or directory: {path_str}") from None
+        self._check_root(path, path_str)
         if self.policy.source_blocked(str(path), path.name, path.as_posix()):
             raise IngestError(f"{path} is blocked by the policy (blocked_sources)")
         if format is not None:
@@ -204,6 +211,19 @@ class Ingestor:
         if not path.is_file() and not path.is_dir():
             raise IngestError(f"{path} is not a regular file or directory")
         return path
+
+    def _check_root(self, path: Path, path_str: str) -> None:
+        if self.policy.path_allowed(path):
+            return
+        if not self.policy.allowed_roots:
+            raise IngestError(
+                "this server reads no paths for add_source: its policy has no allowed_roots (required "
+                "over HTTP); index the file on the server with the CLI, or ask for allowed_roots"
+            )
+        raise IngestError(
+            f"{path_str} is outside the directories this server may read (policy allowed_roots: "
+            f"{self.policy.roots_text()})"
+        )
 
     # -- import ---------------------------------------------------------------------------------
 
@@ -223,6 +243,9 @@ class Ingestor:
             for p in sorted(x for x in path.rglob("*") if x.is_file()):
                 if self.policy.source_blocked(str(p), p.name, p.as_posix()):
                     result.skipped.append(f"{p}: blocked by policy")
+                    continue
+                if not self.policy.path_allowed(p.resolve()):
+                    result.skipped.append(f"{p}: links outside the policy's allowed_roots")
                     continue
                 try:
                     result.files.append(

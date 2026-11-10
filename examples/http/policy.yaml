@@ -1,0 +1,7 @@
+# <home>/policy.yaml for the HTTP server. Over HTTP add_source reads only below allowed_roots
+# (paths on the server's machine); without the key it refuses every path.
+allowed_roots:
+  - /srv/logs              # absolute, or relative to this file; ~ is expanded
+# Optional, as over stdio:
+# allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records, overview, detect]
+# byte_budget: 2000000

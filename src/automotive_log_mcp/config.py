@@ -38,6 +38,19 @@ class Caps:
 
 
 @dataclass(frozen=True)
+class HttpConfig:
+    """``serve --http``: streamable HTTP with a bearer token (D2, M6)."""
+
+    host: str = "127.0.0.1"
+    port: int = 8765
+    path: str = "/mcp"
+    token_file: Path | None = None  # the token; AUTOMOTIVE_LOG_MCP_TOKEN overrides it
+    # Host header values accepted when binding to another address than loopback (DNS rebinding
+    # protection, e.g. ["logs.example.internal:8765"]); empty: any Host header.
+    allowed_hosts: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Config:
     home: Path
     cases_dir: Path
@@ -51,6 +64,7 @@ class Config:
     # One call-log file per round (and a report next to it), to hand over for analysis.
     rounds_dir: Path | None = None
     round_gap_minutes: int = 10
+    http: HttpConfig = field(default_factory=HttpConfig)
 
     def case_db(self, case: str) -> Path:
         """Path of a case's DB file (D7). ``case`` must already be validated."""
@@ -71,7 +85,9 @@ _TOP_KEYS = {
     "structured_output",
     "rounds_dir",
     "round_gap_minutes",
+    "http",
 }
+_HTTP_KEYS = {"host", "port", "path", "token_file", "allowed_hosts"}
 _CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars", "regex_scan_rows"}
 
 
@@ -86,6 +102,31 @@ def _positive_int(value: Any, key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ConfigError(f"config key 'caps.{key}' must be a positive integer, got {value!r}")
     return value
+
+
+def _http(data: Any, base: Path) -> HttpConfig:
+    if data is None:
+        return HttpConfig()
+    if not isinstance(data, dict):
+        raise ConfigError("config key 'http' must be a mapping")
+    unknown = set(data) - _HTTP_KEYS
+    if unknown:
+        raise ConfigError(f"unknown keys under 'http': {', '.join(sorted(unknown))}")
+    out = HttpConfig()
+    host = data.get("host", out.host)
+    if not isinstance(host, str) or not host:
+        raise ConfigError("config key 'http.host' must be a host name or address")
+    port = data.get("port", out.port)
+    if isinstance(port, bool) or not isinstance(port, int) or not 0 < port < 65536:
+        raise ConfigError(f"config key 'http.port' must be a port number, got {port!r}")
+    path = data.get("path", out.path)
+    if not isinstance(path, str) or not path.startswith("/"):
+        raise ConfigError(f"config key 'http.path' must start with '/', got {path!r}")
+    hosts = data.get("allowed_hosts") or []
+    if not isinstance(hosts, list) or not all(isinstance(h, str) and h for h in hosts):
+        raise ConfigError("config key 'http.allowed_hosts' must be a list of host[:port] strings")
+    token = _path(data["token_file"], "http.token_file", base) if data.get("token_file") else None
+    return HttpConfig(host, port, path, token, tuple(hosts))
 
 
 def read_yaml_mapping(path: Path, what: str) -> dict[str, Any]:
@@ -166,4 +207,5 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
         structured_output=structured,
         rounds_dir=rounds_dir,
         round_gap_minutes=gap,
+        http=_http(data.get("http"), base),
     )

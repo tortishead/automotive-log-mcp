@@ -1,0 +1,17 @@
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "automotive-log-token",
+      "description": "automotive-log-mcp bearer token",
+      "password": true
+    }
+  ],
+  "servers": {
+    "automotive-log": {
+      "type": "http",
+      "url": "http://127.0.0.1:8765/mcp",
+      "headers": {"Authorization": "Bearer ${input:automotive-log-token}"}
+    }
+  }
+}
