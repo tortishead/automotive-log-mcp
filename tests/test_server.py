@@ -101,6 +101,22 @@ def test_invalid_params_fail_loudly(config: Config, tool: str, args: dict[str, A
     run(main)
 
 
+def test_unknown_top_level_args_are_rejected(config: Config) -> None:
+    async def main() -> None:
+        async with Client(build_server(structured(config), Policy())) as client:
+            tools = {t.name: t for t in (await client.list_tools()).tools}
+            assert all(t.input_schema.get("additionalProperties") is False for t in tools.values())
+            result = await client.call_tool("search", {"case": "c1", "query": "x", "level": "E"})
+            assert result.is_error
+            text = result.content[0].text  # type: ignore[union-attr]
+            assert "'level' belongs inside filter" in text
+            result = await client.call_tool("list_sources", {"case": "c1", "bogus": 1})
+            assert result.is_error
+            assert "'bogus' is not a parameter" in result.content[0].text  # type: ignore[union-attr]
+
+    run(main)
+
+
 def test_policy_hides_tools(config: Config) -> None:
     policy = Policy(allowed_tools=frozenset({"list_sources", "search"}))
 

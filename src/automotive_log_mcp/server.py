@@ -25,12 +25,12 @@ import uuid
 from collections.abc import Callable
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Annotated, Any, Literal, TypeVar
+from typing import Annotated, Any, ClassVar, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import __version__
 from .app import App
@@ -430,7 +430,8 @@ class LogServer:
             self.mcp.tool(title=title, annotations=annotations, structured_output=structured)(self._guard(fn))
             tool = self.mcp._tool_manager.get_tool(fn.__name__)
             if tool is not None:
-                tool.parameters = slim_schema(tool.parameters)
+                tool.fn_metadata.arg_model = _strict_args(tool.fn_metadata.arg_model, fn.__name__)
+                tool.parameters = slim_schema({**tool.parameters, "additionalProperties": False})
 
     # -- tools ------------------------------------------------------------------------------
 
@@ -730,6 +731,47 @@ TOOL_NAMES = (
     "detect",
     "check_citations",
 )
+
+
+_FILTER_KEYS = frozenset(f.alias or n for n, f in Filter.model_fields.items()) | set(Filter.model_fields)
+
+
+class _RejectUnknownArgs(BaseModel):
+    """Mixin for a tool's argument model: unknown arguments are an error with a hint. MCPServer's
+    models ignore them, so a misplaced ``level`` (top level instead of inside ``filter``) silently
+    widened a search."""
+
+    _tool: ClassVar[str] = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_unknown(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        names = {f.alias or n for n, f in cls.model_fields.items()}
+        unknown = sorted(k for k in data if k not in names and k not in cls.model_fields)
+        if not unknown:
+            return data
+        hints = [
+            f"'{k}' belongs inside filter, e.g. filter={{'{k}': ...}}"
+            if k in _FILTER_KEYS and "filter" in names
+            else f"'{k}' is not a parameter"
+            for k in unknown
+        ]
+        raise ValueError(f"{cls._tool}: {'; '.join(hints)}. Parameters: {', '.join(sorted(names))}.")
+
+
+_M = TypeVar("_M", bound=BaseModel)
+
+
+def _strict_args(model: type[_M], tool: str) -> type[_M]:
+    """The tool's argument model, rejecting unknown arguments (see ``_RejectUnknownArgs``)."""
+    strict: type[_M] = type(
+        model.__name__,
+        (_RejectUnknownArgs, model),
+        {"model_config": ConfigDict(**{**model.model_config, "extra": "forbid"}), "_tool": tool},
+    )
+    return strict
 
 
 def slim_schema(node: Any) -> Any:
