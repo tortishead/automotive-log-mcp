@@ -222,7 +222,9 @@ def parse_rule(spec: Any, path: Path) -> Rule:
 def load_file(path: Path) -> list[Rule]:
     data = read_yaml_mapping(path, "detector rule file")
     if "connector" in data:
-        return []  # a regex connector definition (connectors/regex_yaml.py)
+        return []  # a regex or command connector definition (connectors/regex_yaml.py)
+    if "marker" in data or "markers" in data:
+        return []  # a clock marker rule (core/align.py)
     if "rules" in data:
         if set(data) != {"rules"} or not isinstance(data["rules"], list):
             raise _fail(path, "'rules' must be the only key, with a list of rules")

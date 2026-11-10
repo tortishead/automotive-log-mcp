@@ -25,7 +25,7 @@ import posixpath
 import queue
 import sqlite3
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import Future
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -177,7 +177,9 @@ class Ingestor:
         registry: Registry,
         redactor: Redactor,
         progress: Progress | None = None,
+        markers: Sequence[Any] = (),
     ) -> None:
+        self.markers = list(markers)
         self.config = config
         self.policy = policy
         self.registry = registry
@@ -230,11 +232,28 @@ class Ingestor:
                     result.skipped.append(f"{p}: {e}")
             if not result.files:
                 raise IngestError(f"no indexable files in {path}: " + "; ".join(result.skipped[:5]))
+            self.align(case_db, result)
             return result
         result.files.append(
             self._add_file(case_db, path, format, force, optional=False, other_cases=other_cases)
         )
+        self.align(case_db, result)
         return result
+
+    def align(self, case_db: Path, result: AddResult) -> None:
+        """Recompute the clock model after an import (M5), so tools find it ready."""
+        if not case_db.exists() or all(f.existing for f in result.files):
+            return
+        from . import align as al
+
+        self._say("aligning the sources on one case clock")
+        with db.opened(case_db) as conn:
+            from ..store import query
+
+            try:
+                al.refresh(conn, query.sources(conn), self.markers)
+            except sqlite3.OperationalError as e:  # locked by a reader: tools redo it on first use
+                self._say(f"alignment deferred: {e}")
 
     def reindex(self, case_db: Path, source_id: int) -> AddResult:
         with db.opened(case_db) as conn:
@@ -249,7 +268,9 @@ class Ingestor:
             )
         if file_sha256(Path(path)) != sha:
             raise IngestError(f"{path} has changed since it was indexed (hash differs); add it as a new file")
-        return AddResult(files=[self._add_file(case_db, Path(path), None, True, optional=False)])
+        result = AddResult(files=[self._add_file(case_db, Path(path), None, True, optional=False)])
+        self.align(case_db, result)
+        return result
 
     def _say(self, msg: str) -> None:
         if self.progress is not None:

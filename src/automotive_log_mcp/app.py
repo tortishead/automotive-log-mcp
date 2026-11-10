@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .config import Config
 from .connectors.base import ConnectorError, Registry, build_registry
+from .core.align import MarkerRule, load_markers
 from .core.ingest import CaseWorkers, IngestError, Ingestor, Progress, file_sha256
 from .core.redact import Redactor, redactor_for_home
 from .detect.engine import RuleSet, load_rules
@@ -23,6 +24,7 @@ class App:
     redactor: Redactor
     ingestor: Ingestor
     rules: RuleSet = field(default_factory=lambda: load_rules())
+    markers: list[MarkerRule] = field(default_factory=list)
     workers: CaseWorkers = field(init=False)
 
     def __post_init__(self) -> None:
@@ -37,10 +39,10 @@ class App:
 
             raise ConfigError(str(e)) from e
         rules = load_rules(config.rule_dirs)  # ConfigError for an invalid rule file
+        markers = load_markers(config.rule_dirs)
         redactor = redactor_for_home(config.home)
-        return cls(
-            config, policy, registry, redactor, Ingestor(config, policy, registry, redactor, progress), rules
-        )
+        ingestor = Ingestor(config, policy, registry, redactor, progress, markers)
+        return cls(config, policy, registry, redactor, ingestor, rules, markers)
 
     def versions(self) -> dict[str, str]:
         return {p.name: p.version for p in self.registry.plugins()}

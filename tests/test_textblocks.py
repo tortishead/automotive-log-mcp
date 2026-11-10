@@ -102,7 +102,7 @@ def test_schema2_db_migrates_to_blocks(app: App) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     _schema2_db(path)
     with db.opened(path) as conn:
-        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == "4"
+        assert conn.execute("SELECT value FROM meta WHERE key='schema_version'").fetchone()[0] == str(db.SCHEMA_VERSION)
         assert "msg" not in [r[1] for r in conn.execute("PRAGMA table_info(records)")]
         msgs = [m for (m,) in conn.execute("SELECT msg FROM records_v ORDER BY id")]
         assert msgs == ["onDisplayAreaAppeared id=3", "setProperty failed\nsecond line", "plain words"]

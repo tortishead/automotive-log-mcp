@@ -37,7 +37,7 @@ def test_lists_all_p0_tools_with_annotations(config: Config) -> None:
             for name, tool in tools.items():
                 assert tool.description, name
                 assert tool.annotations is not None
-                assert tool.annotations.read_only_hint is (name != "add_source"), name
+                assert tool.annotations.read_only_hint is (name not in ("add_source", "align")), name
                 assert tool.annotations.destructive_hint is False
                 assert "case" in tool.input_schema["required"]
             search = tools["search"].input_schema
@@ -56,7 +56,7 @@ def test_list_sources_on_empty_case(config: Config) -> None:
         async with Client(build_server(structured(config), Policy())) as client:
             result = await client.call_tool("list_sources", {"case": "TICKET-1"})
             assert not result.is_error
-            assert result.structured_content == {"case": "TICKET-1", "exists": False, "sources": []}
+            assert result.structured_content == {"case": "TICKET-1", "exists": False, "sources": [], "case_clock": None}
             assert "No sources" in result.content[0].text  # type: ignore[union-attr]
 
     run(main)

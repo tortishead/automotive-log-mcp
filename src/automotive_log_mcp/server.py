@@ -35,6 +35,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from . import __version__
 from .app import App
 from .calllog import CallLog
+from .clocktools import AlignResult, TimelineResult
 from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
@@ -61,7 +62,8 @@ from .usage import FixedCost, args_hashes, cite_ids, compact_cites, est_tokens, 
 SERVER_NAME = "automotive-log-mcp"
 
 INSTRUCTIONS = """\
-Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs). The \
+Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs, other \
+formats from connectors). The \
 server parses, indexes and searches; reasoning is yours. Each call re-sends the whole \
 conversation, so make few, narrow calls and stop once the evidence answers the question.
 
@@ -78,6 +80,11 @@ kill, SELinux, binder, VHAL, service restart, boot not completed); overview(case
 errors cluster; context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before an \
 event (scope='pid' follows one process across buffers); search/count with filter level 'W' or \
 'E' and from/to; get_records for messages cut with '…'.
+
+Several files or devices (bugreport plus kernel log, ECU logs): timeline(case, filter) merges all \
+sources on one case clock and context(case, at=..., scope='all') shows every source around an \
+event; '~' marks times aligned from another clock, align(case) shows how well (and sets anchors). \
+Say when an order across sources rests on '~' times within their error.
 
 Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>]; a statement \
 without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \
@@ -145,6 +152,9 @@ class SourceInfo(BaseModel):
     original_missing: bool = Field(False, description="The original file is no longer at its path.")
     stale: bool = Field(False, description="Indexed with an older connector or redaction rules.")
     segments: int = Field(0, description="Stretches with one continuous clock (boots, clock jumps).")
+    clock: str | None = Field(
+        default=None, description="How the source maps onto the case clock (see align); null when exact."
+    )
     error: str | None = None
 
 
@@ -152,6 +162,9 @@ class ListSourcesResult(BaseModel):
     case: str
     exists: bool = Field(description="Whether the case DB exists yet.")
     sources: list[SourceInfo]
+    case_clock: str | None = Field(
+        default=None, description="The clock timeline and context(scope='all') use."
+    )
 
 
 def _source_info(s: query.SourceRow) -> SourceInfo:
@@ -471,11 +484,20 @@ class LogServer:
             return _text(_describe_add(result, case))
 
         def list_sources(case: Case) -> Annotated[CallToolResult, ListSourcesResult]:
-            """List the sources of a case: format, record count, time range and build fingerprint."""
+            """List the sources of a case: format, record count, time range, build fingerprint, and how
+            each maps onto the case clock that timeline uses."""
             rows = self.app.list_sources(case)
             exists = rows is not None
             infos = [_source_info(s) for s in rows or []]
-            result = ListSourcesResult(case=case, exists=exists, sources=infos)
+            case_clock = None
+            if infos and len(infos) > 1:
+                try:
+                    case_clock, clocks = tools.clock_summary(case)
+                except (ToolInputError, StoreError):
+                    clocks = {}
+                for i in infos:
+                    i.clock = clocks.get(i.id)
+            result = ListSourcesResult(case=case, exists=exists, sources=infos, case_clock=case_clock)
             if not infos:
                 why = "" if exists else " (the case does not exist yet)"
                 return _text(
@@ -490,10 +512,16 @@ class LogServer:
                     flags.append("original missing: relink with the CLI")
                 if i.stale:
                     flags.append("stale: reindex recommended")
+                if i.clock:
+                    flags.append(f"clock {i.clock}")
                 span = f"{i.ts_from or '-'} .. {i.ts_to or '-'}"
                 lines.append(
                     f"{i.id}  {i.format}  {i.records} records  {span}  {i.name}"
                     + (f"  [{'; '.join(flags)}]" if flags else "")
+                )
+            if case_clock and any(i.clock for i in infos):
+                lines.append(
+                    f"case clock: {case_clock}; timeline(case) merges all sources, align(case) explains"
                 )
             fps = sorted({i.fingerprint for i in infos if i.fingerprint})
             if fps:
@@ -562,11 +590,12 @@ class LogServer:
             before: Annotated[int, Field(ge=0, le=500, description="Lines before 'at'.")] = 20,
             after: Annotated[int, Field(ge=0, le=500, description="Lines after 'at'.")] = 20,
             scope: Annotated[
-                Literal["source", "pid"],
+                Literal["source", "pid", "all"],
                 Field(
                     description="'source': neighbouring lines of the same source; 'pid': lines of the same "
                     "process from all sources of the same file (e.g. main, system and crash buffers of a "
-                    "bugreport), merged by time."
+                    "bugreport), merged by time; 'all': lines of every source on the case clock (other "
+                    "files, kernel logs), ~ marking aligned times."
                 ),
             ] = "source",
         ) -> Annotated[CallToolResult, ContextResult]:
@@ -691,6 +720,59 @@ class LogServer:
             findings and quotes not in the cited lines are warnings. 'PASS' when there are no errors."""
             return _output(lambda: tools.check_citations(case, text), self.structured)
 
+        def timeline(
+            case: Case,
+            filter: Annotated[
+                Filter | None,
+                Field(
+                    description="Optional record filter; from/to are case-clock times as timeline prints "
+                    "them, or citations ('log:5#120-10s')."
+                ),
+            ] = None,
+            query: Annotated[
+                str | None,
+                Field(min_length=1, description="Optional words that must occur (as in search, text mode)."),
+            ] = None,
+            limit: Annotated[int, Field(ge=1, le=500, description="Maximum lines to return.")] = 50,
+            cursor: Annotated[
+                str | None, Field(description="Cursor from a previous timeline footer.")
+            ] = None,
+        ) -> Annotated[CallToolResult, TimelineResult]:
+            """Records of all sources (bugreport buffers, kernel logs, other devices' logs) merged on one
+            case clock, in time order; '~' marks times aligned from another clock (align shows how)."""
+            return _output(lambda: tools.timeline(case, filter, query, limit, cursor), self.structured)
+
+        def align(
+            case: Case,
+            mode: Annotated[
+                Literal["auto", "offset", "anchor", "reference", "reset"],
+                Field(
+                    description="'auto': show the alignment (computed automatically); 'offset': set a "
+                    "source's offset to the case clock; 'anchor': at and ref happened at the same moment; "
+                    "'reference': use a source's clock as the case clock; 'reset': drop manual settings."
+                ),
+            ] = "auto",
+            source: Annotated[str | None, Field(description="Source id (offset, reference, reset).")] = None,
+            seg: Annotated[
+                int | None, Field(ge=1, description="Segment (boot) of a kernel source, for 'offset'.")
+            ] = None,
+            offset: Annotated[
+                str | None,
+                Field(
+                    description="'offset': case time minus source time, e.g. '+1.5s', '-200ms'; 'anchor': "
+                    "ref happened this long after at (default 0)."
+                ),
+            ] = None,
+            at: Annotated[str | None, Field(pattern=AT_RE, description="'anchor': a citation.")] = None,
+            ref: Annotated[
+                str | None,
+                Field(pattern=AT_RE, description="'anchor': a citation on another clock, same moment."),
+            ] = None,
+        ) -> Annotated[CallToolResult, AlignResult]:
+            """How each source maps onto the case clock (offset, confidence, error, anchors), and manual
+            alignment when the automatic one is missing or wrong."""
+            return _output(lambda: tools.align(case, mode, source, seg, offset, at, ref), self.structured)
+
         self._tool(add_source, WRITES_CASE, "Add a log source")
         self._tool(list_sources, READ_ONLY, "List sources")
         self._tool(search, READ_ONLY, "Search records")
@@ -702,6 +784,8 @@ class LogServer:
         self._tool(count, READ_ONLY, "Count records")
         self._tool(detect, READ_ONLY, "Detect known failure patterns")
         self._tool(check_citations, READ_ONLY, "Check the citations of an answer")
+        self._tool(timeline, READ_ONLY, "Timeline of all sources")
+        self._tool(align, WRITES_CASE, "Align source clocks")
 
     # -- prompts ----------------------------------------------------------------------------
 
@@ -730,6 +814,8 @@ TOOL_NAMES = (
     "count",
     "detect",
     "check_citations",
+    "timeline",
+    "align",
 )
 
 

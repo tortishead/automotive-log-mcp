@@ -22,6 +22,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from .app import App
+from .clocktools import ClockTools, TimelineRecord
 from .core import citations as cit
 from .core import format as fmt
 from .core.timeparse import NS, ts_raw_of, wall_ns
@@ -122,7 +123,7 @@ class ContextResult(BaseModel):
     case: str
     at: str
     scope: str
-    records: list[RecordOut]
+    records: list[RecordOut | TimelineRecord]
     note: str | None = None
 
 
@@ -435,6 +436,7 @@ class Tools:
     def __init__(self, app: App) -> None:
         self.app = app
         self.caps = app.config.caps
+        self.clock = ClockTools(self)
 
     # -- plumbing ---------------------------------------------------------------------------------
 
@@ -1068,15 +1070,23 @@ class Tools:
                 recs = query.pid_neighbours(ctx.conn, anchor, srcs, b, a, seg)
                 ids = sorted({r.source_id for r in recs})
                 head = f"pid {anchor.pid} around {anchor.cite}, sources {_id_ranges(ids)} by time:"
+            elif scope == "all":
+                texts_all, outs_all, head, extra_all = self.clock.context_all(ctx, anchor, b, a)
             else:
                 recs = query.source_neighbours(ctx.conn, rid, b, a)
                 head = f"source {anchor.source_id} around {anchor.cite}:"
-            idx = next(i for i, r in enumerate(recs) if r.id == rid)
-            outs = [self._rec_out(r, ctx) for r in recs]
-            texts = [
-                ("> " if i == idx else "  ") + self.line(o, fmt.short_ts(r.ts, r.ts_src))
-                for i, (r, o) in enumerate(zip(recs, outs, strict=True))
-            ]
+            if scope == "all":
+                idx = next(i for i, t in enumerate(texts_all) if t.startswith("> "))
+                outs: list[Any] = outs_all
+                texts = texts_all
+            else:
+                extra_all = []
+                idx = next(i for i, r in enumerate(recs) if r.id == rid)
+                outs = [self._rec_out(r, ctx) for r in recs]
+                texts = [
+                    ("> " if i == idx else "  ") + self.line(o, fmt.short_ts(r.ts, r.ts_src))
+                    for i, (r, o) in enumerate(zip(recs, outs, strict=True))
+                ]
             lo, hi = 0, len(texts)
             budget = self.caps.max_bytes - 700
             size = sum(fmt.utf8_len(t) + 1 for t in texts)
@@ -1092,7 +1102,7 @@ class Tools:
                     f"output cap of {self.caps.max_bytes} bytes: {lo + len(texts) - hi} lines left out"
                 )
             shown = outs[lo:hi]
-            lines = [head, *texts[lo:hi]]
+            lines = [head, *texts[lo:hi], *extra_all]
             if scope == "source":
                 first, last = recs[lo], recs[hi - 1]
                 s = ctx.by_id[anchor.source_id]
@@ -1126,6 +1136,44 @@ class Tools:
                 case=case, at=anchor.cite, scope=scope, records=shown, note="; ".join(note) or None
             )
             return Output(_join(lines), data)
+
+    def timeline(
+        self,
+        case: str,
+        filter: Filter | None = None,
+        query_text: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> Output:
+        out: Output = self.clock.timeline(case, filter, query_text, limit, cursor)
+        return out
+
+    def align(
+        self,
+        case: str,
+        mode: str = "auto",
+        source: str | None = None,
+        seg: int | None = None,
+        offset: str | None = None,
+        at: str | None = None,
+        ref: str | None = None,
+    ) -> Output:
+        out: Output = self.clock.align(case, mode, source, seg, offset, at, ref)
+        return out
+
+    def clock_summary(self, case: str) -> tuple[str, dict[str, str]]:
+        """(case clock name, short clock text per source id) for list_sources; exact sources omitted."""
+        with self._case(case) as ctx:
+            cc = self.clock.model(ctx)
+            out: dict[str, str] = {}
+            for row in self.clock.align_rows(ctx, cc):
+                if row.conf == "exact" or row.source in out:
+                    continue
+                if not row.placed:
+                    out[row.source] = "not placed (no anchor; see align)"
+                    continue
+                out[row.source] = " ".join(p for p in ("~" + (row.conf or ""), row.error) if p)
+            return self.clock.clock_name(ctx, cc), out
 
     def _anchor(self, ctx: _Ctx, at: str) -> int:
         at = at.strip()

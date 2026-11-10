@@ -98,7 +98,7 @@ def test_raw_jsonrpc_client_over_stdio(home: Path) -> None:
 
     call = responses[3]["result"]
     assert call.get("isError") is not True
-    assert call["structuredContent"] == {"case": "c1", "exists": False, "sources": []}
+    assert call["structuredContent"] == {"case": "c1", "exists": False, "sources": [], "case_clock": None}
 
 
 def test_bad_config_exits_with_message(home: Path) -> None:
