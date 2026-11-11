@@ -5,6 +5,23 @@ and parameters and the connector interface (D11 in the implementation plan): a b
 there needs a new major version. Output text, defaults and the case DB layout may change in minor
 versions; a case DB of an older schema is migrated on first open.
 
+## [Unreleased]
+
+### Changed
+
+- **Internal layout** (no change to tool names, parameters or output): `tools.py`, `clocktools.py`
+  and `difftool.py` are now the package `automotive_log_mcp.tools`, layered without an import
+  cycle (`models`, `timespec`, `text`, `limits`, `clock`, `diff`, `base`, then one module per tool
+  family); `from automotive_log_mcp.tools import Tools, Filter, ...` works as before. A test keeps
+  the layers acyclic.
+- `Output` is generic over its result model (`Output[SearchResult]`, ...), so callers get typed
+  `data`; tool tunables (`AGG_ROWS`, `MAX_BUCKETS`, ...) live in `tools.limits`.
+- A missing case raises `CaseNotFoundError` (a `ToolInputError`); the CLI's exit status 1 for it
+  no longer depends on the message text.
+- The server's instructions and triage prompt are in `prompts.py`; `TOOL_SPECS` is the one list
+  of tools (with annotations and titles) and `TOOL_NAMES` is derived from it.
+- Time-zone lookups catch only the errors an unknown or malformed zone name raises.
+
 ## [0.1.0] - 2026-11-10
 
 First release (milestones M0 to M6 of [docs/implementation-plan.md](docs/implementation-plan.md)).
