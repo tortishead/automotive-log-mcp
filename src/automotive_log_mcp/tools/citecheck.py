@@ -18,7 +18,7 @@ from .timespec import parse_log_cite
 class CitationTools(ToolBase):
     """``check_citations``."""
 
-    def check_citations(self, case: str, text: str) -> Output:
+    def check_citations(self, case: str, text: str) -> Output[CheckCitationsResult]:
         paras = cit.paragraphs(text)
         found = [f for p in paras for f in p.cites]
         errors: list[CitationIssue] = []

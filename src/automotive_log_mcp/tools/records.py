@@ -8,6 +8,8 @@ from ..core import format as fmt
 from ..model import SEQ_BITS, SEQ_MASK, citation
 from ..store import query
 from .base import ToolBase
+from .clock import AlignResult, TimelineResult
+from .diff import DiffResult
 from .models import ContextResult, DiffSide, Filter, GetRecordsResult, Output, RecordOut, ToolInputError
 from .text import cut_bytes, id_ranges, join_lines, list_some, reserve_bytes
 from .timespec import parse_log_cite
@@ -16,7 +18,9 @@ from .timespec import parse_log_cite
 class RecordTools(ToolBase):
     """``context``, ``get_records``, and the clock and diff tools by delegation."""
 
-    def context(self, case: str, at: str, before: int = 20, after: int = 20, scope: str = "source") -> Output:
+    def context(
+        self, case: str, at: str, before: int = 20, after: int = 20, scope: str = "source"
+    ) -> Output[ContextResult]:
         with self.open_case(case) as ctx:
             rid = self.resolve_at(ctx, at)
             anchor = query.records_by_id(ctx.conn, [rid]).get(rid)
@@ -110,7 +114,7 @@ class RecordTools(ToolBase):
             )
             return Output(join_lines(lines), data)
 
-    def get_records(self, case: str, ids: list[str]) -> Output:
+    def get_records(self, case: str, ids: list[str]) -> Output[GetRecordsResult]:
         with self.open_case(case) as ctx:
             wanted: list[tuple[str, int | None]] = []
             for cite in ids:
@@ -201,9 +205,8 @@ class RecordTools(ToolBase):
         query_text: str | None = None,
         limit: int = 50,
         cursor: str | None = None,
-    ) -> Output:
-        out: Output = self.clock.timeline(case, filter, query_text, limit, cursor)
-        return out
+    ) -> Output[TimelineResult]:
+        return self.clock.timeline(case, filter, query_text, limit, cursor)
 
     def align(
         self,
@@ -214,13 +217,13 @@ class RecordTools(ToolBase):
         offset: str | None = None,
         at: str | None = None,
         ref: str | None = None,
-    ) -> Output:
-        out: Output = self.clock.align(case, mode, source, seg, offset, at, ref)
-        return out
+    ) -> Output[AlignResult]:
+        return self.clock.align(case, mode, source, seg, offset, at, ref)
 
-    def diff(self, case: str, a: DiffSide, b: DiffSide, min_ratio: float = 4.0, limit: int = 12) -> Output:
-        out: Output = self.differ.diff(case, a, b, min_ratio, limit)
-        return out
+    def diff(
+        self, case: str, a: DiffSide, b: DiffSide, min_ratio: float = 4.0, limit: int = 12
+    ) -> Output[DiffResult]:
+        return self.differ.diff(case, a, b, min_ratio, limit)
 
     def case_time(self, case: str, cite: str) -> int | None:
         """A record's time on the case clock (ns), as timeline orders it; None when its source is

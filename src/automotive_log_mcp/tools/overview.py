@@ -20,7 +20,7 @@ from .timespec import full_ts_ns
 class OverviewTools(ToolBase):
     """``overview``."""
 
-    def overview(self, case: str, filter: Filter | None = None) -> Output:
+    def overview(self, case: str, filter: Filter | None = None) -> Output[OverviewResult]:
         warnings: list[str] = []
         with self.open_case(case) as ctx:
             conn = ctx.conn

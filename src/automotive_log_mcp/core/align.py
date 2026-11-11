@@ -41,6 +41,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..config import ConfigError, read_yaml_mapping
 from ..model import SEQ_BITS
@@ -49,6 +50,9 @@ from . import clock as ck
 from .clock import CONF_RANK, Piece, SegClock
 from .templates import mask
 from .timeparse import NS, wall_ns
+
+# An unknown or malformed zone name (from a log), or no tz database on the machine.
+_ZONE_ERRORS = (ZoneInfoNotFoundError, ValueError, OSError)
 
 MS = 1_000_000
 PAIR_TOL_NS = 500 * MS  # offsets of one piece agree within this
@@ -578,10 +582,8 @@ def utc_in_message_edges(conn: sqlite3.Connection, nodes: dict[str, Node]) -> li
         if target is None or not target.timezone:
             continue
         try:
-            from zoneinfo import ZoneInfo
-
             zone = ZoneInfo(target.timezone)
-        except Exception:
+        except _ZONE_ERRORS:
             continue
         cond, params = n.where()
         rows = conn.execute(
@@ -838,12 +840,10 @@ def _zone_offset(zone_from: str | None, zone_to: str | None, at: int | None) -> 
     if not zone_from or not zone_to or zone_from == zone_to or at is None:
         return 0 if zone_from and zone_from == zone_to else None
     try:
-        from zoneinfo import ZoneInfo
-
         t = datetime.fromtimestamp(at // NS, UTC)
         a = t.astimezone(ZoneInfo(zone_from)).utcoffset() or timedelta(0)
         b = t.astimezone(ZoneInfo(zone_to)).utcoffset() or timedelta(0)
-    except Exception:
+    except (*_ZONE_ERRORS, OverflowError):
         return None
     return int((b - a).total_seconds()) * NS
 

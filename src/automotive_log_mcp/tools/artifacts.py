@@ -100,7 +100,7 @@ def main_section(a: ArtifactRow) -> str | None:
 class ArtifactTools(ToolBase):
     """``list_artifacts`` and ``read_artifact``."""
 
-    def list_artifacts(self, case: str, type: str | None = None) -> Output:
+    def list_artifacts(self, case: str, type: str | None = None) -> Output[ListArtifactsResult]:
         with self.open_case(case) as ctx:
             visible = [s.id for s in ctx.sources]
             every = query.artifacts(ctx.conn, None, visible)
@@ -207,7 +207,7 @@ class ArtifactTools(ToolBase):
         section: str | None = None,
         start_line: int | None = None,
         end_line: int | None = None,
-    ) -> Output:
+    ) -> Output[ReadArtifactResult]:
         try:
             c = query.parse_art_citation(id)
         except ValueError as e:

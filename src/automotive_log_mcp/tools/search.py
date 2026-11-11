@@ -58,7 +58,7 @@ class SearchTools(ToolBase):
         limit: int = 50,
         cursor: str | None = None,
         busy: bool = False,
-    ) -> Output:
+    ) -> Output[SearchResult]:
         """``text`` None (an empty MCP query) matches every record that passes the filter."""
         warnings: list[str] = []
         q = self.app.redactor.redact(text.strip()) if text is not None else ""

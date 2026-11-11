@@ -62,7 +62,7 @@ def _resolve_all(tools: Tools, case: str, d: DiffResult) -> None:
     items = [*d.only_a, *d.only_b, *d.changed]
     cites = [c for it in items for c in (it.cite_a, it.cite_b) if c]
     assert cites
-    recs = tools.get_records(case, cites).data.records  # type: ignore[attr-defined]
+    recs = tools.get_records(case, cites).data.records
     assert [r.cite for r in recs] == cites
     by_cite = {r.cite: r for r in recs}
     for it in items:
@@ -104,9 +104,9 @@ def test_two_runs_only_in_each_and_changed(app: App, tools: Tools, tmp_path: Pat
     assert "×3 → ×30 (6×)  log:1#41 / log:2#41  W VehicleHal" in out.text
     _resolve_all(tools, "d", d)
     # the text's citations pass check_citations
-    assert tools.check_citations("d", out.text).data.ok  # type: ignore[attr-defined]
+    assert tools.check_citations("d", out.text).data.ok
     # min_ratio above the change: not listed; reversed sides swap the lists
-    assert tools.diff("d", side(sources=["1"]), side(sources=["2"]), min_ratio=7).data.changed == []  # type: ignore[attr-defined]
+    assert tools.diff("d", side(sources=["1"]), side(sources=["2"]), min_ratio=7).data.changed == []
     r = tools.diff("d", side(sources=["2"]), side(sources=["1"])).data
     assert [i.cite_a for i in r.only_a] == ["log:2#71", "log:2#73"]  # type: ignore[attr-defined]
     assert r.changed[0].ratio is not None and r.changed[0].ratio < 1  # type: ignore[attr-defined]

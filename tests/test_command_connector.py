@@ -84,7 +84,7 @@ def test_command_connector_records_artifacts_meta(config: Config, tmp_path: Path
     arts = tools.list_artifacts("e").text
     assert "ecu_reset" in arts and "ECU reset" in arts, arts
     assert "pc=0x1" in tools.read_artifact("e", "art:1", section="dump").text
-    rec = tools.get_records("e", ["log:1#1"]).data.records[0]  # type: ignore[attr-defined]
+    rec = tools.get_records("e", ["log:1#1"]).data.records[0]
     assert rec.attrs == {"ecu": "ECU7", "n": 1} and rec.ts_raw == "2026-10-01 08:00:01.250"
 
 

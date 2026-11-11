@@ -16,7 +16,7 @@ class DetectTools(ToolBase):
 
     def detect(
         self, case: str, rules: list[str] | None = None, filter: Filter | None = None, examples: int = 3
-    ) -> Output:
+    ) -> Output[DetectResult]:
         rs = self.app.rules
         if rules:
             unknown = [r for r in rules if r not in rs.rules]

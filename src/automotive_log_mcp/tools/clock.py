@@ -289,7 +289,7 @@ class ClockTools:
         query_text: str | None = None,
         limit: int = 50,
         cursor: str | None = None,
-    ) -> Any:
+    ) -> Output[TimelineResult]:
 
         warnings: list[str] = []
         key = fmt.query_key(
@@ -412,7 +412,7 @@ class ClockTools:
         offset: str | None = None,
         at: str | None = None,
         ref: str | None = None,
-    ) -> Any:
+    ) -> Output[AlignResult]:
 
         with self.t.open_case(case) as ctx:
             sid = self._source_arg(ctx, source) if source is not None else None
@@ -560,7 +560,7 @@ class ClockTools:
                 )
         return out
 
-    def _align_output(self, ctx: CaseCtx, cc: CaseClock) -> Any:
+    def _align_output(self, ctx: CaseCtx, cc: CaseClock) -> Output[AlignResult]:
 
         rows = self.align_rows(ctx, cc)
         lines = [f"case clock: {self.clock_name(ctx, cc)}"]

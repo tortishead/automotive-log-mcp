@@ -144,7 +144,7 @@ def rules_case(app: App, tmp_path: Path) -> Tools:
 
 
 def _hits(out: Output) -> dict[str, list[str]]:
-    return {r.rule: [h.record.cite for h in r.hits] for r in out.data.results}  # type: ignore[attr-defined]
+    return {r.rule: [h.record.cite for h in r.hits] for r in out.data.results}
 
 
 def test_every_default_rule_hits_once(rules_case: Tools) -> None:
@@ -161,10 +161,10 @@ def test_every_default_rule_hits_once(rules_case: Tools) -> None:
         "vhal_error": ["log:1#9"],
         "service_restart": ["log:1#10"],
     }
-    assert out.data.no_hits == []  # type: ignore[attr-defined]
+    assert out.data.no_hits == []
     assert len(load_rules().rules) == 10
     # severity order, then time
-    sev = [r.severity for r in out.data.results]  # type: ignore[attr-defined]
+    sev = [r.severity for r in out.data.results]
     assert sev == sorted(sev, key=["high", "medium", "low"].index)
 
 
@@ -177,7 +177,7 @@ def test_boot_completed_closes_the_window(app: App, tmp_path: Path) -> None:
     p.write_text(log, encoding="utf-8")
     app.ingestor.add(app.config.case_db("b"), str(p))
     out = Tools(app).detect("b", rules=["boot_not_completed"])
-    assert out.data.results == []  # type: ignore[attr-defined]
+    assert out.data.results == []
     assert "no hits: boot_not_completed" in out.text
 
 
@@ -229,11 +229,11 @@ rules:
     hits = _hits(out)
     assert hits["anr"] == ["log:1#11"]  # the override, not the package rule
     assert hits["died_then_started"] == ["log:1#2"]
-    res = {r.rule: r for r in out.data.results}  # type: ignore[attr-defined]
+    res = {r.rule: r for r in out.data.results}
     assert res["died_then_started"].hits[0].followed_by == "log:1#3"
     assert "followed by log:1#3 (+1 s)" in out.text
     assert hits["crash_not_followed"] == ["log:1#2"]  # the watchdog comes 3 s later
-    assert "same_pid_followed" in out.data.no_hits  # type: ignore[attr-defined]  # pid 2000 vs 2100
+    assert "same_pid_followed" in out.data.no_hits  # pid 2000 vs 2100
     assert hits["raw_mac"] == ["log:1#16"]
 
 
@@ -302,22 +302,22 @@ def test_detect_on_kernel_monotonic_records(app: App, tmp_path: Path) -> None:
 
 def test_count_matches_search_totals(br: Tools) -> None:  # noqa: F811
     for q, mode in (("hvac", "text"), (r"pid \d+", "regex")):
-        total = br.search("br", q, mode=mode, count_only=True).data.total  # type: ignore[attr-defined]
+        total = br.search("br", q, mode=mode, count_only=True).data.total
         for by in ("tag", "level", "pid", "source", "template", None):
-            assert br.count("br", by=by, text=q, mode=mode).data.total == total  # type: ignore[attr-defined]
+            assert br.count("br", by=by, text=q, mode=mode).data.total == total
     every = sum(s.records for s in br.app.list_sources("br") or [])
-    assert br.count("br", by="source").data.total == every  # type: ignore[attr-defined]
+    assert br.count("br", by="source").data.total == every
 
 
 def test_count_buckets_include_empty_and_reject_too_many(br: Tools) -> None:  # noqa: F811
     out = br.count("br", by=None, bucket="1m")
-    buckets = out.data.buckets  # type: ignore[attr-defined]
-    assert len(buckets) == 17 and sum(b.count for b in buckets) == out.data.total  # type: ignore[attr-defined]
+    buckets = out.data.buckets
+    assert len(buckets) == 17 and sum(b.count for b in buckets) == out.data.total
     assert any(b.count == 0 for b in buckets)
     assert buckets[0].ts == "2025-12-31 23:50:00.000"
     # every printed bucket start is accepted back as 'from'
     first = out.text.split("\n")[1].split()[:2]
-    assert br.search("br", None, filter=F(from_=" ".join(first), to="+59s"), count_only=True).data.total == 1  # type: ignore[attr-defined]
+    assert br.search("br", None, filter=F(from_=" ".join(first), to="+59s"), count_only=True).data.total == 1
     with pytest.raises(ToolInputError, match="use bucket='30s'"):
         br.count("br", bucket="1s")
     with pytest.raises(ToolInputError, match="invalid bucket"):
@@ -325,12 +325,12 @@ def test_count_buckets_include_empty_and_reject_too_many(br: Tools) -> None:  # 
 
 
 def test_count_broad_query_is_sampled(br: Tools, monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: F811
-    exact = br.count("br", by="level", text="com").data.total  # type: ignore[attr-defined]
+    exact = br.count("br", by="level", text="com").data.total
     monkeypatch.setattr(tools_mod, "AGG_ROWS", 1)
     out = br.count("br", by="level", text="com")
-    assert out.data.exact is False and out.text.startswith("≈")  # type: ignore[attr-defined]
+    assert out.data.exact is False and out.text.startswith("≈")
     assert "estimated from every" in out.text
-    assert out.data.total > 0 and exact > 0  # type: ignore[attr-defined]
+    assert out.data.total > 0 and exact > 0
 
 
 # -- overview ----------------------------------------------------------------------------------
@@ -366,7 +366,7 @@ def test_overview_gaps_and_bursts(app: App, tmp_path: Path) -> None:
 
 def test_overview_empty_and_filtered(app: App, br: Tools) -> None:  # noqa: F811
     out = br.overview("br", F(sources=["5"]))
-    assert out.data.records == 3 and out.data.mono_from == "0.000000"  # type: ignore[attr-defined]
+    assert out.data.records == 3 and out.data.mono_from == "0.000000"
     assert "since boot 0.000000 .. 124.000000" in out.text
     with pytest.raises(ToolInputError, match="does not exist"):
         br.overview("nope")
@@ -428,17 +428,17 @@ def test_check_citations_errors_and_warnings(br: Tools) -> None:  # noqa: F811
 
 def test_check_citations_pass_and_no_citations(br: Tools) -> None:  # noqa: F811
     ok = br.check_citations("br", "The app crashed (log:3#1), stack in art:1/exception:L3-L4.\n")
-    assert ok.data.ok and ok.text.startswith("PASS")  # type: ignore[attr-defined]
+    assert ok.data.ok and ok.text.startswith("PASS")
     none = br.check_citations("br", "The app crashed because the HAL was not ready in time, clearly.\n")
-    assert none.data.ok and none.data.citations == 0  # type: ignore[attr-defined]
-    assert "cites nothing" in none.text and none.data.uncited == 1  # type: ignore[attr-defined]
+    assert none.data.ok and none.data.citations == 0
+    assert "cites nothing" in none.text and none.data.uncited == 1
 
 
 def test_check_citations_respects_blocked_sources(app: App, tmp_path: Path) -> None:
     app.ingestor.add(app.config.case_db("br"), str(make_bugreport_zip(tmp_path)))
     blocked = App.create(app.config, Policy(blocked_sources=("*SYSTEM LOG:crash*",)))
     out = Tools(blocked).check_citations("br", "Crash at log:3#1 and art:1.\n")
-    assert {e.cite for e in out.data.errors} == {"log:3#1", "art:1"}  # type: ignore[attr-defined]
+    assert {e.cite for e in out.data.errors} == {"log:3#1", "art:1"}
 
 
 def test_call_log_keeps_only_size_of_checked_text(app: App, tmp_path: Path) -> None:
@@ -478,7 +478,7 @@ def test_dlt_viewer_export_example_connector(home: Path, tmp_path: Path) -> None
     )
     app.ingestor.add(app.config.case_db("d"), str(p))
     t = Tools(app)
-    rec = t.get_records("d", ["log:1#2"]).data.records[0]  # type: ignore[attr-defined]
+    rec = t.get_records("d", ["log:1#2"]).data.records[0]
     assert (rec.level, rec.tag, rec.ts) == ("E", "CTRL", "2026-01-01 08:00:01.123")
     assert rec.attrs["ecu"] == "ECU1" and rec.attrs["apid"] == "HVAC"
     assert _hits(t.detect("d", rules=["vhal_error"])) == {"vhal_error": ["log:1#2"]}

@@ -21,6 +21,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import BaseModel
+
 from . import __version__
 from .app import App
 from .config import CASE_NAME_RE, Config, ConfigError, load_config
@@ -32,6 +34,7 @@ from .policy import Policy, load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
 from .tools import DiffSide, Filter, Output, ToolInputError, Tools
+from .tools.clock import AlignResult
 
 
 def _case(value: str) -> str:
@@ -308,7 +311,7 @@ def _query(app: App, args: argparse.Namespace) -> int:
         _err(str(e))
         return 1 if "does not exist" in str(e) else 2
     if args.count:
-        print(out.data.total)  # type: ignore[attr-defined]
+        print(out.data.total)
     else:
         print(out.text)
     return 0
@@ -317,6 +320,8 @@ def _query(app: App, args: argparse.Namespace) -> int:
 def _tool(app: App, args: argparse.Namespace) -> int:
     """overview, count, detect, check, timeline and align: print the MCP tool's text."""
     tools = Tools(app)
+    out: Output[BaseModel]
+    passed = True  # check: whether the citations passed
     try:
         if args.command == "overview":
             out = tools.overview(args.case, _filter(args))
@@ -345,14 +350,13 @@ def _tool(app: App, args: argparse.Namespace) -> int:
             )
         else:
             text = sys.stdin.read() if str(args.file) == "-" else args.file.read_text(encoding="utf-8")
-            out = tools.check_citations(args.case, text)
+            checked = tools.check_citations(args.case, text)
+            out, passed = checked, checked.data.ok
     except (ToolInputError, OSError) as e:
         _err(str(e))
         return 1 if "does not exist" in str(e) else 2
     print(out.text)
-    if args.command == "check":
-        return 0 if out.data.ok else 1  # type: ignore[attr-defined]
-    return 0
+    return 0 if passed else 1
 
 
 def _diff_side(args: argparse.Namespace, side: str) -> DiffSide:
@@ -376,7 +380,7 @@ def _diff_side(args: argparse.Namespace, side: str) -> DiffSide:
         raise ToolInputError(f"--{side}: {e}") from None
 
 
-def _align(tools: Tools, args: argparse.Namespace) -> Output:
+def _align(tools: Tools, args: argparse.Namespace) -> Output[AlignResult]:
     given = [x for x in (args.offset, args.anchor, args.reference, args.reset) if x is not None]
     if len(given) > 1:
         raise ToolInputError("give one of --offset, --anchor, --reference, --reset")

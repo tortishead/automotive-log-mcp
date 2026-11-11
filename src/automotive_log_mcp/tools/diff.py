@@ -152,7 +152,7 @@ class DiffTool:
         b: DiffSide,
         min_ratio: float = DEFAULT_RATIO,
         limit: int = 12,
-    ) -> Output:
+    ) -> Output[DiffResult]:
 
         if not min_ratio > 1:
             raise ToolInputError("min_ratio must be above 1, e.g. 4 (four times as frequent)")

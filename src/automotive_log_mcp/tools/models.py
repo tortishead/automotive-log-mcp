@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -314,7 +314,12 @@ class CheckCitationsResult(BaseModel):
     warnings: list[CitationIssue] = Field(default_factory=list)
 
 
-@dataclass
-class Output:
+ResultT = TypeVar("ResultT", bound=BaseModel, covariant=True)
+
+
+@dataclass(frozen=True)
+class Output(Generic[ResultT]):
+    """A tool's result: the text the agent reads and the same items as a model."""
+
     text: str
-    data: BaseModel
+    data: ResultT

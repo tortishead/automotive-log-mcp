@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from pydantic import BaseModel
 
 from automotive_log_mcp.app import App
 from automotive_log_mcp.config import CASE_NAME_RE, load_config
@@ -166,7 +167,7 @@ def load_cases(path: Path) -> list[Case]:
     return out
 
 
-def _call(tools: Tools, case: str, tool: str, args: dict[str, Any]) -> Output:
+def _call(tools: Tools, case: str, tool: str, args: dict[str, Any]) -> Output[BaseModel]:
     args = dict(args)
     if "filter" in args and args["filter"] is not None:
         args["filter"] = Filter.model_validate(args["filter"])
@@ -195,11 +196,11 @@ def _cited_text(tools: Tools, case: str, cite: str) -> str:
     """The text a citation points at: a record's tag and message, an artifact's lines, or (for a
     whole artifact or section without lines) its summary and lines."""
     if cite.startswith("log:"):
-        recs = tools.get_records(case, [cite]).data.records  # type: ignore[attr-defined]
+        recs = tools.get_records(case, [cite]).data.records
         return f"{recs[0].tag or ''} {recs[0].msg}" if recs else ""
     data = tools.read_artifact(case, cite).data
-    lines = "\n".join(x.text for x in (data.lines or []))  # type: ignore[attr-defined]
-    return f"{data.summary or ''}\n{lines}"  # type: ignore[attr-defined]
+    lines = "\n".join(x.text for x in (data.lines or []))
+    return f"{data.summary or ''}\n{lines}"
 
 
 def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
@@ -228,7 +229,7 @@ def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
         for c in set(CITE.findall(out.text)):
             seen.setdefault(c, []).append(tool)
     check = tools.check_citations(case.id, "\n\n".join(f"Expected: {c}." for c in case.citations))
-    errors = check.data.errors  # type: ignore[attr-defined]
+    errors = check.data.errors
     res.unresolved = [f"{e.cite}: {e.message}" for e in errors]
     bad = {e.cite for e in errors}
     for c, want in case.texts.items():

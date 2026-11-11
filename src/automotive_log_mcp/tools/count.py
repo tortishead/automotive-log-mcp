@@ -108,7 +108,7 @@ class CountTools(ToolBase):
         filter: Filter | None = None,
         bucket: str | None = None,
         limit: int = 20,
-    ) -> Output:
+    ) -> Output[CountResult]:
         warnings: list[str] = []
         q, rx = self._query_arg(text, mode, warnings)
         if by is not None and by not in query.COUNT_KEYS:

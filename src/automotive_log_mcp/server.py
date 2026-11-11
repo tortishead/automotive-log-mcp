@@ -255,7 +255,7 @@ def _text(text: str, structured: BaseModel | None = None, send_structured: bool 
     )
 
 
-def _output(run: Callable[[], Output], send_structured: bool = True) -> CallToolResult:
+def _output(run: Callable[[], Output[BaseModel]], send_structured: bool = True) -> CallToolResult:
     """Run a read tool; invalid arguments and unknown ids become tool errors the agent can read."""
     try:
         out = run()

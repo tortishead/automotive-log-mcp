@@ -366,8 +366,8 @@ def test_timeline_merges_and_pages_in_case_time(app: App, tools: Tools, tmp_path
     cursor = None
     for _ in range(20):
         out = tools.timeline("t", limit=17, cursor=cursor)
-        seen += [(r.ts or "", r.cite) for r in out.data.records]  # type: ignore[attr-defined]
-        cursor = out.data.next_cursor  # type: ignore[attr-defined]
+        seen += [(r.ts or "", r.cite) for r in out.data.records]
+        cursor = out.data.next_cursor
         if cursor is None:
             break
     assert cursor is None
@@ -375,11 +375,11 @@ def test_timeline_merges_and_pages_in_case_time(app: App, tools: Tools, tmp_path
     assert len(seen) == total == len({c for _, c in seen})
     assert [t for t, _ in seen] == sorted(t for t, _ in seen)
     out = tools.timeline("t", Filter.model_validate({"sources": ["2"], "from": "log:2#10", "to": "+2s"}))
-    recs = out.data.records  # type: ignore[attr-defined]
+    recs = out.data.records
     assert recs and recs[0].cite == "log:2#10" and all(r.approx for r in recs)
     assert "~" in out.text and "~ source 2: paired" in out.text
     out = tools.timeline("t", query_text="user line")
-    assert out.data.records and all("user line" in r.msg for r in out.data.records)  # type: ignore[attr-defined]
+    assert out.data.records and all("user line" in r.msg for r in out.data.records)
 
 
 def test_timeline_from_to_errors(app: App, tools: Tools, tmp_path: Path) -> None:
@@ -401,7 +401,7 @@ def test_context_all_shows_other_sources_around_an_event(app: App, tools: Tools,
     assert marked == [ln for ln in lines[1:] if "log:2#20 " in ln]
     cites = {ln.split()[0] if not ln.startswith(">") else ln.split()[1] for ln in lines[1:10]}
     assert any(c.startswith("log:1#") for c in cites) and any(c.startswith("log:2#") for c in cites)
-    assert len(out.data.records) == 9  # type: ignore[attr-defined]
+    assert len(out.data.records) == 9
 
 
 def test_context_all_refuses_an_unplaced_record(app: App, tools: Tools, tmp_path: Path) -> None:
