@@ -15,7 +15,6 @@ from typing import Any
 
 import pytest
 
-from automotive_log_mcp import tools as tools_mod
 from automotive_log_mcp.app import App
 from automotive_log_mcp.config import Caps, ConfigError, load_config
 from automotive_log_mcp.core import citations as cit
@@ -23,6 +22,7 @@ from automotive_log_mcp.core import format as fmt
 from automotive_log_mcp.detect.engine import load_rules
 from automotive_log_mcp.policy import Policy
 from automotive_log_mcp.tools import Output, ToolInputError, Tools
+from automotive_log_mcp.tools import limits as tools_mod
 
 from .conftest import FIXED_SECRET, REF_TIME, check_golden
 from .test_golden import make_bugreport_zip

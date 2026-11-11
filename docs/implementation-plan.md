@@ -40,7 +40,7 @@ automotive-log-mcp/
   src/automotive_log_mcp/
     server.py                 # MCP tools, instructions, prompts, arg validation, caps
     httpserve.py              # M6: serve --http (streamable HTTP, bearer token)
-    tools.py, clocktools.py, difftool.py   # tool logic (difftool: M6 diff)
+    tools/                    # tool logic, one module per tool family (clock: M5, diff: M6)
     cli.py                    # serve | index | query | diff | rules | ...  (works without an agent)
     config.py                 # paths, caps, rule dirs, policy file
     policy.py                 # allowed tools, blocked sources/ECUs, byte budget
@@ -271,7 +271,7 @@ agent run, on real or synthetic cases); item 4 prepared as version 0.1.0 (versio
 docs), **not published to PyPI and not tagged**, as asked. DLT stays out (company-specific
 connectors, as in M5).
 
-- **`diff`** (`difftool.py`, CLI `diff <case> --a SPEC --b SPEC`): each side is a record filter
+- **`diff`** (`tools/diff.py`, CLI `diff <case> --a SPEC --b SPEC`): each side is a record filter
   plus `seg` (one segment of a single source), so "per source or segment" covers two files or
   runs, two boots of a kernel log, and before/after windows of one source. A message is tag +
   level + template (templates are shared by all sources of a case). Lists: only in B, only in A

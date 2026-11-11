@@ -26,14 +26,15 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from .core import format as fmt
-from .core.levels import LEVEL_RANK
-from .model import SEQ_BITS, SEQ_MASK, citation
-from .store import query
-from .store.query import RecordFilter
+from ..core import format as fmt
+from ..core.levels import LEVEL_RANK
+from ..store import query
+from ..store.query import RecordFilter
+from .models import DiffSide, Filter, Output, ToolInputError
+from .text import cite_id
 
 if TYPE_CHECKING:
-    from .tools import DiffSide, Filter, Output, Tools, _Ctx
+    from .base import CaseCtx, ToolBase
 
 MIN_CHANGED = 5  # a changed message has at least this many records on its larger side
 DEFAULT_RATIO = 4.0
@@ -90,17 +91,12 @@ def _rank(level: str | None) -> int:
     return LEVEL_RANK.get(level or "", -1)
 
 
-def _cite(rid: int | None) -> str | None:
-    return citation(rid >> SEQ_BITS, rid & SEQ_MASK) if rid else None
-
-
 class DiffTool:
-    def __init__(self, tools: Tools) -> None:
+    def __init__(self, tools: ToolBase) -> None:
         self.t = tools
         self.caps = tools.caps
 
-    def _side(self, ctx: _Ctx, name: str, side: DiffSide, warnings: list[str]) -> _Side:
-        from .tools import ToolInputError
+    def _side(self, ctx: CaseCtx, name: str, side: DiffSide, warnings: list[str]) -> _Side:
 
         seg = side.seg
         side_warnings: list[str] = []
@@ -157,7 +153,6 @@ class DiffTool:
         min_ratio: float = DEFAULT_RATIO,
         limit: int = 12,
     ) -> Output:
-        from .tools import Output, ToolInputError
 
         if not min_ratio > 1:
             raise ToolInputError("min_ratio must be above 1, e.g. 4 (four times as frequent)")
@@ -165,7 +160,7 @@ class DiffTool:
         limit_eff = min(limit, self.caps.max_lines)
         if limit > limit_eff:
             warnings.append(f"limit {limit} reduced to {limit_eff} (config caps.max_lines)")
-        with self.t._case(case) as ctx:
+        with self.t.open_case(case) as ctx:
             sa = self._side(ctx, "a", a, warnings)
             sb = self._side(ctx, "b", b, warnings)
             if sa.rf.where() == sb.rf.where() and a.seg == b.seg:
@@ -213,8 +208,8 @@ class DiffTool:
                     count_a=ga[0] if ga else 0,
                     count_b=gb[0] if gb else 0,
                     ratio=round(ratio, 2) if ratio is not None else None,
-                    cite_a=_cite(ga[1]) if ga else None,
-                    cite_b=_cite(gb[1]) if gb else None,
+                    cite_a=cite_id(ga[1]) if ga else None,
+                    cite_b=cite_id(gb[1]) if gb else None,
                 )
 
             data = DiffResult(

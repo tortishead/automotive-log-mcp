@@ -17,32 +17,22 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
 
-from .core import align as al
-from .core import clock as ck
-from .core import format as fmt
-from .core.clock import CaseClock, SegClock
-from .core.timeparse import NS, fmt_wall
-from .model import SEQ_BITS, SEQ_MASK
-from .store import query
-from .store.query import Rec
+from ..core import align as al
+from ..core import clock as ck
+from ..core import format as fmt
+from ..core.clock import CaseClock, SegClock
+from ..core.timeparse import NS, fmt_wall, wall_ns
+from ..model import SEQ_BITS, SEQ_MASK
+from ..store import query
+from ..store.query import Rec
+from .models import Filter, Output, RecordOut, TimelineRecord, ToolInputError
+from .text import fts_error, id_ranges, tail_text
+from .timespec import CITE_OFFSET, FULL_TS, Bound, Span, duration_ns
 
 if TYPE_CHECKING:
-    from .tools import Filter, Tools, _Ctx
+    from .base import CaseCtx, ToolBase
 
 SLACK = 50  # extra rows per query for records at the cursor's time
-
-
-class TimelineRecord(BaseModel):
-    cite: str
-    ts: str | None = Field(default=None, description="Case-clock time; accepted back as timeline from/to.")
-    approx: bool | None = Field(default=None, description="True: mapped from another clock (~ in the text).")
-    level: str | None = None
-    tag: str | None = None
-    pid: int | None = None
-    tid: int | None = None
-    msg: str
-    cut: bool | None = None
-    art: str | None = None
 
 
 class TimelineResult(BaseModel):
@@ -100,26 +90,25 @@ def _signed(ns: int) -> str:
 
 
 class ClockTools:
-    def __init__(self, tools: Tools) -> None:
+    def __init__(self, tools: ToolBase) -> None:
         self.t = tools
         self.app = tools.app
 
     # -- the model -------------------------------------------------------------------------------
 
-    def model(self, ctx: _Ctx, force: bool = False) -> CaseClock:
+    def model(self, ctx: CaseCtx, force: bool = False) -> CaseClock:
         """The case clock, recomputed first when sources, manual entries or marker rules changed."""
         rows = query.sources(ctx.conn)
         al.refresh(ctx.conn, rows, self.app.markers, force=force)
         return ck.load(ctx.conn)
 
-    def clock_name(self, ctx: _Ctx, cc: CaseClock) -> str:
+    def clock_name(self, ctx: CaseCtx, cc: CaseClock) -> str:
         if cc.reference is None:
             return "no case clock (no source with timestamps)"
         s = ctx.by_id.get(cc.reference)
         what = "wall clock" if cc.kind == "wall" else "monotonic clock (seconds since boot)"
-        from .tools import _tail
 
-        name = _tail(s.name, 48) if s else f"source {cc.reference}"
+        name = tail_text(s.name, 48) if s else f"source {cc.reference}"
         return f"{what} of source {cc.reference} ({name})"
 
     def fmt_case(self, cc: CaseClock, t: int, short: bool = True) -> str:
@@ -200,8 +189,8 @@ class ClockTools:
         found.sort(key=lambda x: (x[0], x[1].id), reverse=desc)
         return found[:limit]
 
-    def _out(self, ctx: _Ctx, cc: CaseClock, t: int, r: Rec) -> TimelineRecord:
-        o = self.t._rec_out(r, ctx)
+    def _out(self, ctx: CaseCtx, cc: CaseClock, t: int, r: Rec) -> TimelineRecord:
+        o = self.t.rec_out(r, ctx)
         sc = cc.get(r.source_id, r.seg)
         approx = sc is not None and not sc.exact
         return TimelineRecord(
@@ -218,13 +207,12 @@ class ClockTools:
         )
 
     def _line(self, cc: CaseClock, t: int, o: TimelineRecord, mark: str = "") -> str:
-        from .tools import RecordOut
 
         ro = RecordOut(cite=o.cite, level=o.level, tag=o.tag, pid=o.pid, tid=o.tid, msg=o.msg, art=o.art)
         short = ("~" if o.approx else "") + self.fmt_case(cc, t)
         return mark + self.t.line(ro, short)
 
-    def _legend(self, ctx: _Ctx, cc: CaseClock, shown: Sequence[Rec]) -> list[str]:
+    def _legend(self, ctx: CaseCtx, cc: CaseClock, shown: Sequence[Rec]) -> list[str]:
         lines = []
         seen: set[tuple[int, int]] = set()
         for r in shown:
@@ -242,30 +230,25 @@ class ClockTools:
                 break
         return lines
 
-    def _case_time_of(self, ctx: _Ctx, cc: CaseClock, cite: str, role: str) -> int:
-        rid = self.t._anchor(ctx, cite)
+    def _case_time_of(self, ctx: CaseCtx, cc: CaseClock, cite: str, role: str) -> int:
+        rid = self.t.resolve_at(ctx, cite)
         r = query.records_by_id(ctx.conn, [rid]).get(rid)
         if r is None:
-            from .tools import ToolInputError
-
             raise ToolInputError(f"{role}: no record {cite} in case '{ctx.case}'")
         t = cc.case_time(r.source_id, r.seg, r.ts, r.ts_src)
         if t is None:
-            from .tools import ToolInputError
-
             raise ToolInputError(
                 f"{role}: {r.cite} is not on the case clock (its source has no anchor); see align(case)"
             )
         return t
 
     def _resolve_case_time(
-        self, ctx: _Ctx, cc: CaseClock, spec: str, role: str, span: tuple[int, int], other: int | None
+        self, ctx: CaseCtx, cc: CaseClock, spec: str, role: str, span: tuple[int, int], other: int | None
     ) -> tuple[int, int]:
         """(case ns, granularity) for a timeline from/to."""
-        from .tools import _CITE_OFFSET, Bound, Span, ToolInputError, duration_ns
 
         text = spec.strip()
-        m = _CITE_OFFSET.fullmatch(text)
+        m = CITE_OFFSET.fullmatch(text)
         if m:
             t = self._case_time_of(ctx, cc, m[1], role)
             if m[2]:
@@ -283,7 +266,7 @@ class ClockTools:
             )
         return b.ns, b.gran
 
-    def _span(self, ctx: _Ctx, cc: CaseClock, units: Sequence[SegClock]) -> tuple[int, int] | None:
+    def _case_span(self, ctx: CaseCtx, cc: CaseClock, units: Sequence[SegClock]) -> tuple[int, int] | None:
         keys = {(u.source_id, u.seg): u for u in units}
         ts: list[int] = []
         for sid, seg, t0, t1, m0, m1 in ctx.conn.execute(
@@ -307,7 +290,6 @@ class ClockTools:
         limit: int = 50,
         cursor: str | None = None,
     ) -> Any:
-        from .tools import Output, ToolInputError, _id_ranges
 
         warnings: list[str] = []
         key = fmt.query_key(
@@ -315,7 +297,7 @@ class ClockTools:
         )
         after = _read_cursor(cursor, key) if cursor else None
         limit = min(limit, self.t.caps.max_lines)
-        with self.t._case(case) as ctx:
+        with self.t.open_case(case) as ctx:
             cc = self.model(ctx)
             base = filter.model_copy(update={"from_": None, "to": None}) if filter else None
             rf = self.t.resolve_filter(ctx, base, warnings)
@@ -328,7 +310,7 @@ class ClockTools:
             if query_text:
                 where.append(query.FTS_MATCH)
                 params.append(query.fts_query(self.app.redactor.redact(query_text)))
-            span = self._span(ctx, cc, units)
+            span = self._case_span(ctx, cc, units)
             lo = hi = None
             if filter is not None and span is not None:
                 if filter.from_:
@@ -341,15 +323,13 @@ class ClockTools:
             try:
                 found = self.scan(ctx.conn, cc, units, where, params, lo, hi, limit + 1, after=after)
             except sqlite3.OperationalError as e:
-                from .tools import _fts_error
-
-                raise ToolInputError(_fts_error(query_text or "", e)) from None
+                raise ToolInputError(fts_error(query_text or "", e)) from None
             more = len(found) > limit
             found = found[:limit]
             outs = [self._out(ctx, cc, t, r) for t, r in found]
             head = f"timeline on the case clock: {self.clock_name(ctx, cc)}"
             ids = sorted({sc.source_id for sc in units})
-            head += f"; sources {_id_ranges(ids) or 'none'}"
+            head += f"; sources {id_ranges(ids) or 'none'}"
             lines = [head]
             page = fmt.Page(limit, self.t.caps.max_bytes, reserve=900)
             shown: list[Rec] = []
@@ -373,7 +353,7 @@ class ClockTools:
                 lines.append(f'more: cursor="{next_cursor}", or narrow with level, tags, from/to or query')
             if unplaced:
                 lines.append(
-                    f"not on the case clock (no anchor): sources {_id_ranges(unplaced)}; "
+                    f"not on the case clock (no anchor): sources {id_ranges(unplaced)}; "
                     "align(case, mode='anchor', at=..., ref=...) places them"
                 )
             if any(o.cut for o in shown_out):
@@ -392,10 +372,9 @@ class ClockTools:
     # -- context(scope='all') -------------------------------------------------------------------------
 
     def context_all(
-        self, ctx: _Ctx, anchor: Rec, b: int, a: int
+        self, ctx: CaseCtx, anchor: Rec, b: int, a: int
     ) -> tuple[list[str], list[Any], str, list[str]]:
         """(text lines with '>' on the anchor, records out, head, extra lines) on the case clock."""
-        from .tools import ToolInputError
 
         cc = self.model(ctx)
         t = cc.case_time(anchor.source_id, anchor.seg, anchor.ts, anchor.ts_src)
@@ -419,9 +398,7 @@ class ClockTools:
         extra = self._legend(ctx, cc, [r for _, r in rows])
         unplaced = sorted(s.id for s in ctx.sources if s.records and not cc.of_source(s.id))
         if unplaced:
-            from .tools import _id_ranges
-
-            extra.append(f"not on the case clock (no anchor): sources {_id_ranges(unplaced)}")
+            extra.append(f"not on the case clock (no anchor): sources {id_ranges(unplaced)}")
         return texts, outs, head, extra
 
     # -- align ------------------------------------------------------------------------------------------
@@ -436,9 +413,8 @@ class ClockTools:
         at: str | None = None,
         ref: str | None = None,
     ) -> Any:
-        from .tools import ToolInputError
 
-        with self.t._case(case) as ctx:
+        with self.t.open_case(case) as ctx:
             sid = self._source_arg(ctx, source) if source is not None else None
             force = False
             if mode == "offset":
@@ -495,18 +471,16 @@ class ClockTools:
             cc = self.model(ctx, force=force)
             return self._align_output(ctx, cc)
 
-    def _offset_arg(self, ctx: _Ctx, cc: CaseClock, sid: int, offset: str) -> int:
+    def _offset_arg(self, ctx: CaseCtx, cc: CaseClock, sid: int, offset: str) -> int:
         """A duration (case time minus source time), or for a monotonic source on a wall-clock case
         clock the boot time as a case-clock timestamp ('2026-01-01 07:59:58.000')."""
-        from .core.timeparse import wall_ns
-        from .tools import _FULL, ToolInputError
 
         text = offset.strip()
         try:
             return al.parse_duration(text.lstrip("+"), "offset")
         except ValueError as e:
             s = ctx.by_id[sid]
-            m = _FULL.fullmatch(text)
+            m = FULL_TS.fullmatch(text)
             if m and cc.kind == "wall" and s.ts_min is None:
                 try:
                     return wall_ns(
@@ -528,23 +502,21 @@ class ClockTools:
             )
             raise ToolInputError(f"{e}{hint}") from None
 
-    def _ref_sources(self, ctx: _Ctx, cc: CaseClock) -> set[int]:
+    def _ref_sources(self, ctx: CaseCtx, cc: CaseClock) -> set[int]:
         return {sid for (sid, _), sc in cc.segs.items() if sc.exact}
 
-    def _source_arg(self, ctx: _Ctx, source: str) -> int:
-        from .tools import ToolInputError, _id_ranges
+    def _source_arg(self, ctx: CaseCtx, source: str) -> int:
 
         text = source.strip().removeprefix("log:")
         if not text.isdigit() or int(text) not in ctx.by_id:
             raise ToolInputError(
-                f"unknown source {source!r}; sources: {_id_ranges(list(ctx.by_id)) or 'none'}"
+                f"unknown source {source!r}; sources: {id_ranges(list(ctx.by_id)) or 'none'}"
             )
         return int(text)
 
-    def _record(self, ctx: _Ctx, cite: str, role: str) -> Rec:
-        from .tools import ToolInputError
+    def _record(self, ctx: CaseCtx, cite: str, role: str) -> Rec:
 
-        rid = self.t._anchor(ctx, cite)
+        rid = self.t.resolve_at(ctx, cite)
         r = query.records_by_id(ctx.conn, [rid]).get(rid)
         if r is None:
             raise ToolInputError(f"{role}: no record {cite}")
@@ -552,7 +524,7 @@ class ClockTools:
             raise ToolInputError(f"{role}: {r.cite} has no timestamp")
         return r
 
-    def align_rows(self, ctx: _Ctx, cc: CaseClock) -> list[SourceClockOut]:
+    def align_rows(self, ctx: CaseCtx, cc: CaseClock) -> list[SourceClockOut]:
         segs: dict[int, list[int]] = {}
         for sid, seg, n, t0, m0 in ctx.conn.execute(
             "SELECT source_id, seg, count, ts_first, ts_src_first FROM segments ORDER BY source_id, seg"
@@ -588,19 +560,18 @@ class ClockTools:
                 )
         return out
 
-    def _align_output(self, ctx: _Ctx, cc: CaseClock) -> Any:
-        from .tools import Output, _id_ranges, _tail
+    def _align_output(self, ctx: CaseCtx, cc: CaseClock) -> Any:
 
         rows = self.align_rows(ctx, cc)
         lines = [f"case clock: {self.clock_name(ctx, cc)}"]
         exact = [int(r.source) for r in rows if r.conf == "exact"]
         if exact:
             what = "wall-clock sources of the reference file" if cc.kind == "wall" else "the reference clock"
-            lines.append(f"{_id_ranges(exact)}  exact  [{what}]")
+            lines.append(f"{id_ranges(exact)}  exact  [{what}]")
         for r in rows:
             if r.conf == "exact":
                 continue
-            name = _tail(r.name, 48)
+            name = tail_text(r.name, 48)
             seg = f" seg {r.seg}" if r.seg is not None else ""
             if not r.placed:
                 lines.append(
@@ -631,7 +602,6 @@ def _make_cursor(pos: _Pos, key: str) -> str:
 
 
 def _read_cursor(cursor: str, key: str) -> _Pos:
-    from .tools import ToolInputError
 
     try:
         pad = "=" * (-len(cursor) % 4)

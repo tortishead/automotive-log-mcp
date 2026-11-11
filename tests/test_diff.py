@@ -16,10 +16,10 @@ from automotive_log_mcp.app import App
 from automotive_log_mcp.cli import main as cli_main
 from automotive_log_mcp.config import Caps, Config
 from automotive_log_mcp.core import format as fmt
-from automotive_log_mcp.difftool import DiffResult
 from automotive_log_mcp.policy import Policy
 from automotive_log_mcp.server import build_server
 from automotive_log_mcp.tools import DiffSide, ToolInputError, Tools
+from automotive_log_mcp.tools.diff import DiffResult
 
 from .conftest import REF_TIME
 

@@ -2,7 +2,7 @@
 groups, context neighbours, artifacts and citations, relink.
 
 Everything here works on resolved values (ids, ns); parsing tool arguments, caps and formatting
-are in ``tools.py`` and ``core/format.py``.
+are in the ``tools`` package and ``core/format.py``.
 """
 
 from __future__ import annotations

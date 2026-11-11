@@ -1,8 +1,8 @@
 """MCP tools, server instructions and prompts.
 
 Every tool is registered with its full parameter schema, an output schema and annotations; the
-tool logic is in ``tools.py``. Every call passes through the policy (allowed tools, byte budget)
-and is written to the call log with redacted arguments (D5); the text given to
+tool logic is in the ``tools`` package. Every call passes through the policy (allowed tools, byte
+budget) and is written to the call log with redacted arguments (D5); the text given to
 ``check_citations`` is logged only as its length and hash (it quotes log content), plus the
 citation ids it contains. Each call-log line also holds sizes, counts and hashes that explain
 token use (see ``calllog.py``).
@@ -37,11 +37,9 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from . import __version__
 from .app import App
 from .calllog import CallLog
-from .clocktools import AlignResult, TimelineResult
 from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
-from .difftool import DiffResult
 from .policy import ByteBudget, Policy
 from .store import query
 from .store.db import StoreError
@@ -61,6 +59,8 @@ from .tools import (
     ToolInputError,
     Tools,
 )
+from .tools.clock import AlignResult, TimelineResult
+from .tools.diff import DiffResult
 from .usage import FixedCost, args_hashes, cite_ids, compact_cites, est_tokens, fixed_cost, json_bytes
 
 SERVER_NAME = "automotive-log-mcp"

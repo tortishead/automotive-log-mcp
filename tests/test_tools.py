@@ -486,7 +486,7 @@ def test_structured_content_matches_text(br: Tools) -> None:
 def test_broad_text_query_is_sampled(app: App, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Above AGG_ROWS text matches, collapse groups are estimated from a rowid sample (marked ≈);
     without a filter the total stays exact. Pages are read through the time index then."""
-    from automotive_log_mcp import tools as tools_mod
+    from automotive_log_mcp.tools import limits as tools_mod
 
     log = tmp_path / "gen.log"
     subprocess.run([sys.executable, str(GEN), str(log), "--mb", "1"], check=True)
