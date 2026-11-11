@@ -27,6 +27,7 @@ from .citecheck import CitationTools
 from .count import CountTools
 from .detect import DetectTools
 from .models import (
+    CaseNotFoundError,
     CheckCitationsResult,
     ContextResult,
     CountResult,
@@ -49,6 +50,7 @@ from .text import looks_like_regex
 
 __all__ = [
     "CaseCtx",
+    "CaseNotFoundError",
     "CheckCitationsResult",
     "ContextResult",
     "CountResult",

@@ -18,7 +18,7 @@ from ..store import db, query
 from ..store.query import Rec, RecordFilter
 from .clock import ClockTools
 from .diff import DiffTool
-from .models import Filter, RecordOut, ToolInputError
+from .models import CaseNotFoundError, Filter, RecordOut, ToolInputError
 from .text import id_ranges, sources_word
 from .timespec import (
     ART_ID,
@@ -71,7 +71,9 @@ class ToolBase:
     def open_case(self, case: str) -> Iterator[CaseCtx]:
         path = self.app.config.case_db(case)
         if not path.exists():
-            raise ToolInputError(f"case '{case}' does not exist; add a log with add_source(case, path) first")
+            raise CaseNotFoundError(
+                f"case '{case}' does not exist; add a log with add_source(case, path) first"
+            )
         with db.opened(path) as conn:
             all_rows = query.sources(conn, self.app.versions(), self.app.redactor.rules_hash)
             visible = [s for s in all_rows if not self.app.blocked(s.name, s.path)]

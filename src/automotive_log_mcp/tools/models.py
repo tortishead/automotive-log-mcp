@@ -14,6 +14,10 @@ class ToolInputError(ValueError):
     """Invalid arguments, or ids that do not exist; the message says how to fix the call."""
 
 
+class CaseNotFoundError(ToolInputError):
+    """The case named in the call has no case DB yet."""
+
+
 class Filter(BaseModel):
     """Record filter; all fields optional, combined with AND."""
 

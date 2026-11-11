@@ -33,7 +33,7 @@ from .detect.engine import BUILTIN_DIR
 from .policy import Policy, load_policy
 from .store import query
 from .store.db import StoreError, check_fts5
-from .tools import DiffSide, Filter, Output, ToolInputError, Tools
+from .tools import CaseNotFoundError, DiffSide, Filter, Output, ToolInputError, Tools
 from .tools.clock import AlignResult
 
 
@@ -309,7 +309,7 @@ def _query(app: App, args: argparse.Namespace) -> int:
         )
     except ToolInputError as e:
         _err(str(e))
-        return 1 if "does not exist" in str(e) else 2
+        return 1 if isinstance(e, CaseNotFoundError) else 2
     if args.count:
         print(out.data.total)
     else:
@@ -354,7 +354,7 @@ def _tool(app: App, args: argparse.Namespace) -> int:
             out, passed = checked, checked.data.ok
     except (ToolInputError, OSError) as e:
         _err(str(e))
-        return 1 if "does not exist" in str(e) else 2
+        return 1 if isinstance(e, CaseNotFoundError) else 2
     print(out.text)
     return 0 if passed else 1
 
