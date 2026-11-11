@@ -32,6 +32,7 @@ from starlette.applications import Starlette
 
 from .config import Config, ConfigError
 from .policy import Policy
+from .server import TOOL_NAMES, LogServer
 
 ENV_TOKEN = "AUTOMOTIVE_LOG_MCP_TOKEN"
 MIN_TOKEN = 16
@@ -80,8 +81,6 @@ def build_http_app(
     config: Config, policy: Policy, token: str, session: str | None = None
 ) -> tuple[Starlette, Policy]:
     """The Starlette app serving MCP at ``http.path``, and the policy it enforces."""
-    from .server import TOOL_NAMES, LogServer
-
     policy = http_policy(policy)
     policy.check_tools(TOOL_NAMES)
     h = config.http

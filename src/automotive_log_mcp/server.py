@@ -41,6 +41,7 @@ from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
 from .policy import ByteBudget, Policy
+from .prompts import INSTRUCTIONS, TRIAGE_PROMPT
 from .store import query
 from .store.db import StoreError
 from .tools import (
@@ -64,68 +65,6 @@ from .tools.diff import DiffResult
 from .usage import FixedCost, args_hashes, cite_ids, compact_cites, est_tokens, fixed_cost, json_bytes
 
 SERVER_NAME = "automotive-log-mcp"
-
-INSTRUCTIONS = """\
-Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs, other \
-formats from connectors). The \
-server parses, indexes and searches; reasoning is yours. Each call re-sends the whole \
-conversation, so make few, narrow calls and stop once the evidence answers the question.
-
-Simple questions (what crashed, and why): 3-4 calls.
-1. add_source(case, path) if the case is new; its reply lists the sources (no list_sources needed).
-2. list_artifacts(case): tombstones, ANRs, Java crashes, dropbox entries, grouped by signature in \
-time order; 'same crash as' marks copies, which need no second read.
-3. read_artifact(case, id='art:<id>') for the crash that fits: its summary has the signal or \
-exception, cause and top of the stack; read a section only if the summary is not enough.
-4. Answer, citing each finding; check_citations(case, text) before answering when asked to cite.
-
-Broader questions: detect(case) for known failure patterns (crash, ANR, watchdog, low memory \
-kill, SELinux, binder, VHAL, service restart, boot not completed); overview(case) for where \
-errors cluster; context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before an \
-event (scope='pid' follows one process across buffers); search/count with filter level 'W' or \
-'E' and from/to; get_records for messages cut with '…'.
-
-Several files or devices (bugreport plus kernel log, ECU logs): timeline(case, filter) merges all \
-sources on one case clock and context(case, at=..., scope='all') shows every source around an \
-event; '~' marks times aligned from another clock, align(case) shows how well (and sets anchors). \
-Say when an order across sources rests on '~' times within their error. A good and a bad run, \
-or two boots: diff(case, a={'sources': [...]}, b=...) lists what only one side has.
-
-Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>]; a statement \
-without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \
-from/to, tags or pid instead of paging. Printed timestamps work as from/to, as do '-5m', '+30s' \
-and 'log:3#120-30s'. Redacted values are stable tokens (<MAC:3fa2c1d0>); ≈ marks estimated counts.
-"""
-
-TRIAGE_PROMPT = """\
-Triage the defect in case '{case}' with the automotive-log-mcp tools.
-
-{symptom}Work in this order and stop as soon as the evidence is clear:
-1. list_sources(case='{case}'). Note the build fingerprint and each source's time range. If the case \
-has no sources, ask for the log files and add them with add_source.
-2. overview(case='{case}') and detect(case='{case}'): where the errors are, and which known failure \
-patterns (crash, ANR, watchdog, low memory kill, VHAL error, service restart, …) occur and when.
-3. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
-read_artifact the first artifact, then the section it suggests: the backtrace of a tombstone, the \
-exception of a Java crash, the main thread (and lock holder or binder peer) of an ANR.
-4. context(case='{case}', at='art:<id>', before=30, after=10) for what happened just before the \
-crash; scope='pid' to follow the crashing process across buffers.
-5. search(case='{case}', query=..., filter={{'level': 'W', 'from': ..., 'to': ...}}) for errors \
-and warnings in the minutes before the defect: start from the component or process in the \
-symptom, then widen. Keep collapse on; repeated messages show ×count. count(..., bucket='1m') shows \
-when a message starts or stops.
-6. get_records for any message cut with '…' that matters.
-7. Before you answer: check_citations(case='{case}', text=<your answer in Markdown>). Fix every \
-error it reports (a citation that is malformed or does not resolve) and either cite or mark as a \
-guess every paragraph it warns about; run it again until it passes. Only then give the answer.
-
-Answer with:
-- What failed (component, process) and when (timestamp as printed).
-- The chain of evidence, oldest first, each step with its citation (log:<source>#<seq> or \
-art:<id>/<section>:L<n>) exactly as the tools printed it.
-- The constant text from 'code search' for the lines a developer should look up in the code.
-- What the logs do not show, and what you are guessing (without a citation it is a guess).
-"""
 
 CASE_RE = CASE_NAME_RE
 ADD_WAIT_S = 10.0  # add_source waits this long for an import, then reports it as running
@@ -323,6 +262,25 @@ READ_ONLY = ToolAnnotations(
 WRITES_CASE = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=True, open_world_hint=False
 )
+
+# Every tool in the order of the tool list: name, annotations, title.
+TOOL_SPECS: tuple[tuple[str, ToolAnnotations, str], ...] = (
+    ("add_source", WRITES_CASE, "Add a log source"),
+    ("list_sources", READ_ONLY, "List sources"),
+    ("search", READ_ONLY, "Search records"),
+    ("context", READ_ONLY, "Lines around a record"),
+    ("list_artifacts", READ_ONLY, "List artifacts"),
+    ("read_artifact", READ_ONLY, "Read an artifact"),
+    ("get_records", READ_ONLY, "Get full records"),
+    ("overview", READ_ONLY, "Case overview"),
+    ("count", READ_ONLY, "Count records"),
+    ("detect", READ_ONLY, "Detect known failure patterns"),
+    ("check_citations", READ_ONLY, "Check the citations of an answer"),
+    ("timeline", READ_ONLY, "Timeline of all sources"),
+    ("align", WRITES_CASE, "Align source clocks"),
+    ("diff", READ_ONLY, "Compare two sets of records"),
+)
+TOOL_NAMES = tuple(name for name, _, _ in TOOL_SPECS)
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 MAX_LOG_CITES = 300
@@ -808,20 +766,29 @@ class LogServer:
             on different clocks."""
             return _output(lambda: tools.diff(case, a, b, min_ratio, limit), self.structured)
 
-        self._tool(add_source, WRITES_CASE, "Add a log source")
-        self._tool(list_sources, READ_ONLY, "List sources")
-        self._tool(search, READ_ONLY, "Search records")
-        self._tool(context, READ_ONLY, "Lines around a record")
-        self._tool(list_artifacts, READ_ONLY, "List artifacts")
-        self._tool(read_artifact, READ_ONLY, "Read an artifact")
-        self._tool(get_records, READ_ONLY, "Get full records")
-        self._tool(overview, READ_ONLY, "Case overview")
-        self._tool(count, READ_ONLY, "Count records")
-        self._tool(detect, READ_ONLY, "Detect known failure patterns")
-        self._tool(check_citations, READ_ONLY, "Check the citations of an answer")
-        self._tool(timeline, READ_ONLY, "Timeline of all sources")
-        self._tool(align, WRITES_CASE, "Align source clocks")
-        self._tool(diff, READ_ONLY, "Compare two sets of records")
+        functions = {
+            f.__name__: f
+            for f in (
+                add_source,
+                list_sources,
+                search,
+                context,
+                list_artifacts,
+                read_artifact,
+                get_records,
+                overview,
+                count,
+                detect,
+                check_citations,
+                timeline,
+                align,
+                diff,
+            )
+        }
+        for name, hints, title in TOOL_SPECS:
+            self._tool(functions.pop(name), hints, title)
+        if functions:
+            raise RuntimeError(f"tools without a TOOL_SPECS entry: {', '.join(functions)}")
 
     # -- prompts ----------------------------------------------------------------------------
 
@@ -836,24 +803,6 @@ class LogServer:
                 raise ValueError(f"invalid case name {case!r}")
             symptom_line = f"Reported symptom: {symptom}\n\n" if symptom else ""
             return TRIAGE_PROMPT.format(case=case, symptom=symptom_line)
-
-
-TOOL_NAMES = (
-    "add_source",
-    "list_sources",
-    "search",
-    "context",
-    "list_artifacts",
-    "read_artifact",
-    "get_records",
-    "overview",
-    "count",
-    "detect",
-    "check_citations",
-    "timeline",
-    "align",
-    "diff",
-)
 
 
 _FILTER_KEYS = frozenset(f.alias or n for n, f in Filter.model_fields.items()) | set(Filter.model_fields)
