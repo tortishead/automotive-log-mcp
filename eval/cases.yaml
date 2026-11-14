@@ -22,8 +22,6 @@
 #     citations    the lines that show the root cause: log:<source>#<seq> or art:<id>[/section][:L<n>],
 #                  each optionally with the text the line must contain ({cite: …, text: …}): the
 #                  harness checks it, which catches citations that drifted (reindex, miscount)
-#     order        optional: citations on different clocks in the order they happened; the harness
-#                  checks that the case clock (timeline, alignment) puts them in this order
 #   queries    optional: queries a reasonable engineer would run first, beyond detect and
 #              list_artifacts (tool + args, as the MCP tools take them); counted in evidence recall
 #   fix        the fix commit (or "synthetic")
@@ -109,26 +107,7 @@ cases:
         - {cite: log:1#5, text: "avc: denied { read write }"}
     fix: synthetic
 
-  # -- M6 (Nov 10, 2026): five more synthetic cases, expected answers written before the first run --
-
-  - id: syn-can-busoff
-    synthetic: true
-    title: Speed shows '--' on the cluster while driving
-    symptom: For about a second the cluster shows '--' instead of the vehicle speed; it comes back by itself.
-    files: [synthetic/can-busoff/hu-logcat.txt, synthetic/can-busoff/dmesg.txt]
-    expected:
-      component: CAN controller can0 (flexcan driver) going bus-off; VHAL only reports the missing frames
-      root_cause: >-
-        The CAN controller goes bus-off and drops its tx queue 250 ms before the VHAL notices that the
-        speed frame 0x3A1 is missing; the kernel log (seconds since boot) has the cause, the head unit's
-        logcat (wall clock) the symptom, so the two must be put on one clock to see the order.
-      citations:
-        - {cite: log:2#6, text: "can0: bus-off, stopping controller"}
-        - {cite: log:1#6, text: "CAN rx timeout on can0"}
-      order: [log:2#6, log:1#6]
-    queries:
-      - {tool: timeline, args: {filter: {from: "log:1#6-1s", to: "log:1#6"}}}
-    fix: synthetic
+  # -- M6 (Nov 10, 2026): four more synthetic cases, expected answers written before the first run --
 
   - id: syn-watchdog-audio
     synthetic: true

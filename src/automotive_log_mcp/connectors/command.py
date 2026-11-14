@@ -35,7 +35,7 @@ import):
   "sections": [{"name": "info", "lines": [...]}], "ts": ..., "pid": ..., "process": ...,
   "signature": ..., "level": "F", "fields": {...}}``: an artifact (read with read_artifact);
 - ``{"type": "meta", "values": {"timezone": "Europe/Berlin", "ecu": "MCU1"}}``: source metadata
-  (``timezone`` is used by the clock alignment).
+  (``timezone``: the device's zone, kept with the source).
 
 A program that exits with a non-zero status fails the import with the end of its standard error.
 Everything it outputs is redacted like any other source (D5).

@@ -7,7 +7,7 @@ Android bugreports), with a caller id ``[    1.234567][  T123] msg``, facility/l
 indented ``KEY=value`` continuation lines kept in ``attrs``).
 
 Timestamps are monotonic seconds since boot (``ts_src``); ``ts`` is filled only when the
-container knows the boot time, otherwise it is null and the clock model (M5) maps it later.
+container knows the boot time, otherwise it is null.
 ``Booting Linux`` / ``Linux version`` lines are boot markers.
 """
 

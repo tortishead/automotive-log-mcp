@@ -1,6 +1,6 @@
 """Token accounting for the call log: sizes, hashes, citation ids and the server's fixed cost.
 
-The server never sees the model's real token counts; the client does (see README "Token use").
+The server never sees the model's real token counts; the client does (see docs/reference.md, "Token use").
 What the server can measure is bytes: what each tool result holds, and what the server adds to
 every model request (its instructions and the tool list). Tokens are estimated as bytes / 4,
 which is a rough rule for English text; JSON and log lines with many digits and symbols usually
@@ -19,7 +19,6 @@ from typing import Any
 
 BYTES_PER_TOKEN = 4
 PAGING_ARGS = frozenset({"limit", "cursor", "before", "after", "examples"})
-MAX_CITES = 300  # citation ranges kept per call-log line
 
 _LOG = re.compile(r"\blog:(\d+)#(\d+)\b")
 _ART = re.compile(r"\bart:(\d+)\b")

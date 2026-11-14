@@ -20,7 +20,7 @@ from typing import Any
 from ..core.words import camel_parts
 from . import textblocks
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 BATCH_ROWS = 50_000
 
 
@@ -60,6 +60,7 @@ MIGRATIONS: dict[int, str | Callable[[sqlite3.Connection], None]] = {
     3: "schema_v3.sql",
     4: textblocks.migrate_v4,
     5: "schema_v5.sql",
+    6: "schema_v6.sql",
 }
 
 
@@ -272,7 +273,6 @@ def delete_sources(conn: sqlite3.Connection, source_ids: list[int]) -> None:
             conn.executemany("UPDATE templates SET count = count - ? WHERE id = ?", [(n, t) for t, n in rows])
             conn.execute("DELETE FROM records WHERE id BETWEEN ? AND ?", (lo, hi))
             conn.execute("DELETE FROM segments WHERE source_id = ?", (sid,))
-            conn.execute("DELETE FROM clock WHERE source_id = ?", (sid,))
             conn.execute("DELETE FROM msg_blocks WHERE source_id = ?", (sid,))
             delete_artifacts(conn, "source_id = ?", (sid,))
             conn.execute("DELETE FROM sources WHERE id = ?", (sid,))

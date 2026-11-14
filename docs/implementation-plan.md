@@ -7,8 +7,8 @@ Nov 8, 2026 · @Xuan · draft · based on [design.md](design.md)
 Build an MCP server that lets any agent analyse a defect from automotive logs, with every finding cited to a log line or artifact.
 
 - **First release (M0–M4):** logcat, bugreport (including tombstones, ANRs, Java crashes and dropbox), kernel logs and config-driven text logs; P0 and P1 tools including `check_citations`; local stdio transport; redaction and policy file; call log; evaluation on closed defects.
-- **Second release (M5–M6):** DLT (via `dlt-core`), cross-source alignment, `timeline`, `diff`, remaining artifact parsers (`dumpsys`, kernel panic, tombstone `.pb`), HTTP transport. Until then, DLT users can use dlt-mcp-server inside DLT Viewer.
-- **Out:** any UI, ticket-system integration, server-side model calls, multi-user operation, symbolization of native frames.
+- **Second release (M5–M6):** DLT (via `dlt-core`), `diff`, remaining artifact parsers (`dumpsys`, kernel panic, tombstone `.pb`), HTTP transport. Cross-source alignment and `timeline` were built in M5 and removed on Nov 14, 2026 (see [Scope change](#scope-change-nov-14-2026)). Until then, DLT users can use dlt-mcp-server inside DLT Viewer.
+- **Out:** any UI, ticket-system integration, server-side model calls, multi-user operation, symbolization of native frames, aligning several sources on one clock.
 
 Efforts are for one developer, in working days, including tests.
 
@@ -29,7 +29,7 @@ Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision
 | D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`, run through the generic `command` connector | PyO3 binding; DLT Viewer export; own parser | M5 (deferred: company-specific connectors) |
 | D10 | Single process; background indexing in one worker thread per case | Worker processes | M1 |
 | D11 | Tool names and parameters, and the connector interface, follow semver; breaking changes only in a major version | No API stability promise | all |
-| D12 | First release without DLT; DLT and alignment in M5 | DLT before the first evaluation | M4, M5 |
+| D12 | First release without DLT; DLT in M5 (alignment: built, then removed, see Scope change) | DLT before the first evaluation | M4, M5 |
 | D13 | Third-party connectors: YAML, `command`, or Python entry points; extend by default, replace when configured; code connectors allowed by policy | Connectors only in this repo | M1, M5, M6 |
 
 ## Repository layout
@@ -40,7 +40,7 @@ automotive-log-mcp/
   src/automotive_log_mcp/
     server.py                 # MCP tools, instructions, prompts, arg validation, caps
     httpserve.py              # M6: serve --http (streamable HTTP, bearer token)
-    tools/                    # tool logic, one module per tool family (clock: M5, diff: M6)
+    tools/                    # tool logic, one module per tool family (diff: M6)
     cli.py                    # serve | index | query | diff | rules | ...  (works without an agent)
     config.py                 # paths, caps, rule dirs, policy file
     policy.py                 # allowed tools, blocked sources/ECUs, byte budget
@@ -53,7 +53,6 @@ automotive-log-mcp/
     core/
       ingest.py               # sniff -> container -> connector -> pipeline -> store
       levels.py, templates.py, redact.py, segments.py
-      clock.py, align.py      # M5 (done)
       format.py               # text + structured output, truncation, citations
     connectors/
       base.py                 # protocols, registry
@@ -88,7 +87,7 @@ automotive-log-mcp/
 | M3 | P0 tools | An agent finds and reads errors and crash artifacts in one bugreport, with citations | 4 d |
 | M4 | P1 tools + evaluation | `overview`, `detect`, `count`, `check_citations`; agent instructions and prompt; eval on 5 defects | 5–6 d |
 | — | **Checkpoint** | Go / adjust / stop, based on eval and call logs | — |
-| M5 | DLT + multi-source | DLT incl. file transfer, clock model, `align`, `timeline`, remaining artifact parsers | 8–10 d |
+| M5 | DLT + multi-source | DLT incl. file transfer, remaining artifact parsers (clock model, `align`, `timeline`: built, removed Nov 14, 2026) | 8–10 d |
 | M6 | Finish | `diff`, HTTP transport, eval on 10 defects, release | 2–3 d |
 
 To checkpoint: about 17–20 days. To M6: about 27–33 days.
@@ -258,6 +257,8 @@ Status (Nov 10, 2026): items 1, 2, 3 and 5 built (multi-source without DLT, as r
 - **Not verified:** real multi-device cases, real `logcat -b kernel` next to dmesg (the tag-prefix rule follows how logd splits kernel lines), suspend lines on current kernels, time zones other than in a bugreport, a non-UTC device whose kernel prints local time.
 - Not done: `blocked_ecus` (policy) is still not enforced; it belongs to the DLT connector.
 
+**Removed (Nov 14, 2026):** items 1, 2 and 3 (clock model, automatic and manual alignment, marker rules, `timeline`, `align`, `context(scope='all')`) are no longer in the code; the notes above describe what was built. Item 5 (`command` connector) stays. See [Scope change](#scope-change-nov-14-2026).
+
 ## M6 Finish (2–3 days)
 
 1. `diff`: template sets per source or segment, only-in-A, only-in-B, count ratios above a threshold.
@@ -358,6 +359,21 @@ connectors, as in M5).
   not compare runs can hide it with `allowed_tools`.
 - Not done in M6: DLT (by choice, as in M5); the remaining artifact parsers of M5 item 8;
   `blocked_ecus`; the M1 ingest target.
+
+## Scope change (Nov 14, 2026)
+
+Cases normally hold one log: a logcat (or bugreport), or a DLT trace. Putting several sources on one clock solved a case that does not come up, and its two tools cost tokens in every model request. So the multi-source parts of M5 are removed:
+
+- **Removed:** `core/clock.py`, `core/align.py`, `tools/clock.py`; the tools `timeline` and `align` (12 tools remain); `context(scope='all')`; marker rules (a `marker:` file in a rule directory is now an invalid rule file); the clock fields of `list_sources`; the CLI commands `timeline` and `align`; the evaluation's `timeline` queries, `expected.order` and the case `syn-can-busoff` (9 synthetic cases, 17 of 18 citations surfaced).
+- **Schema 6** drops the tables `clock` and `clock_manual` and the `clock_*` keys in `meta`; a case DB of schema 5 migrates on first open. Manual `align` settings in existing cases are lost.
+- **Kept:** several sources per case (the buffers and kernel log of a bugreport, several files), each on its own clock as written; `context(scope='pid')` across the buffers of one file; `diff`, which compares messages and never used the alignment; segments (boots) per source; the `command` connector; the bugreport's boot-time estimate and time zone as source metadata.
+- **D11:** removing two tools and a `scope` value is a breaking change to the tool list. 0.1.0 was not published or tagged, so the next version stays 0.x; the changelog lists it under Removed.
+
+Next, in this order:
+
+1. **DLT** through a `command` connector with a real decoder (M5 items 4 and 6, or a company decoder): half of the cases are DLT and the server cannot read them. `blocked_ecus` belongs to it.
+2. **Evaluation on real closed defects** (M4 and M6 done criteria, the checkpoint): 5 logcat or bugreport cases and, once item 1 works, DLT cases; agent runs and the shell-only baseline.
+3. Remaining artifact parsers (M5 item 8) and the M1 ingest target only if the evaluation shows they matter.
 
 ## Cross-cutting
 

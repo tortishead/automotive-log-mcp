@@ -1,22 +1,19 @@
-"""``context`` and ``get_records``, and the entry points of the clock and diff tools."""
+"""``context`` and ``get_records``, and the entry point of the diff tool."""
 
 from __future__ import annotations
-
-from typing import Any
 
 from ..core import format as fmt
 from ..model import SEQ_BITS, SEQ_MASK, citation
 from ..store import query
 from .base import ToolBase
-from .clock import AlignResult, TimelineResult
 from .diff import DiffResult
-from .models import ContextResult, DiffSide, Filter, GetRecordsResult, Output, RecordOut, ToolInputError
+from .models import ContextResult, DiffSide, GetRecordsResult, Output, RecordOut, ToolInputError
 from .text import cut_bytes, id_ranges, join_lines, list_some, reserve_bytes
 from .timespec import parse_log_cite
 
 
 class RecordTools(ToolBase):
-    """``context``, ``get_records``, and the clock and diff tools by delegation."""
+    """``context``, ``get_records``, and the diff tool by delegation."""
 
     def context(
         self, case: str, at: str, before: int = 20, after: int = 20, scope: str = "source"
@@ -47,23 +44,15 @@ class RecordTools(ToolBase):
                 recs = query.pid_neighbours(ctx.conn, anchor, srcs, b, a, seg)
                 ids = sorted({r.source_id for r in recs})
                 head = f"pid {anchor.pid} around {anchor.cite}, sources {id_ranges(ids)} by time:"
-            elif scope == "all":
-                texts_all, outs_all, head, extra_all = self.clock.context_all(ctx, anchor, b, a)
             else:
                 recs = query.source_neighbours(ctx.conn, rid, b, a)
                 head = f"source {anchor.source_id} around {anchor.cite}:"
-            if scope == "all":
-                idx = next(i for i, t in enumerate(texts_all) if t.startswith("> "))
-                outs: list[Any] = outs_all
-                texts = texts_all
-            else:
-                extra_all = []
-                idx = next(i for i, r in enumerate(recs) if r.id == rid)
-                outs = [self.rec_out(r, ctx) for r in recs]
-                texts = [
-                    ("> " if i == idx else "  ") + self.line(o, fmt.short_ts(r.ts, r.ts_src))
-                    for i, (r, o) in enumerate(zip(recs, outs, strict=True))
-                ]
+            idx = next(i for i, r in enumerate(recs) if r.id == rid)
+            outs = [self.rec_out(r, ctx) for r in recs]
+            texts = [
+                ("> " if i == idx else "  ") + self.line(o, fmt.short_ts(r.ts, r.ts_src))
+                for i, (r, o) in enumerate(zip(recs, outs, strict=True))
+            ]
             lo, hi = 0, len(texts)
             budget = self.caps.max_bytes - 700
             size = sum(fmt.utf8_len(t) + 1 for t in texts)
@@ -79,7 +68,7 @@ class RecordTools(ToolBase):
                     f"output cap of {self.caps.max_bytes} bytes: {lo + len(texts) - hi} lines left out"
                 )
             shown = outs[lo:hi]
-            lines = [head, *texts[lo:hi], *extra_all]
+            lines = [head, *texts[lo:hi]]
             if scope == "source":
                 first, last = recs[lo], recs[hi - 1]
                 s = ctx.by_id[anchor.source_id]
@@ -198,54 +187,7 @@ class RecordTools(ToolBase):
         body = "\n".join("  " + x for x in o.msg.split("\n"))
         return "\n".join([head, *(["  " + " · ".join(meta)] if meta else []), body])
 
-    def timeline(
-        self,
-        case: str,
-        filter: Filter | None = None,
-        query_text: str | None = None,
-        limit: int = 50,
-        cursor: str | None = None,
-    ) -> Output[TimelineResult]:
-        return self.clock.timeline(case, filter, query_text, limit, cursor)
-
-    def align(
-        self,
-        case: str,
-        mode: str = "auto",
-        source: str | None = None,
-        seg: int | None = None,
-        offset: str | None = None,
-        at: str | None = None,
-        ref: str | None = None,
-    ) -> Output[AlignResult]:
-        return self.clock.align(case, mode, source, seg, offset, at, ref)
-
     def diff(
         self, case: str, a: DiffSide, b: DiffSide, min_ratio: float = 4.0, limit: int = 12
     ) -> Output[DiffResult]:
         return self.differ.diff(case, a, b, min_ratio, limit)
-
-    def case_time(self, case: str, cite: str) -> int | None:
-        """A record's time on the case clock (ns), as timeline orders it; None when its source is
-        not placed. For the evaluation's order check."""
-        with self.open_case(case) as ctx:
-            cc = self.clock.model(ctx)
-            rid = self.resolve_at(ctx, cite)
-            r = query.records_by_id(ctx.conn, [rid]).get(rid)
-            if r is None:
-                raise ToolInputError(f"no record {cite} in case '{case}'")
-            return cc.case_time(r.source_id, r.seg, r.ts, r.ts_src)
-
-    def clock_summary(self, case: str) -> tuple[str, dict[str, str]]:
-        """(case clock name, short clock text per source id) for list_sources; exact sources omitted."""
-        with self.open_case(case) as ctx:
-            cc = self.clock.model(ctx)
-            out: dict[str, str] = {}
-            for row in self.clock.align_rows(ctx, cc):
-                if row.conf == "exact" or row.source in out:
-                    continue
-                if not row.placed:
-                    out[row.source] = "not placed (no anchor; see align)"
-                    continue
-                out[row.source] = " ".join(p for p in ("~" + (row.conf or ""), row.error) if p)
-            return self.clock.clock_name(ctx, cc), out

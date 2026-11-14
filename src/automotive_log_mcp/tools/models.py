@@ -97,24 +97,11 @@ class SearchResult(BaseModel):
     empty_reason: str | None = None
 
 
-class TimelineRecord(BaseModel):
-    cite: str
-    ts: str | None = Field(default=None, description="Case-clock time; accepted back as timeline from/to.")
-    approx: bool | None = Field(default=None, description="True: mapped from another clock (~ in the text).")
-    level: str | None = None
-    tag: str | None = None
-    pid: int | None = None
-    tid: int | None = None
-    msg: str
-    cut: bool | None = None
-    art: str | None = None
-
-
 class ContextResult(BaseModel):
     case: str
     at: str
     scope: str
-    records: list[RecordOut | TimelineRecord]
+    records: list[RecordOut]
     note: str | None = None
 
 

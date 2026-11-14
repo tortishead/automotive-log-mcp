@@ -40,6 +40,7 @@ TOOLS = (
     "count",
     "detect",
     "check_citations",
+    "diff",
 )
 NO_CITE_TOOLS = frozenset({"add_source", "list_sources", "check_citations"})
 BIG_CALL_TOKENS = 1500  # a single result above this is worth a look

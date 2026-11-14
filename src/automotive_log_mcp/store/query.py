@@ -156,7 +156,6 @@ def time_range(s: SourceRow) -> tuple[str | None, str | None]:
 
 # -- records: filter, search, context --------------------------------------------------------
 
-LOWER_BOUND = 0
 UPPER_BOUND = (1 << 63) - 1
 
 
@@ -876,7 +875,7 @@ class ArtifactRow:
 
     @property
     def record_cite(self) -> str:
-        return citation(self.record_id >> SEQ_BITS, self.record_id & ((1 << SEQ_BITS) - 1))
+        return citation(self.record_id >> SEQ_BITS, self.record_id & SEQ_MASK)
 
 
 @dataclass(frozen=True)

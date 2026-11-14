@@ -16,7 +16,6 @@ from ..detect.engine import Rule, RuleResult, run_rule
 from ..model import SEQ_BITS
 from ..store import db, query
 from ..store.query import Rec, RecordFilter
-from .clock import ClockTools
 from .diff import DiffTool
 from .models import CaseNotFoundError, Filter, RecordOut, ToolInputError
 from .text import id_ranges, sources_word
@@ -59,12 +58,11 @@ class CaseCtx:
 
 class ToolBase:
     """What every tool needs: the app, the caps, one call's case view, record lines, filters and
-    times. The clock and diff tools hold a reference to it."""
+    times. The diff tool holds a reference to it."""
 
     def __init__(self, app: App) -> None:
         self.app = app
         self.caps = app.config.caps
-        self.clock = ClockTools(self)
         self.differ = DiffTool(self)
 
     @contextmanager

@@ -17,15 +17,9 @@ from typing import Any
 SEQ_BITS = 40
 SEQ_MASK = (1 << SEQ_BITS) - 1
 
-LEVELS = ("V", "D", "I", "W", "E", "F")
-
 
 def record_id(source_id: int, seq: int) -> int:
     return (source_id << SEQ_BITS) | seq
-
-
-def split_record_id(rid: int) -> tuple[int, int]:
-    return rid >> SEQ_BITS, rid & SEQ_MASK
 
 
 def citation(source_id: int, seq: int) -> str:
@@ -74,16 +68,6 @@ class StreamMarker:
     stream: str
     join: bool = False
     switch: bool = False
-
-
-@dataclass(slots=True)
-class SourceMeta:
-    """Metadata a container learns about its members (fingerprint, time zone, ...)."""
-
-    values: dict[str, Any] = field(default_factory=dict)
-
-    def get(self, key: str, default: Any = None) -> Any:
-        return self.values.get(key, default)
 
 
 @dataclass(slots=True)

@@ -220,9 +220,9 @@ def test_batches_are_committed_while_indexing(
 
 
 def test_blocked_sources(config: Config, tmp_path: Path) -> None:
-    policy = Policy(blocked_sources=("*private*", "*FS/data/misc/*"))
+    policy = Policy(blocked_sources=("*secret*", "*FS/data/misc/*"))
     app = App.create(config, policy)
-    priv = tmp_path / "private.log"
+    priv = tmp_path / "secret.log"
     priv.write_text(LINE, encoding="utf-8")
     with pytest.raises(IngestError, match="blocked"):
         app.ingestor.add(config.case_db("c"), str(priv))

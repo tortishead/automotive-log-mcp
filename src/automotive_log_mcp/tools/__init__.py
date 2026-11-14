@@ -10,7 +10,7 @@ Layout, from the bottom up (a module imports only those above it):
 - :mod:`.models`: argument and result models, :class:`Output`, :class:`ToolInputError`;
 - :mod:`.timespec`: the ``from``/``to`` forms, durations and citations;
 - :mod:`.text`: small text helpers;
-- :mod:`.clock`, :mod:`.diff`: ``timeline``/``align`` and ``diff``, on top of a :class:`ToolBase`;
+- :mod:`.diff`: ``diff``, on top of a :class:`ToolBase`;
 - :mod:`.base`: :class:`ToolBase`, one call's case view, record lines, filters and times;
 - one module per tool family (:mod:`.search`, :mod:`.records`, :mod:`.artifacts`, :mod:`.count`,
   :mod:`.detect`, :mod:`.overview`, :mod:`.citecheck`), each a mixin over :class:`ToolBase`.

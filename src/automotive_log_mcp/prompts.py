@@ -20,11 +20,8 @@ errors cluster; context(case, at='art:<id>' or 'log:<source>#<seq>') for the lin
 event (scope='pid' follows one process across buffers); search/count with filter level 'W' or \
 'E' and from/to; get_records for messages cut with '…'.
 
-Several files or devices (bugreport plus kernel log, ECU logs): timeline(case, filter) merges all \
-sources on one case clock and context(case, at=..., scope='all') shows every source around an \
-event; '~' marks times aligned from another clock, align(case) shows how well (and sets anchors). \
-Say when an order across sources rests on '~' times within their error. A good and a bad run, \
-or two boots: diff(case, a={'sources': [...]}, b=...) lists what only one side has.
+A good and a bad run, or two boots: diff(case, a={'sources': [...]}, b=...) lists what only \
+one side has.
 
 Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>]; a statement \
 without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from automotive_log_mcp.app import App
-from automotive_log_mcp.config import Config, ConfigError
+from automotive_log_mcp.config import Config
 from automotive_log_mcp.connectors.base import ConnectorError
 from automotive_log_mcp.connectors.command import CommandConnector
 from automotive_log_mcp.core.ingest import IngestError
@@ -153,12 +153,10 @@ def test_missing_program_is_a_clear_error(config: Config, tmp_path: Path) -> Non
         app.ingestor.add(app.config.case_db("m"), str(log))
 
 
-def test_example_mcu_connector_and_marker_rule(config: Config, tmp_path: Path) -> None:
+def test_example_mcu_connector(config: Config, tmp_path: Path) -> None:
     rules = tmp_path / "rules"
     shutil.copytree(EXAMPLES / "connectors", rules)
-    shutil.copy(EXAMPLES / "rules" / "markers_vhal_set.yaml", rules)
     app = _app(config, rules)
-    assert [m.name for m in app.markers] == ["vhal_set_property"]
     hu = tmp_path / "headunit.log"
     hu.write_text(
         "10-01 08:00:01.000   900   900 I VehicleHal: setProperty prop=0x11400400 seq=17\n"
@@ -170,36 +168,13 @@ def test_example_mcu_connector_and_marker_rule(config: Config, tmp_path: Path) -
     tools = Tools(app)
     rows = app.list_sources("mcu") or []
     assert rows[1].format == "mcu_trace" and rows[1].meta.get("ecu") == "MCU1"
-    out = tools.align("mcu").text
-    # One marker pair is not enough for an automatic mapping (two are needed).
-    assert "2  not placed" in out, out
-    tools.align("mcu", "anchor", at="log:2#3", ref="log:1#1", offset="-2ms")  # at is 2 ms after ref
-    tl = tools.timeline("mcu").text
-    assert "log:2#3  ~10-01 08:00:01.002  E VHAL  SET prop=0x11400400 seq=17 rejected" in tl, tl
+    assert "E VHAL  SET prop=0x11400400 seq=17 rejected" in tools.search("mcu", "rejected").text
     assert "mcu_fault" in tools.list_artifacts("mcu").text
 
 
-def test_marker_rule_file_errors(tmp_path: Path) -> None:
-    from automotive_log_mcp.core.align import load_markers
-
-    d = tmp_path / "r"
-    d.mkdir()
-    (d / "m.yaml").write_text(
-        "marker: m\na: {match: 'x(?P<k>\\d)'}\nb: {match: 'y(?P<j>\\d)'}\n", encoding="utf-8"
-    )
-    with pytest.raises(ConfigError, match="same named groups"):
-        load_markers([d])
-    (d / "m.yaml").write_text(
-        "marker: m\na: {match: 'x(?P<k>\\d)'}\nb: {match: 'y(?P<k>\\d)'}\ndelay: soon\n"
-    )
-    with pytest.raises(ConfigError, match="duration"):
-        load_markers([d])
-
-
-def test_marker_and_connector_files_do_not_break_detector_rules(config: Config, tmp_path: Path) -> None:
+def test_connector_files_do_not_break_detector_rules(config: Config, tmp_path: Path) -> None:
     rules = tmp_path / "rules"
     shutil.copytree(EXAMPLES / "connectors", rules)
-    shutil.copy(EXAMPLES / "rules" / "markers_vhal_set.yaml", rules)
     app = _app(config, rules)
     assert "mcu_trace" in app.registry.names()
     assert app.rules.rules  # the package detector rules are still there

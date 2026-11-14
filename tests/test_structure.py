@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 import automotive_log_mcp.tools
+from automotive_log_mcp import callreport
 from automotive_log_mcp.app import App
-from automotive_log_mcp.core.align import _zone_offset
 from automotive_log_mcp.core.timeparse import NS
 from automotive_log_mcp.server import TOOL_NAMES, TOOL_SPECS
 from automotive_log_mcp.tools import CaseNotFoundError, ToolInputError, Tools
@@ -46,26 +46,19 @@ def test_tools_package_has_no_import_cycle() -> None:
 
     for mod in graph:
         visit(mod, ())
-    assert "base" not in graph["clock"] | graph["diff"]
+    assert "base" not in graph["diff"]
 
 
 def test_tool_specs_are_the_tool_names() -> None:
     names = [name for name, _, _ in TOOL_SPECS]
-    assert tuple(names) == TOOL_NAMES and len(set(names)) == len(names) == 14
+    assert tuple(names) == TOOL_NAMES and len(set(names)) == len(names) == 12
+    assert set(callreport.TOOLS) == set(TOOL_NAMES)  # calls joins transcripts by these names
 
 
 def test_missing_case_is_a_typed_input_error(app: App) -> None:
     with pytest.raises(CaseNotFoundError, match="does not exist") as e:
         Tools(app).overview("no-such-case")
     assert isinstance(e.value, ToolInputError)  # the server turns it into a tool error
-
-
-def test_unknown_or_malformed_zone_gives_no_offset() -> None:
-    at = 1_767_225_600 * NS
-    assert _zone_offset("Europe/Berlin", "Europe/Berlin", at) == 0
-    assert _zone_offset("Europe/Berlin", "UTC", at) == -3600 * NS
-    assert _zone_offset("Not/AZone", "UTC", at) is None
-    assert _zone_offset("../etc", "UTC", at) is None
 
 
 def test_full_ts_ns_rejects_other_text() -> None:

@@ -7,11 +7,22 @@ versions; a case DB of an older schema is migrated on first open.
 
 ## [Unreleased]
 
+### Removed
+
+- **Multi-source alignment** (a breaking change to the tool list): the tools `timeline` and
+  `align`, `context(scope='all')`, the clock model and automatic alignment, marker rules
+  (`marker:` files in a rule directory are now an error), the `clock` fields of `list_sources`
+  and the CLI commands `timeline` and `align`. Cases normally hold one logcat or one DLT trace,
+  so the case clock had no use; each source keeps its times as written. `diff` stays (it never
+  used the alignment). Schema 6 drops the clock tables; older case DBs migrate on first open.
+- The evaluation's `timeline` queries and `expected.order` check, and the synthetic case
+  `syn-can-busoff` that needed them (9 synthetic cases remain).
+
 ### Changed
 
 - **Internal layout** (no change to tool names, parameters or output): `tools.py`, `clocktools.py`
   and `difftool.py` are now the package `automotive_log_mcp.tools`, layered without an import
-  cycle (`models`, `timespec`, `text`, `limits`, `clock`, `diff`, `base`, then one module per tool
+  cycle (`models`, `timespec`, `text`, `limits`, `diff`, `base`, then one module per tool
   family); `from automotive_log_mcp.tools import Tools, Filter, ...` works as before. A test keeps
   the layers acyclic.
 - `Output` is generic over its result model (`Output[SearchResult]`, ...), so callers get typed

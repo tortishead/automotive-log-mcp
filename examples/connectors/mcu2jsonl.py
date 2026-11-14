@@ -9,8 +9,8 @@ Input (text, for the example):
       r0=0x00000000 r1=0x20001000
     END
 
-The first column is milliseconds since MCU start (a monotonic clock); the server aligns it with
-the other sources (marker rules, anchors). Output: one JSON object per line, see
+The first column is milliseconds since MCU start (a monotonic clock). Output: one JSON object per
+line, see
 connectors/command.py for the fields.
 """
 

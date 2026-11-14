@@ -1,11 +1,9 @@
 # DLT
 
 automotive-log-mcp does not read DLT (AUTOSAR Diagnostic Log and Trace) files itself: the DLT
-connector through `dlt-core` (plan, D9 and D12) was left out of M5, which built the multi-source
-parts (clock alignment, `timeline`, the `command` connector) without it. A DLT decoder you
+connector through `dlt-core` (plan, D9 and D12) is not built yet. A DLT decoder you
 already have can be plugged in as a `command` connector that writes JSON lines (ECU, APID and CTID
-as `attrs`, ECU ticks as `mono`), see [connectors.md](connectors.md); its sources then share the
-case clock with the Android logs. Without such a connector there are two ways to work on a defect
+as `attrs`, ECU ticks as `mono`), see [connectors.md](connectors.md). Without such a connector there are two ways to work on a defect
 whose evidence is partly in DLT.
 
 ## 1. dlt-mcp-server in DLT Viewer, next to this server
@@ -31,8 +29,8 @@ What to expect:
   `check_citations` checks those and ignores the DLT side; ask the agent to cite DLT messages by
   their DLT Viewer index (and ECU, APID, CTID) and check those by hand in DLT Viewer.
 - **Time:** the two sides are not aligned. DLT storage time, ECU timestamps (ticks since ECU
-  start) and the Android wall clock can be seconds or more apart; cross-source alignment is the
-  clock model, which needs the DLT side indexed by this server. Have the agent pair events by content (a request and its answer), not by time
+  start) and the Android wall clock can be seconds or more apart, and this server does not align
+  sources. Have the agent pair events by content (a request and its answer), not by time
   alone, and say when an order between the two sides is a guess.
 - **Redaction:** the DLT side is whatever the plugin returns. This server's redaction (D5) does
   not apply to it; check the plugin's behaviour before using an agent on traces with personal data
@@ -62,8 +60,7 @@ its lines get `log:` citations.
    ```
 
 Limits of the export route: the storage time printed by DLT Viewer is the wall-clock time of the
-logger, not of the head unit (it is `assumed` on the case clock until an anchor places it); ECU
+logger, not of the head unit; ECU
 ticks are kept as an attribute but not used as a clock; DLT file transfers, control messages and non-verbose payloads without
 FIBEX are not decoded; a multi-GB trace exported as text is slow to index (about 30–40k lines/s,
-see the M1 status). Marker rules or `align` anchors place the export on the case clock
-([connectors.md](connectors.md#clock-alignment-m5)).
+see the M1 status).

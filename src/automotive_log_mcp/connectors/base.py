@@ -95,7 +95,7 @@ def head_lines(head: bytes, n: int = 40) -> list[str]:
     lines = text.splitlines()
     if len(head) >= SNIFF_BYTES and lines:
         lines = lines[:-1]
-    return [ln for ln in lines[:n]]
+    return lines[:n]
 
 
 @dataclass

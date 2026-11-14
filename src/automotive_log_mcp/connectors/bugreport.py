@@ -116,7 +116,7 @@ class BugreportContainer:
     @staticmethod
     def _boot_estimate(meta: dict[str, Any]) -> None:
         if "dumpstate_ns" in meta and "uptime_s" in meta:
-            # Minute resolution at best: metadata for the clock model (M5), not used for ts.
+            # Minute resolution at best: source metadata only, not used for ts.
             meta["boot_time_estimate"] = meta["dumpstate_ns"] - meta["uptime_s"] * NS
 
     @staticmethod
