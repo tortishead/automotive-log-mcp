@@ -40,6 +40,7 @@ class Filter(BaseModel):
     tags: list[str] | None = Field(default=None, description="Tags to include; globs allowed, e.g. 'Car*'.")
     not_tags: list[str] | None = Field(default=None, description="Tags to exclude; globs allowed.")
     pid: int | None = Field(default=None, ge=0, description="Process id.")
+    tid: int | None = Field(default=None, ge=0, description="Thread id.")
     attrs: dict[str, str | int | float | bool] | None = Field(
         default=None,
         description="Attributes that must match exactly, as get_records shows them, e.g. {'art': 3}.",

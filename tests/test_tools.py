@@ -187,6 +187,13 @@ def test_tags_not_tags_pid_attrs(br: Tools) -> None:
     assert cites(br.search("br", None, filter=F(tags=["Hvac*"]), collapse=False)) == ["log:1#1", "log:1#2"]
     got = cites(br.search("br", None, filter=F(pid=1234, not_tags=["Hvac*", "java_*"]), collapse=False))
     assert got == ["log:3#1"]
+    hits = [
+        ln
+        for ln in br.search("br", None, filter=F(tid=1250), collapse=False).text.splitlines()
+        if ln.startswith("log:")
+    ]
+    assert hits and all("/1250 " in ln for ln in hits)
+    assert "tid filter (tid 1)" in br.search("br", "setProperty", filter=F(tid=1)).text
     assert cites(br.search("br", None, filter=F(attrs={"art": 6}), collapse=False)) == ["log:11#1"]
     assert cites(br.search("br", None, filter=F(attrs={"uid": 1000}), collapse=False))[:2] == [
         "log:4#1",

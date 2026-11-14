@@ -221,6 +221,7 @@ class RecordFilter:
     tag_ids: list[int] | None = None
     not_tag_ids: list[int] | None = None
     pid: int | None = None
+    tid: int | None = None
     attrs: dict[str, Any] | None = None
 
     def where(self, skip: frozenset[str] = frozenset()) -> tuple[list[str], list[Any]]:
@@ -267,6 +268,9 @@ class RecordFilter:
         if self.pid is not None and "pid" not in skip:
             where.append("r.pid = ?")
             params.append(self.pid)
+        if self.tid is not None and "tid" not in skip:
+            where.append("r.tid = ?")
+            params.append(self.tid)
         if self.attrs and "attrs" not in skip:
             for key, value in self.attrs.items():
                 # Compare as text: attributes are stored as JSON (uid "1000", art 3, flags true).
@@ -289,6 +293,8 @@ class RecordFilter:
             out.append("not_tags")
         if self.pid is not None:
             out.append("pid")
+        if self.tid is not None:
+            out.append("tid")
         if self.attrs:
             out.append("attrs")
         return out

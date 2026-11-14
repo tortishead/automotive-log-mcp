@@ -123,6 +123,7 @@ def _parser() -> argparse.ArgumentParser:
     di.add_argument("--tag", "-t", action="append", help="tag (glob), both sides; repeatable")
     di.add_argument("--not-tag", action="append", help="tag to exclude (glob), both sides; repeatable")
     di.add_argument("--pid", type=int, help="process id, both sides")
+    di.add_argument("--tid", type=int, help="thread id, both sides")
     di.add_argument("--min-ratio", type=float, default=4.0, help="changed: share differs by this factor")
     di.add_argument("--limit", "-n", type=int, default=12, help="items per list")
 
@@ -178,6 +179,7 @@ def _filter_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--not-tag", action="append", help="tag to exclude (glob); repeatable")
     p.add_argument("--source", type=int, action="append", help="source id; repeatable")
     p.add_argument("--pid", type=int)
+    p.add_argument("--tid", type=int)
     p.add_argument(
         "--from", dest="from_", metavar="TIME", help="start time, as printed, relative or a citation"
     )
@@ -193,6 +195,7 @@ def _filter(args: argparse.Namespace) -> Filter | None:
         "tags": args.tag,
         "not_tags": args.not_tag,
         "pid": args.pid,
+        "tid": args.tid,
     }
     values = {k: v for k, v in flt.items() if v is not None}
     return Filter.model_validate(values) if values else None
@@ -344,6 +347,7 @@ def _diff_side(args: argparse.Namespace, side: str) -> DiffSide:
         "tags": args.tag,
         "not_tags": args.not_tag,
         "pid": args.pid,
+        "tid": args.tid,
     }
     try:
         return DiffSide.model_validate({k: v for k, v in values.items() if v is not None})

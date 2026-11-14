@@ -32,6 +32,7 @@ _PART_NAMES = {
     "tags": "tags filter",
     "not_tags": "not_tags filter",
     "pid": "pid filter",
+    "tid": "tid filter",
     "attrs": "attrs filter",
 }
 
@@ -41,6 +42,8 @@ def _part_value(rf: RecordFilter, part: str) -> str:
         return f" (level {rf.min_level})"
     if part == "pid":
         return f" (pid {rf.pid})"
+    if part == "tid":
+        return f" (tid {rf.tid})"
     return ""
 
 

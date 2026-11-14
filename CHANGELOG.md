@@ -7,6 +7,10 @@ versions; a case DB of an older schema is migrated on first open.
 
 ## [Unreleased]
 
+### Added
+
+- Filter field `tid` (CLI `--tid`): one thread of a process, in every tool that takes a filter.
+
 ### Removed
 
 - **Multi-source alignment** (a breaking change to the tool list): the tools `timeline` and

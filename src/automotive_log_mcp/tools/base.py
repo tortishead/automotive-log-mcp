@@ -175,6 +175,7 @@ class ToolBase:
             for g in unmatched:
                 warnings.append(f"not_tags '{g}' matches no tag in the case")
         rf.pid = f.pid
+        rf.tid = f.tid
         if f.attrs:
             attrs: dict[str, Any] = {}
             for k, v in f.attrs.items():

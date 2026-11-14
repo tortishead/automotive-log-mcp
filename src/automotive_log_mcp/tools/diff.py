@@ -319,6 +319,12 @@ def _describe(f: Filter, seg: int | None) -> str:
         parts.append(f"to {f.to}")
     if f.level:
         parts.append(f"level ≥ {f.level}")
-    extra: dict[str, Any] = {"tags": f.tags, "not_tags": f.not_tags, "pid": f.pid, "attrs": f.attrs}
+    extra: dict[str, Any] = {
+        "tags": f.tags,
+        "not_tags": f.not_tags,
+        "pid": f.pid,
+        "tid": f.tid,
+        "attrs": f.attrs,
+    }
     parts.extend(f"{k} {v}" for k, v in extra.items() if v)
     return " ".join(parts)

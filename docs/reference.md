@@ -222,7 +222,7 @@ token.
 ### Filter
 
 `sources`, `from`/`to`, `level` (minimum), `tags`/`not_tags` (globs, case-sensitive; an unknown
-tag gets a warning with similar tags), `pid`, `attrs` (exact match on format attributes, e.g.
+tag gets a warning with similar tags), `pid`, `tid`, `attrs` (exact match on format attributes, e.g.
 `{"uid": "1000"}` or `{"art": 3}`). `from`/`to` accept:
 
 | Form | Example | Meaning |
@@ -267,7 +267,7 @@ automotive-log-mcp diff T-1 --a 2 --a-to log:2#500 --b 2 --b-from log:2#500   # 
   (adding the same file again is otherwise a no-op).
 - `query` runs the `search` tool and prints its text: `--search` (FTS5 over message and tag) or
   `--regex` (neither: every record that passes the filter), `--level` (minimum), `--tag` and
-  `--not-tag` (glob, repeatable), `--source` (id, repeatable), `--pid`, `--from`/`--to` (forms as
+  `--not-tag` (glob, repeatable), `--source` (id, repeatable), `--pid`, `--tid`, `--from`/`--to` (forms as
   in [Filter](#filter); write `--from=-5m` for values starting with `-`), `--collapse`, `--limit`,
   `--cursor`, `--count`. Raw values in the query (a VIN, a MAC) are redacted the same way as the
   logs, so they still match.
