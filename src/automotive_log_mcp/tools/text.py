@@ -9,7 +9,6 @@ from ..core import format as fmt
 from ..core.timeparse import NS
 from ..model import SEQ_BITS, SEQ_MASK, citation
 from ..store import query
-from ..store.query import Rec
 from .models import RecordOut
 
 _REGEX_HINT = re.compile(
@@ -139,12 +138,6 @@ def dur_text(ns: int) -> str:
     if secs < 2 * 86400:
         return f"{secs / 3600:.1f} h".replace(".0 h", " h")
     return f"{secs / 86400:.1f} d".replace(".0 d", " d")
-
-
-def delta_text(a: Rec, b: Rec) -> str:
-    if a.ts is not None and b.ts is not None:
-        return f" (+{dur_text(b.ts - a.ts)})"
-    return ""
 
 
 _SPARK = "▁▂▃▄▅▆▇█"

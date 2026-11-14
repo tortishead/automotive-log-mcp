@@ -17,17 +17,16 @@ import pytest
 EVAL = Path(__file__).resolve().parent.parent / "eval"
 
 # case -> (exact, by artifact, missed): first run of the synthetic cases (M4 five and M6 four,
-# Nov 10, 2026)
+# Nov 10, 2026), updated Nov 14, 2026 when detect was removed (overview + list_artifacts first)
 BASELINE = {
     "syn-hvac-crash": (["log:1#2"], ["art:1/exception:L3"], []),
     "syn-radio-anr": ([], ["art:2/p1500.t1.main:L12", "art:2/p1500.t12.radioworker:L23"], []),
-    "syn-vhal-abort": (["log:1#15", "log:1#16"], [], []),
+    # no artifact, and overview's top lists do not reach the abort lines (detect's vhal_error did)
+    "syn-vhal-abort": ([], [], ["log:1#15", "log:1#16"]),
     "syn-lmk-media": (["log:1#11", "log:1#12"], [], []),
-    # detect shows the avc denial, not hvacd's own "Permission denied" error before it
-    "syn-boot-selinux": (["log:1#5"], [], ["log:1#4"]),
+    "syn-boot-selinux": (["log:1#4", "log:1#5"], [], []),
     "syn-watchdog-audio": (["log:1#4", "log:1#8"], [], []),
     "syn-evs-crash": (["log:1#5"], ["art:1/backtrace:L16"], []),
-    # only diff (boot 1 against boot 2) shows the firmware lines: no level filter or rule has them
     "syn-wifi-fw-ota": (["log:1#15", "log:1#16"], [], []),
     "syn-bt-restart": (["log:1#3", "log:1#5"], [], []),
 }
@@ -56,14 +55,14 @@ def test_evidence_recall_on_synthetic_cases(tmp_path: Path) -> None:
         assert (r["exact"], r["artifact"], r["missed"]) == (exact, art, missed), cid
         assert all(c["bytes"] <= 8192 for c in r["calls"])
     text = report.read_text(encoding="utf-8")
-    assert "17/18 root-cause citations surfaced" in text
+    assert "16/18 root-cause citations surfaced" in text
     # with --min-recall 1 the known miss fails the run
     assert (
         er.main(
             [
                 str(EVAL / "cases.yaml"),
                 "--case",
-                "syn-boot-selinux",
+                "syn-vhal-abort",
                 "--min-recall",
                 "1",
                 "--report",

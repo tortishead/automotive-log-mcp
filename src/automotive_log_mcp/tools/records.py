@@ -1,4 +1,4 @@
-"""``context`` and ``get_records``, and the entry point of the diff tool."""
+"""``context`` and ``get_records``."""
 
 from __future__ import annotations
 
@@ -6,14 +6,13 @@ from ..core import format as fmt
 from ..model import SEQ_BITS, SEQ_MASK, citation
 from ..store import query
 from .base import ToolBase
-from .diff import DiffResult
-from .models import ContextResult, DiffSide, GetRecordsResult, Output, RecordOut, ToolInputError
+from .models import ContextResult, GetRecordsResult, Output, RecordOut, ToolInputError
 from .text import cut_bytes, id_ranges, join_lines, list_some, reserve_bytes
 from .timespec import parse_log_cite
 
 
 class RecordTools(ToolBase):
-    """``context``, ``get_records``, and the diff tool by delegation."""
+    """``context`` and ``get_records``."""
 
     def context(
         self, case: str, at: str, before: int = 20, after: int = 20, scope: str = "source"
@@ -186,8 +185,3 @@ class RecordTools(ToolBase):
             meta.append(f'code search: "{o.literal}"')
         body = "\n".join("  " + x for x in o.msg.split("\n"))
         return "\n".join([head, *(["  " + " · ".join(meta)] if meta else []), body])
-
-    def diff(
-        self, case: str, a: DiffSide, b: DiffSide, min_ratio: float = 4.0, limit: int = 12
-    ) -> Output[DiffResult]:
-        return self.differ.diff(case, a, b, min_ratio, limit)

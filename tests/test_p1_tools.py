@@ -1,7 +1,7 @@
-"""M4 P1 tools: overview, count, detect (rules, loading, overrides) and check_citations.
+"""M4 P1 tools: overview, count and check_citations.
 
 Golden outputs (text and structured content) on the bugreport zip are in
-``tests/golden/tools__{overview,count,detect,check_citations}.json``; regenerate with
+``tests/golden/tools__{overview,count,check_citations}.json``; regenerate with
 ``UPDATE_GOLDEN=1`` and review the diff.
 """
 
@@ -16,15 +16,14 @@ from typing import Any
 import pytest
 
 from automotive_log_mcp.app import App
-from automotive_log_mcp.config import Caps, ConfigError, load_config
+from automotive_log_mcp.config import Caps
 from automotive_log_mcp.core import citations as cit
 from automotive_log_mcp.core import format as fmt
-from automotive_log_mcp.detect.engine import load_rules
 from automotive_log_mcp.policy import Policy
-from automotive_log_mcp.tools import Output, ToolInputError, Tools
+from automotive_log_mcp.tools import ToolInputError, Tools
 from automotive_log_mcp.tools import limits as tools_mod
 
-from .conftest import FIXED_SECRET, REF_TIME, check_golden
+from .conftest import REF_TIME, check_golden
 from .test_golden import make_bugreport_zip
 from .test_tools import F, br  # noqa: F401  (fixture)
 
@@ -60,10 +59,6 @@ CALLS: dict[str, list[tuple[str, dict[str, Any]]]] = {
         ("template", {"by": "template", "limit": 3}),
         ("kernel buckets (monotonic)", {"by": "level", "bucket": "1m", "filter": {"sources": ["5"]}}),
     ],
-    "detect": [
-        ("all rules", {}),
-        ("one rule, filtered", {"rules": ["java_crash"], "filter": {"to": "00:00:02"}}),
-    ],
     "check_citations": [
         ("answer", {"text": ANSWER}),
         ("pass", {"text": "Crash: log:3#1 (art:1/exception:L3).\n"}),
@@ -98,203 +93,14 @@ def test_tiny_caps_hold_for_p1_tools(app: App, tmp_path: Path) -> None:
         t.overview("br"),
         t.count("br"),
         t.count("br", by="template", bucket="10m"),
-        t.detect("br", examples=10),
         t.check_citations("br", ANSWER * 20),
     ]
     for o in outs:
         assert fmt.utf8_len(o.text) <= caps.max_bytes, o.text
     assert "more values" in outs[1].text
-    assert "not shown" in outs[3].text or "output cap" in outs[3].text
-    assert "more issues not shown" in outs[4].text
+    assert "more issues not shown" in outs[3].text
     with pytest.raises(ToolInputError, match="at most 4"):
         t.count("br", bucket="10s")  # 4 buckets at most with max_lines=4
-
-
-# -- detect ------------------------------------------------------------------------------------
-
-# One line per default rule, plus near misses that must not hit.
-RULES_LOG = """\
---------- beginning of main
-01-05 10:00:00.000   500   500 I boot_progress_start: 1000
-01-05 10:01:00.000  2000  2000 E AndroidRuntime: FATAL EXCEPTION: main
-01-05 10:01:00.000  2000  2000 E AndroidRuntime: Process: com.example.foo, PID: 2000
-01-05 10:01:01.000  2100  2101 F libc    : Fatal signal 11 (SIGSEGV), code 1 (SEGV_MAPERR), fault addr 0x0 in tid 2101 (worker), pid 2100 (vendor.foo)
-01-05 10:01:02.000  1000  1100 E ActivityManager: ANR in com.example.foo (com.example.foo/.Main)
-01-05 10:01:03.000  1000  1012 W Watchdog: *** WATCHDOG KILLING SYSTEM PROCESS: Blocked in handler on foreground thread
-01-05 10:01:04.000   400   400 I lowmemorykiller: Kill 'com.example.bar' (2300), uid 10060, oom_score_adj 900 to free 50000kB rss
-01-05 10:01:05.000  2400  2400 W foo     : type=1400 audit(0.0:12): avc: denied { read } for name="x" scontext=u:r:foo:s0 tcontext=u:object_r:bar:s0 tclass=file permissive=0
-01-05 10:01:06.000  1000  1188 E JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel size = 1048576)
-01-05 10:01:07.000   610   640 E DefaultVehicleHal: getValue failed for prop 0x11400400
-01-05 10:01:08.000     1     1 I init    : Service 'vendor.foo' (pid 2100) received signal 11
-01-05 10:01:09.000  1000  1100 I ActivityManager: ANR rate is low
-01-05 10:01:10.000  2400  2400 I foo     : avc: granted { read }
-01-05 10:01:11.000   610   640 W DefaultVehicleHal: getValue slow for prop 0x11400400
-01-05 10:01:12.000  2000  2000 I AndroidRuntime: no exception here
-01-05 10:05:00.000  1000  1100 I ActivityManager: still booting
-"""
-
-
-@pytest.fixture
-def rules_case(app: App, tmp_path: Path) -> Tools:
-    p = tmp_path / "rules.log"
-    p.write_text(RULES_LOG, encoding="utf-8")
-    os.utime(p, (REF_TIME, REF_TIME))
-    app.ingestor.add(app.config.case_db("r"), str(p))
-    return Tools(app)
-
-
-def _hits(out: Output) -> dict[str, list[str]]:
-    return {r.rule: [h.record.cite for h in r.hits] for r in out.data.results}
-
-
-def test_every_default_rule_hits_once(rules_case: Tools) -> None:
-    out = rules_case.detect("r", examples=10)
-    assert _hits(out) == {
-        "boot_not_completed": ["log:1#1"],
-        "java_crash": ["log:1#2"],
-        "native_crash": ["log:1#3"],
-        "anr": ["log:1#4"],
-        "watchdog": ["log:1#5"],
-        "lmk": ["log:1#6"],
-        "selinux_denial": ["log:1#7"],
-        "binder_failure": ["log:1#8"],
-        "vhal_error": ["log:1#9"],
-        "service_restart": ["log:1#10"],
-    }
-    assert out.data.no_hits == []
-    assert len(load_rules().rules) == 10
-    # severity order, then time
-    sev = [r.severity for r in out.data.results]
-    assert sev == sorted(sev, key=["high", "medium", "low"].index)
-
-
-def test_boot_completed_closes_the_window(app: App, tmp_path: Path) -> None:
-    log = RULES_LOG.replace(
-        "01-05 10:01:12.000  2000  2000 I AndroidRuntime: no exception here",
-        "01-05 10:01:12.000   500   500 I boot_progress_enable_screen: 72000",
-    )
-    p = tmp_path / "b.log"
-    p.write_text(log, encoding="utf-8")
-    app.ingestor.add(app.config.case_db("b"), str(p))
-    out = Tools(app).detect("b", rules=["boot_not_completed"])
-    assert out.data.results == []
-    assert "no hits: boot_not_completed" in out.text
-
-
-def test_rule_dirs_override_and_add(home: Path, tmp_path: Path) -> None:
-    rules = tmp_path / "myrules"
-    rules.mkdir()
-    (rules / "anr.yaml").write_text(
-        "rule: anr\nseverity: low\ndescription: my ANR\nmatch: 'ANR rate'\ntags: [ActivityManager]\n",
-        encoding="utf-8",
-    )
-    (rules / "more.yaml").write_text(
-        """\
-rules:
-  - rule: died_then_started
-    severity: medium
-    description: process death followed by a new process within 5 s
-    match: 'FATAL EXCEPTION'
-    followed_by: {match: 'Fatal signal', within: 5s}
-  - rule: crash_not_followed
-    severity: low
-    description: FATAL not followed by a watchdog within 1 s
-    match: 'FATAL EXCEPTION'
-    followed_by: {tags: [Watchdog], within: 1s, absent: true}
-  - rule: same_pid_followed
-    severity: low
-    description: needs the same pid
-    match: 'FATAL EXCEPTION'
-    group_by: pid
-    followed_by: {match: 'Fatal signal', within: 5s}
-  - rule: raw_mac
-    severity: low
-    description: a raw value in a pattern is redacted like a query
-    match: '3c:5a:b4:01:02:03'
-""",
-        encoding="utf-8",
-    )
-    cfg = tmp_path / "c.yaml"
-    cfg.write_text(f"rule_dirs: [{rules.as_posix()}]\n", encoding="utf-8")
-    home.mkdir(parents=True, exist_ok=True)
-    (home / "secret.key").write_bytes(FIXED_SECRET)
-    app = App.create(load_config(cfg), Policy())
-    assert app.rules.overridden["anr"].endswith("anr.yaml")
-    assert app.rules.rules["anr"].origin == str(rules / "anr.yaml")
-    log = RULES_LOG + "01-05 10:05:01.000  1000  1100 I wpa_supplicant: associated with 3c:5a:b4:01:02:03\n"
-    p = tmp_path / "r.log"
-    p.write_text(log, encoding="utf-8")
-    app.ingestor.add(app.config.case_db("r"), str(p))
-    out = Tools(app).detect("r")
-    hits = _hits(out)
-    assert hits["anr"] == ["log:1#11"]  # the override, not the package rule
-    assert hits["died_then_started"] == ["log:1#2"]
-    res = {r.rule: r for r in out.data.results}
-    assert res["died_then_started"].hits[0].followed_by == "log:1#3"
-    assert "followed by log:1#3 (+1 s)" in out.text
-    assert hits["crash_not_followed"] == ["log:1#2"]  # the watchdog comes 3 s later
-    assert "same_pid_followed" in out.data.no_hits  # pid 2000 vs 2100
-    assert hits["raw_mac"] == ["log:1#16"]
-
-
-@pytest.mark.parametrize(
-    ("text", "match"),
-    [
-        ("rule: Bad\nseverity: low\ndescription: x\nmatch: x\n", "lowercase name"),
-        ("rule: x\nseverity: urgent\ndescription: x\nmatch: x\n", "severity"),
-        ("rule: x\nseverity: low\ndescription: x\nmatch: '('\n", "not a valid regex"),
-        ("rule: x\nseverity: low\ndescription: x\n", "at least one of"),
-        ("rule: x\nseverity: low\ndescription: x\nmatch: x\nwhen: now\n", "unknown keys: when"),
-        (
-            "rule: x\nseverity: low\ndescription: x\nmatch: x\nfollowed_by: {match: y}\n",
-            "'within' is required",
-        ),
-        (
-            "rule: x\nseverity: low\ndescription: x\nmatch: x\nfollowed_by: {match: y, within: soon}\n",
-            "duration",
-        ),
-        ("rule: x\nseverity: low\ndescription: x\nmatch: x\ngroup_by: tid\n", "group_by"),
-        ("rule: x\nseverity: low\ndescription: x\nmatch: x\nany: [{match: y}]\n", "either 'any'"),
-        (
-            "rules: [{rule: x, severity: low, description: x, match: x}, {rule: x, severity: low, description: y, match: y}]\n",
-            "defined twice",
-        ),
-        ("foo: bar\n", "expected 'rule"),
-    ],
-)
-def test_invalid_rule_files_fail_loudly(tmp_path: Path, text: str, match: str) -> None:
-    d = tmp_path / "r"
-    d.mkdir()
-    (d / "x.yaml").write_text(text, encoding="utf-8")
-    with pytest.raises(ConfigError, match=match):
-        load_rules([d])
-
-
-def test_missing_rule_dir(tmp_path: Path) -> None:
-    with pytest.raises(ConfigError, match="does not exist"):
-        load_rules([tmp_path / "nope"])
-
-
-def test_detect_unknown_rule_and_filter(rules_case: Tools) -> None:
-    with pytest.raises(ToolInputError, match="unknown rules: nope"):
-        rules_case.detect("r", rules=["nope"])
-    out = rules_case.detect("r", filter=F(from_="01-05 10:01:05", to="01-05 10:01:08"))
-    assert set(_hits(out)) == {"selinux_denial", "binder_failure", "vhal_error", "service_restart"}
-
-
-def test_detect_on_kernel_monotonic_records(app: App, tmp_path: Path) -> None:
-    p = tmp_path / "dmesg.txt"
-    p.write_text(
-        "<6>[    0.000000] Booting Linux on physical CPU 0x0\n"
-        "<3>[  500.123456] Out of memory: Killed process 1234 (foo) total-vm:1000kB, anon-rss:900kB\n"
-        "<5>[  501.000000] audit: type=1400 audit(1700000000.123:7): avc:  denied  { write } for pid=88 "
-        'comm="bar" scontext=u:r:bar:s0 tcontext=u:object_r:baz:s0 tclass=file permissive=0\n',
-        encoding="utf-8",
-    )
-    app.ingestor.add(app.config.case_db("k"), str(p))
-    out = Tools(app).detect("k")
-    assert _hits(out) == {"lmk": ["log:1#2"], "selinux_denial": ["log:1#3"]}
-    assert "500.123456" in out.text
 
 
 # -- count -------------------------------------------------------------------------------------
@@ -459,26 +265,3 @@ def test_call_log_keeps_only_size_of_checked_text(app: App, tmp_path: Path) -> N
     entry = next(x for x in lines if x["tool"] == "check_citations")
     assert entry["args"]["text"].startswith("<20 chars, sha256 ")
     assert "secret" not in json.dumps(lines)
-
-
-def test_dlt_viewer_export_example_connector(home: Path, tmp_path: Path) -> None:
-    """docs/dlt.md: a DLT Viewer text export indexed with examples/rules/dlt_viewer_ascii.yaml."""
-    rules = Path(__file__).resolve().parent.parent / "examples" / "rules"
-    cfg = tmp_path / "c.yaml"
-    cfg.write_text(f"rule_dirs: [{rules.as_posix()}]\n", encoding="utf-8")
-    home.mkdir(parents=True, exist_ok=True)
-    (home / "secret.key").write_bytes(FIXED_SECRET)
-    app = App.create(load_config(cfg), Policy())
-    p = tmp_path / "ecu1_dlt.txt"
-    p.write_text(
-        "0 2026/01/01 08:00:00.000100 10.0001 1 ECU1 HVAC CTRL log info verbose 1 HVAC controller started\n"
-        "1 2026/01/01 08:00:01.123456 11.1234 2 ECU1 HVAC CTRL log error verbose 1 setProperty failed, "
-        "status=NOT_AVAILABLE\n",
-        encoding="utf-8",
-    )
-    app.ingestor.add(app.config.case_db("d"), str(p))
-    t = Tools(app)
-    rec = t.get_records("d", ["log:1#2"]).data.records[0]
-    assert (rec.level, rec.tag, rec.ts) == ("E", "CTRL", "2026-01-01 08:00:01.123")
-    assert rec.attrs["ecu"] == "ECU1" and rec.attrs["apid"] == "HVAC"
-    assert _hits(t.detect("d", rules=["vhal_error"])) == {"vhal_error": ["log:1#2"]}

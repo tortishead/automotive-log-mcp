@@ -12,11 +12,9 @@ from typing import Any, Literal
 from ..app import App
 from ..core import format as fmt
 from ..core.timeparse import NS, ts_raw_of, wall_ns
-from ..detect.engine import Rule, RuleResult, run_rule
 from ..model import SEQ_BITS
 from ..store import db, query
 from ..store.query import Rec, RecordFilter
-from .diff import DiffTool
 from .models import CaseNotFoundError, Filter, RecordOut, ToolInputError
 from .text import id_ranges, sources_word
 from .timespec import (
@@ -58,12 +56,11 @@ class CaseCtx:
 
 class ToolBase:
     """What every tool needs: the app, the caps, one call's case view, record lines, filters and
-    times. The diff tool holds a reference to it."""
+    times."""
 
     def __init__(self, app: App) -> None:
         self.app = app
         self.caps = app.config.caps
-        self.differ = DiffTool(self)
 
     @contextmanager
     def open_case(self, case: str) -> Iterator[CaseCtx]:
@@ -316,15 +313,3 @@ class ToolBase:
                 f"no source {sid} in case '{ctx.case}'; sources: {id_ranges(list(ctx.by_id)) or 'none'}"
             )
         return (sid << SEQ_BITS) | seq
-
-    def run_rules(self, ctx: CaseCtx, rf: RecordFilter, rules: list[Rule]) -> list[RuleResult]:
-        where, params = rf.where()
-        follow_where = RecordFilter(sources=rf.sources).where()
-        selected = [ctx.by_id[i] for i in (rf.sources if rf.sources is not None else list(ctx.by_id))]
-        ends = [s.ts_max for s in selected if s.ts_max is not None]
-        case_end = max(ends) if ends else None
-        redact = self.app.redactor.redact
-        return [
-            run_rule(ctx.conn, r, where, params, redact, self.caps.regex_scan_rows, follow_where, case_end)
-            for r in rules
-        ]

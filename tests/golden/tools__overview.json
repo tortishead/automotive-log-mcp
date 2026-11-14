@@ -10,15 +10,6 @@
    },
    "bursts": [],
    "case": "br",
-   "detect": {
-    "anr": 1,
-    "boot_not_completed": 1,
-    "java_crash": 3,
-    "native_crash": 2,
-    "service_restart": 2,
-    "vhal_error": 1
-   },
-   "exact": true,
    "gaps": [
     {
      "after": "log:4#1",
@@ -409,9 +400,8 @@
    "histogram from 12-31 23:50:00.000, 33 buckets of 30s (peak 5 records, 3 E/F; count(case, bucket='30s') for numbers):",
    "  all |▂···············▂··▄█····▂▂···▂·▂|",
    "  E/F |···················▃█····▃····▃·▃|",
-   "detect: anr 1, boot_not_completed 1, java_crash 3, native_crash 2, service_restart 2, vhal_error 1 (detect(case) shows the lines)",
    "artifacts: anr 1, dropbox 1, java_crash 3, tombstone 2 (list_artifacts(case))",
-   "next: detect(case) for known failure patterns, list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
+   "next: list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
   ]
  },
  "filtered: level E": {
@@ -429,14 +419,6 @@
    },
    "bursts": [],
    "case": "br",
-   "detect": {
-    "anr": 1,
-    "java_crash": 3,
-    "native_crash": 2,
-    "service_restart": 1,
-    "vhal_error": 1
-   },
-   "exact": true,
    "gaps": [
     {
      "after": "log:12#1",
@@ -806,9 +788,8 @@
    "histogram from 12-31 23:59:50.000, 38 buckets of 10s (peak 3 records, 3 E/F; count(case, bucket='10s') for numbers):",
    "  all |▃█··············▃··············▃·····▃|",
    "  E/F |▃█··············▃··············▃·····▃|",
-   "detect: anr 1, java_crash 3, native_crash 2, service_restart 1, vhal_error 1 (detect(case) shows the lines)",
    "artifacts: anr 1, dropbox 1, java_crash 3, tombstone 2 (list_artifacts(case))",
-   "next: detect(case) for known failure patterns, list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
+   "next: list_artifacts(case) for crashes, then search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
   ]
  }
 }

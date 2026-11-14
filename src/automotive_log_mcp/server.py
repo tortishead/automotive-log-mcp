@@ -10,7 +10,7 @@ token use (see ``calllog.py``).
 Structured content: off by default. Clients that get both a text and ``structuredContent`` may
 forward only the JSON to the model (Claude Code 2.1 does), which is 1.5-2x the bytes of the text
 and drops its footer hints ('capped: narrow with …'). ``structured_output: true`` in the config
-(or ``serve --structured``) restores the output schemas and structured content.
+(or ``--structured``) restores the output schemas and structured content.
 """
 
 from __future__ import annotations
@@ -48,8 +48,6 @@ from .tools import (
     CheckCitationsResult,
     ContextResult,
     CountResult,
-    DetectResult,
-    DiffSide,
     Filter,
     GetRecordsResult,
     ListArtifactsResult,
@@ -60,7 +58,6 @@ from .tools import (
     ToolInputError,
     Tools,
 )
-from .tools.diff import DiffResult
 from .usage import FixedCost, args_hashes, cite_ids, compact_cites, est_tokens, fixed_cost, json_bytes
 
 SERVER_NAME = "automotive-log-mcp"
@@ -265,9 +262,7 @@ TOOL_SPECS: tuple[tuple[str, ToolAnnotations, str], ...] = (
     ("get_records", READ_ONLY, "Get full records"),
     ("overview", READ_ONLY, "Case overview"),
     ("count", READ_ONLY, "Count records"),
-    ("detect", READ_ONLY, "Detect known failure patterns"),
     ("check_citations", READ_ONLY, "Check the citations of an answer"),
-    ("diff", READ_ONLY, "Compare two sets of records"),
 )
 TOOL_NAMES = tuple(name for name, _, _ in TOOL_SPECS)
 
@@ -461,9 +456,9 @@ class LogServer:
             for i in infos:
                 flags = [i.status] if i.status != "done" else []
                 if i.original_missing:
-                    flags.append("original missing: relink with the CLI")
+                    flags.append("original missing")
                 if i.stale:
-                    flags.append("stale: reindex recommended")
+                    flags.append("stale: add_source again with reindex=true")
                 span = f"{i.ts_from or '-'} .. {i.ts_to or '-'}"
                 lines.append(
                     f"{i.id}  {i.format}  {i.records} records  {span}  {i.name}"
@@ -603,7 +598,7 @@ class LogServer:
             filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
         ) -> Annotated[CallToolResult, OverviewResult]:
             """Orientation for a case: level counts, top tags, processes and messages, clock segments,
-            gaps, error bursts, a histogram, detector and artifact counts, each cited."""
+            gaps, error bursts, a histogram and artifact counts, each cited."""
             return _output(lambda: tools.overview(case, filter), self.structured)
 
         def count(
@@ -635,21 +630,6 @@ class LogServer:
             value with an example citation (≈: estimated from a sample)."""
             return _output(lambda: tools.count(case, by, query, mode, filter, bucket, limit), self.structured)
 
-        def detect(
-            case: Case,
-            rules: Annotated[
-                list[Annotated[str, Field(pattern=r"^[a-z][a-z0-9_]{0,47}$")]] | None,
-                Field(description="Rule names to run (see the result's 'no hits' list); omit for all rules."),
-            ] = None,
-            filter: Annotated[Filter | None, Field(description="Optional record filter.")] = None,
-            examples: Annotated[
-                int, Field(ge=1, le=10, description="Example lines per rule (collapsed by message or pid).")
-            ] = 3,
-        ) -> Annotated[CallToolResult, DetectResult]:
-            """Run detector rules for known failure patterns (crashes, ANRs, watchdog, low memory kills,
-            SELinux, binder, VHAL errors, service restarts, boot not completed): cited hits by severity."""
-            return _output(lambda: tools.detect(case, rules, filter, examples), self.structured)
-
         def check_citations(
             case: Case,
             text: Annotated[
@@ -665,26 +645,6 @@ class LogServer:
             findings and quotes not in the cited lines are warnings. 'PASS' when there are no errors."""
             return _output(lambda: tools.check_citations(case, text), self.structured)
 
-        def diff(
-            case: Case,
-            a: Annotated[
-                DiffSide,
-                Field(
-                    description="Side A (e.g. the good run): a filter such as {'sources': ['2']}, "
-                    "{'sources': ['2'], 'seg': 1} for one boot, or a from/to window."
-                ),
-            ],
-            b: Annotated[DiffSide, Field(description="Side B (e.g. the bad run), as a.")],
-            min_ratio: Annotated[
-                float,
-                Field(gt=1, le=1000, description="Report shares changed by this factor or more."),
-            ] = 4.0,
-            limit: Annotated[int, Field(ge=1, le=100, description="Maximum items per list.")] = 12,
-        ) -> Annotated[CallToolResult, DiffResult]:
-            """Compare two sets of records (two files or runs, two boots, before and after an event):
-            messages only in B, only in A, and those whose rate changed; each item cited."""
-            return _output(lambda: tools.diff(case, a, b, min_ratio, limit), self.structured)
-
         functions = {
             f.__name__: f
             for f in (
@@ -697,9 +657,7 @@ class LogServer:
                 get_records,
                 overview,
                 count,
-                detect,
                 check_citations,
-                diff,
             )
         }
         for name, hints, title in TOOL_SPECS:

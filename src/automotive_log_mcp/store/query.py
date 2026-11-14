@@ -1,5 +1,5 @@
 """Read side of a case DB: sources, the record filter as SQL, FTS and regex search, collapse
-groups, context neighbours, artifacts and citations, relink.
+groups, context neighbours, artifacts and citations.
 
 Everything here works on resolved values (ids, ns); parsing tool arguments, caps and formatting
 are in the ``tools`` package and ``core/format.py``.
@@ -11,7 +11,6 @@ import fnmatch
 import json
 import re
 import sqlite3
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -622,20 +621,15 @@ def regex_prefilter(pattern: str) -> tuple[list[str], list[Any]]:
     return where, params
 
 
-# A record test for regex_scan: (msg, tag, level, tag_id) -> match.
-RecordTest = Callable[[str, str | None, str | None, int | None], bool]
-
-
 def regex_scan(
     conn: sqlite3.Connection,
     where: list[str],
     params: list[Any],
-    rx: re.Pattern[str] | RecordTest,
+    rx: re.Pattern[str],
     max_rows: int,
     window: int,
 ) -> ScanResult:
-    """Scan candidate records (``where``, in id order) with ``rx`` over message and tag (or with a
-    record test, e.g. a detector rule's conditions).
+    """Scan candidate records (``where``, in id order) with ``rx`` over message and tag.
 
     Stops after ``max_rows`` candidates. Returns groups like :func:`aggregate` and the first
     ``window`` matches in time order."""
@@ -647,18 +641,14 @@ def regex_scan(
     heap: list[tuple[tuple[int, int, int], int, Rec]] = []  # max-heap by negated key
     scanned = 0
     last: int | None = None
-    search = rx.search if isinstance(rx, re.Pattern) else None
-    test = None if isinstance(rx, re.Pattern) else rx
+    search = rx.search
     for row in conn.execute(sql, [*params, max_rows + 1]):
         if scanned >= max_rows:
             return ScanResult(_sorted(groups), _heap_sorted(heap), scanned, False, last)
         scanned += 1
         last = row[0]
         msg, tag = row[8], row[5]
-        if search is not None:
-            if not (search(msg) or (tag and search(tag))):
-                continue
-        elif test is not None and not test(msg, tag, row[4], row[12]):
+        if not (search(msg) or (tag and search(tag))):
             continue
         rec = _rec(row[:12])
         key = (rec.source_id, rec.template_id, row[12], rec.level)
@@ -810,33 +800,6 @@ def segment_of(conn: sqlite3.Connection, sid: int, seq: int) -> tuple[int, int] 
         (sid, seq, seq),
     ).fetchone()
     return (row[0], row[1]) if row else None
-
-
-def relink(conn: sqlite3.Connection, source_id: int, new_path: Path, sha256_of: Any) -> list[int]:
-    """Point every source of the same original at ``new_path`` after checking its hash."""
-    row = conn.execute("SELECT path, sha256 FROM sources WHERE id = ?", (source_id,)).fetchone()
-    if row is None:
-        raise ValueError(f"no source {source_id} in this case")
-    old_path, sha = row
-    if not new_path.is_file():
-        raise ValueError(f"no such file: {new_path}")
-    actual = sha256_of(new_path)
-    if actual != sha:
-        raise ValueError(
-            f"{new_path} is not the file source {source_id} was indexed from (SHA-256 {actual[:12]}… "
-            f"differs from {sha[:12]}…)"
-        )
-    with conn:
-        ids = [
-            sid
-            for (sid,) in conn.execute(
-                "SELECT id FROM sources WHERE sha256 = ? AND path = ?", (sha, old_path)
-            )
-        ]
-        conn.execute(
-            "UPDATE sources SET path = ? WHERE sha256 = ? AND path = ?", (str(new_path), sha, old_path)
-        )
-    return ids
 
 
 # -- artifacts --------------------------------------------------------------------------------

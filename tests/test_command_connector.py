@@ -172,14 +172,6 @@ def test_example_mcu_connector(config: Config, tmp_path: Path) -> None:
     assert "mcu_fault" in tools.list_artifacts("mcu").text
 
 
-def test_connector_files_do_not_break_detector_rules(config: Config, tmp_path: Path) -> None:
-    rules = tmp_path / "rules"
-    shutil.copytree(EXAMPLES / "connectors", rules)
-    app = _app(config, rules)
-    assert "mcu_trace" in app.registry.names()
-    assert app.rules.rules  # the package detector rules are still there
-
-
 def test_ingest_error_for_unknown_forced_format(config: Config, tmp_path: Path) -> None:
     app = _app(config, _rules(tmp_path, ["{python}", "{dir}/ecu2jsonl.py", "{path}"]))
     log = tmp_path / "a.txt"

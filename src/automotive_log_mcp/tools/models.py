@@ -47,16 +47,6 @@ class Filter(BaseModel):
     )
 
 
-class DiffSide(Filter):
-    """One side of ``diff``: a record filter, optionally one segment of a single source."""
-
-    seg: int | None = Field(
-        default=None,
-        ge=1,
-        description="Segment (boot or clock reset) of the one source in 'sources'; overview lists them.",
-    )
-
-
 class RecordOut(BaseModel):
     cite: str = Field(description="Citation log:<source>#<seq>.")
     ts: str | None = Field(default=None, description="Time, accepted back as from/to.")
@@ -203,36 +193,6 @@ class CountResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class HitOut(BaseModel):
-    record: RecordOut
-    count: int = Field(description="Hits in this group (same template, or same pid).")
-    last: str | None = Field(default=None, description="Citation of the last hit in the group.")
-    followed_by: str | None = Field(default=None, description="followed_by rules: the second event.")
-    open: bool | None = Field(default=None, description="Absence rules: the log ends inside the window.")
-
-
-class RuleHits(BaseModel):
-    rule: str
-    severity: str
-    description: str
-    count: int
-    exact: bool = True
-    first_ts: str | None = None
-    last_ts: str | None = None
-    hits: list[HitOut] = Field(default_factory=list)
-    more_groups: int = 0
-    note: str | None = None
-    search: str | None = Field(default=None, description="A search call that lists every hit.")
-
-
-class DetectResult(BaseModel):
-    case: str
-    rules_run: int
-    results: list[RuleHits] = Field(description="Rules with hits, by severity and first time.")
-    no_hits: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
-
-
 class TimeBucket(BaseModel):
     ts: str
     count: int
@@ -282,9 +242,7 @@ class OverviewResult(BaseModel):
     bursts: list[BurstOut] = Field(default_factory=list, description="E/F per 10 s above 5× the median.")
     histogram_step: str | None = None
     histogram: list[TimeBucket] = Field(default_factory=list)
-    detect: dict[str, int] = Field(default_factory=dict, description="Detector rules with hits.")
     artifacts: dict[str, int] = Field(default_factory=dict, description="Artifacts per type.")
-    exact: bool = True
     warnings: list[str] = Field(default_factory=list)
 
 

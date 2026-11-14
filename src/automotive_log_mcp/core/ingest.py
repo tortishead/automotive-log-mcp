@@ -215,7 +215,7 @@ class Ingestor:
         if not self.policy.allowed_roots:
             raise IngestError(
                 "this server reads no paths for add_source: its policy has no allowed_roots (required "
-                "over HTTP); index the file on the server with the CLI, or ask for allowed_roots"
+                "over HTTP); ask for allowed_roots"
             )
         raise IngestError(
             f"{path_str} is outside the directories this server may read (policy allowed_roots: "
@@ -257,21 +257,6 @@ class Ingestor:
             self._add_file(case_db, path, format, force, optional=False, other_cases=other_cases)
         )
         return result
-
-    def reindex(self, case_db: Path, source_id: int) -> AddResult:
-        with db.opened(case_db) as conn:
-            row = conn.execute("SELECT path, sha256 FROM sources WHERE id = ?", (source_id,)).fetchone()
-        if row is None:
-            raise IngestError(f"no source {source_id} in this case")
-        path, sha = row
-        if not Path(path).is_file():
-            raise IngestError(
-                f"the original of source {source_id} is missing: {path}. "
-                f"Use 'relink <case> {source_id} <new path>' first."
-            )
-        if file_sha256(Path(path)) != sha:
-            raise IngestError(f"{path} has changed since it was indexed (hash differs); add it as a new file")
-        return AddResult(files=[self._add_file(case_db, Path(path), None, True, optional=False)])
 
     def _say(self, msg: str) -> None:
         if self.progress is not None:
@@ -341,8 +326,7 @@ class Ingestor:
                 origin.notes.insert(
                     0,
                     "an earlier import of this file did not finish (the server was probably stopped "
-                    "while indexing), so it was indexed again from the start; index large files once "
-                    "with the CLI ('index <case> <path>') to avoid this",
+                    "while indexing), so it was indexed again from the start",
                 )
         finally:
             conn.close()

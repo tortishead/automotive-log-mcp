@@ -193,21 +193,7 @@ class OverviewTools(ToolBase):
                 )
                 lines.append("  all |" + "".join(spark(h.count, peak) for h in hist) + "|")
                 lines.append("  E/F |" + "".join(spark(h.errors, epeak) for h in hist) + "|")
-            # detector counts and artifacts
-            results = self.run_rules(ctx, rf, self.app.rules.ordered())
-            data.detect = {r.rule.name: r.count for r in results if r.count}
-            if any(not r.exact for r in results if r.count):
-                data.exact = False
-            lines.append(
-                "detect: "
-                + (
-                    ", ".join(
-                        f"{r.rule.name} {'≥' if not r.exact else ''}{r.count:,}" for r in results if r.count
-                    )
-                    or "no rule hits"
-                )
-                + " (detect(case) shows the lines)"
-            )
+            # artifacts
             arts = query.artifacts(conn, None, sel_ids)
             if rf.ts_from is not None or rf.ts_to is not None:
                 a0 = rf.ts_from if rf.ts_from is not None else -(1 << 62)
@@ -224,7 +210,7 @@ class OverviewTools(ToolBase):
                 )
             )
             lines.append(
-                "next: detect(case) for known failure patterns, list_artifacts(case) for crashes, then "
+                "next: list_artifacts(case) for crashes, then "
                 "search(query, filter={'level': 'W', 'from': …, 'to': …}) around them"
             )
             page = fmt.Page(

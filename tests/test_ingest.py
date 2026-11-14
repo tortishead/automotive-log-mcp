@@ -237,25 +237,6 @@ def test_blocked_sources(config: Config, tmp_path: Path) -> None:
     assert not any("time.log" in s.name for s in hidden.list_sources("c") or [])
 
 
-def test_relink_checks_hash_and_missing_original(app: App, tmp_path: Path) -> None:
-    p = copy_fixture("logcat/time.log", tmp_path)
-    (sid,) = app.ingestor.add(app.config.case_db("c"), str(p)).source_ids
-    moved = tmp_path / "moved.log"
-    p.rename(moved)
-    (src,) = app.list_sources("c") or []
-    assert src.original_missing
-    with pytest.raises(IngestError, match="missing"):
-        app.ingestor.reindex(app.config.case_db("c"), sid)
-    other = tmp_path / "other.log"
-    other.write_text(LINE, encoding="utf-8")
-    with pytest.raises(IngestError, match="SHA-256"):
-        app.relink("c", sid, other)
-    assert app.relink("c", sid, moved) == [sid]
-    (src,) = app.list_sources("c") or []
-    assert not src.original_missing and src.path == str(moved.resolve())
-    assert app.ingestor.reindex(app.config.case_db("c"), sid).files[0].records == 2
-
-
 def test_stale_when_connector_version_changes(
     app: App, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

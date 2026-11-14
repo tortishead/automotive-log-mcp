@@ -23,7 +23,7 @@ Interventions (questions answered, nudges): none
 | Component (expected: …) | right / partly / wrong / none |
 | Root-cause direction | right / partly / wrong |
 | Expected citations cited | x of y: … |
-| check_citations (`automotive-log-mcp check`) | PASS / FAIL, n errors, m warnings |
+| check_citations | PASS / FAIL, n errors, m warnings |
 | Agent ran check_citations before answering | yes (n times) / no |
 | Calls / bytes / errors (`callstats.py`) | |
 | Wall time | |

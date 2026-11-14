@@ -1,7 +1,7 @@
 # Connectors
 
 How to add a log format (for example a company-specific ECU or vendor log). A connector only turns
-bytes into records; search, collapse, redaction, citations and detector rules then work on it like on any
+bytes into records; search, collapse, redaction, and citations then work on it like on any
 other source (design: one tool API, per-format connectors behind it).
 
 Three ways, from least to most code:
@@ -13,10 +13,8 @@ Three ways, from least to most code:
 | Python entry point | an installed Python package | full control, streaming parse in-process, containers (formats holding several logs) | `allow_code_connectors: true` |
 
 Rule directories are listed under `rule_dirs` in `config.yaml`; one directory may hold regex
-and command connectors and detector rules side by side (the top-level key decides:
-`connector:` with `line:` for a regex connector or `command:` for a command connector,
-`rule:`/`rules:`; detector rules are described in
-[rules.md](rules.md)). An invalid file stops the server at startup with the file name and the
+and command connectors side by side (`connector:` with `line:` for a regex connector or
+`command:` for a command connector; YAML files without `connector:` are ignored). An invalid file stops the server at startup with the file name and the
 reason.
 
 A connector named like an existing one is an error unless it says `replace: true` (D13). Bump
@@ -73,8 +71,7 @@ replace: false                    # true: replace a connector with the same name
 Named groups: `msg` (required), `ts`, `level`, `tag`, `pid`, `tid`; any other group becomes an
 attribute. A format without a year gets one as logcat does (December → January increments it).
 Lines that do not match `line` (and are no continuation) are kept as unparsed records. Examples:
-[src/automotive_log_mcp/rules/connectors/syslog.yaml](../src/automotive_log_mcp/rules/connectors/syslog.yaml)
-and [examples/rules/dlt_viewer_ascii.yaml](../examples/rules/dlt_viewer_ascii.yaml).
+[src/automotive_log_mcp/rules/connectors/syslog.yaml](../src/automotive_log_mcp/rules/connectors/syslog.yaml).
 
 ## `command` connector
 
@@ -154,10 +151,4 @@ that holds several logs implements a container (`expand(member, ctx)`, see
 set `ctx.meta["timezone"]` when the format knows the device's zone.
 
 Test a connector like the package's own: a small synthetic fixture per format variant and a golden
-file of the records (`tests/test_golden.py`); the CLI shows the result without an agent:
-
-```bash
-automotive-log-mcp index T-1 trace.mcutrace --format mcu_trace
-automotive-log-mcp sources T-1
-automotive-log-mcp query T-1 --level W
-```
+file of the records (`tests/test_golden.py`).

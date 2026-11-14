@@ -39,7 +39,7 @@ class Caps:
 
 @dataclass(frozen=True)
 class HttpConfig:
-    """``serve --http``: streamable HTTP with a bearer token (D2, M6)."""
+    """``--http``: streamable HTTP with a bearer token (D2, M6)."""
 
     host: str = "127.0.0.1"
     port: int = 8765

@@ -1,14 +1,14 @@
 # automotive-log-mcp: implementation plan
 
-Nov 8, 2026 · @Xuan · draft · based on [design.md](design.md)
+Nov 8, 2026 · @Xuan · draft
 
 ## Goal and scope
 
 Build an MCP server that lets any agent analyse a defect from automotive logs, with every finding cited to a log line or artifact.
 
 - **First release (M0–M4):** logcat, bugreport (including tombstones, ANRs, Java crashes and dropbox), kernel logs and config-driven text logs; P0 and P1 tools including `check_citations`; local stdio transport; redaction and policy file; call log; evaluation on closed defects.
-- **Second release (M5–M6):** DLT (via `dlt-core`), `diff`, remaining artifact parsers (`dumpsys`, kernel panic, tombstone `.pb`), HTTP transport. Cross-source alignment and `timeline` were built in M5 and removed on Nov 14, 2026 (see [Scope change](#scope-change-nov-14-2026)). Until then, DLT users can use dlt-mcp-server inside DLT Viewer.
-- **Out:** any UI, ticket-system integration, server-side model calls, multi-user operation, symbolization of native frames, aligning several sources on one clock.
+- **Second release (M5–M6):** remaining artifact parsers (`dumpsys`, kernel panic, tombstone `.pb`), HTTP transport. Cross-source alignment, `timeline` and `diff` were built and removed on Nov 14, 2026; DLT was dropped the same day (see [Scope change](#scope-change-nov-14-2026)).
+- **Out:** any UI, ticket-system integration, server-side model calls, multi-user operation, symbolization of native frames, aligning several sources on one clock, DLT.
 
 Efforts are for one developer, in working days, including tests.
 
@@ -18,7 +18,7 @@ Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision
 
 | # | Decision | Alternative | Affects |
 | --- | --- | --- | --- |
-| D1 | Python 3.11+ for server and core; Rust only for the DLT sidecar | All Rust (faster ingest, single binary) | all |
+| D1 | Python 3.11+ for server and core | All Rust (faster ingest, single binary) | all |
 | D2 | Official Python `mcp` SDK, stdio first, HTTP in M6 | Own JSON-RPC | M0, M6 |
 | D3 | Store: stdlib `sqlite3` with FTS5, one DB file per case, WAL | DuckDB, Tantivy | M1 |
 | D4 | Templates by regex masking (numbers, hex, UUIDs, paths) | Drain3 clustering | M1 |
@@ -26,10 +26,8 @@ Reviewed on Nov 8, 2026 (see the review outcome at the end). Changing a decision
 | D6 | Citations `log:<source>#<seq>` (seq 1-based per source) and `art:<id>[/section][:L<line>]` | Global row id | M3 |
 | D7 | Cases in `~/.automotive-log-mcp/cases/<case>.db`; originals referenced by path and hash, not copied; `relink` for moved files | Copy into a case folder | M1 |
 | D8 | Default detector rules and regex connectors ship in the package; extra rule directories from config override rules by name | Rules only in the package | M4 |
-| D9 | DLT parsed by `dlt-core` in a sidecar binary `dlt2jsonl`, run through the generic `command` connector | PyO3 binding; DLT Viewer export; own parser | M5 (deferred: company-specific connectors) |
 | D10 | Single process; background indexing in one worker thread per case | Worker processes | M1 |
 | D11 | Tool names and parameters, and the connector interface, follow semver; breaking changes only in a major version | No API stability promise | all |
-| D12 | First release without DLT; DLT in M5 (alignment: built, then removed, see Scope change) | DLT before the first evaluation | M4, M5 |
 | D13 | Third-party connectors: YAML, `command`, or Python entry points; extend by default, replace when configured; code connectors allowed by policy | Connectors only in this repo | M1, M5, M6 |
 
 ## Repository layout
@@ -39,11 +37,11 @@ automotive-log-mcp/
   pyproject.toml              # deps: mcp, pyyaml; dev: pytest, ruff, mypy, hypothesis
   src/automotive_log_mcp/
     server.py                 # MCP tools, instructions, prompts, arg validation, caps
-    httpserve.py              # M6: serve --http (streamable HTTP, bearer token)
+    httpserve.py              # M6: --http (streamable HTTP, bearer token)
     tools/                    # tool logic, one module per tool family (diff: M6)
-    cli.py                    # serve | index | query | diff | rules | ...  (works without an agent)
+    cli.py                    # entry point: starts the server (stdio or --http)
     config.py                 # paths, caps, rule dirs, policy file
-    policy.py                 # allowed tools, blocked sources/ECUs, byte budget
+    policy.py                 # allowed tools, blocked sources, byte budget
     calllog.py                # JSONL call log
     model.py                  # RawRecord, RawArtifact, Record, Artifact, Source, Segment
     store/
@@ -60,12 +58,8 @@ automotive-log-mcp/
       bugreport.py            # container
       logcat.py, kernel.py, regex_yaml.py
       command.py              # M5 (done)
-      artifacts/              # M2: tombstone, anr, java_crash, dropbox; M5: dumpsys, kernel_panic, tombstone .pb, dlt_file
-      dlt.py                  # M5, drives dlt2jsonl
-    detect/
-      engine.py
-    rules/                    # default detector rules and regex connectors (YAML)
-  dlt2jsonl/                  # M5, Rust crate using dlt-core
+      artifacts/              # M2: tombstone, anr, java_crash, dropbox; M5: dumpsys, kernel_panic, tombstone .pb
+    rules/                    # package regex connectors (YAML)
   tests/
     fixtures/                 # small synthetic logs, one per format variant
     golden/                   # expected tool outputs
@@ -87,7 +81,7 @@ automotive-log-mcp/
 | M3 | P0 tools | An agent finds and reads errors and crash artifacts in one bugreport, with citations | 4 d |
 | M4 | P1 tools + evaluation | `overview`, `detect`, `count`, `check_citations`; agent instructions and prompt; eval on 5 defects | 5–6 d |
 | — | **Checkpoint** | Go / adjust / stop, based on eval and call logs | — |
-| M5 | DLT + multi-source | DLT incl. file transfer, remaining artifact parsers (clock model, `align`, `timeline`: built, removed Nov 14, 2026) | 8–10 d |
+| M5 | Multi-source | Remaining artifact parsers (clock model, `align`, `timeline`: built, removed Nov 14, 2026) | 8–10 d |
 | M6 | Finish | `diff`, HTTP transport, eval on 10 defects, release | 2–3 d |
 
 To checkpoint: about 17–20 days. To M6: about 27–33 days.
@@ -189,8 +183,7 @@ Status (Nov 9, 2026): built; verified on synthetic data and with a real MCP clie
 2. `count`: group by field, optional time buckets.
 3. `check_citations`: validate every `log:` and `art:` citation in Markdown; warn on uncited paragraphs; errors on malformed ids. Used by the triage prompt before an answer is final, and by the evaluation.
 4. `detect`: rule format (`match`, `level`, `tag`, `followed_by within`, `group_by pid`, `severity`, `note`); 8–10 default rules (Java crash, native crash, ANR, watchdog, LMK, SELinux denial, binder failure, VHAL error, service restart, boot not completed); rule directories from config.
-5. **Docs:** how to use dlt-mcp-server in DLT Viewer for DLT until M5.
-6. **Evaluation**, two levels. Expected answers (component, root-cause citations) are written into `cases.yaml` before any run and judged against the fix commit.
+5. **Evaluation**, two levels. Expected answers (component, root-cause citations) are written into `cases.yaml` before any run and judged against the fix commit.
    - **Evidence recall (no agent):** for each closed defect in `eval/cases.yaml`, check that `detect`, `list_artifacts` or a recorded query surfaces the known root-cause citations in the first page. Runs in CI on redacted or synthetic cases.
    - **Agent runs:** the same cases, run by hand in at least one interactive MCP client with a checklist; record correctness of the root-cause direction, citation validity, tool calls and bytes from the call log. Optional baseline: the same agent with only shell tools on the unpacked files, to show what the server adds. A non-interactive runner is built only if the checkpoint says go.
 
@@ -208,7 +201,6 @@ Status (Nov 10, 2026): built; verified on synthetic data; **the done criterion i
   - `count` has `by` = `tag | level | pid | source | template` (or none), an optional `query`/`mode` as in `search`, and `bucket` (at most 60 buckets, or `caps.max_lines` when smaller). `overview` and `count` sample broad text queries above 300k matches as `search` does.
   - `check_citations` also warns when quoted text (`code` or "double quotes", 10+ characters) in a paragraph is not in any of the lines it cites. Ranges such as `log:3#10-12` and filter forms such as `log:3#1-30s` are errors (not citations). The call log stores the checked text as `<N chars, sha256 …>`, since an answer quotes log content.
   - New CLI commands `overview`, `count`, `detect`, `check` (exit 1 on errors) besides `rules`. On a console or pipe whose code page cannot encode the output (Windows), the CLI prints UTF-8.
-  - DLT docs (`docs/dlt.md`) describe dlt-mcp-server next to this server from the client side only (its own docs were not available here; tool names and options not verified), plus a tested route through a DLT Viewer text export and the example connector `examples/rules/dlt_viewer_ascii.yaml`.
   - Real cases go into the git-ignored `eval/cases.local.yaml` (logs and run notes stay out of the repository); `evidence_recall.py` takes several case files.
 
 ### Token use after M4 (Nov 10, 2026)
@@ -230,23 +222,19 @@ Status: built and measured with Claude Code only; Copilot not verified. Trigger:
 - **Adjust** if agents spend many calls getting oriented (improve `overview`, rules, instructions) or evidence recall is low (parsers or rules miss things).
 - **Stop or rethink** if logs alone rarely explain the defects; the bottleneck is then elsewhere (code, ticket data, domain knowledge).
 
-## M5 DLT and multi-source (7–9 days)
+## M5 Multi-source (7–9 days)
 
 1. **Clock model**: per segment `a`, `b`, `ts_conf`; batch recompute of `ts`.
 2. **Automatic alignment**: anchors 1–3 from the design with residual error; `align` tool (`auto`, `anchor`, `offset`); results in `list_sources`.
 3. **`timeline`** and `context(scope=all)`: k-way merge on `ts`, `~` for non-exact times.
-4. **`dlt2jsonl`** (Rust, about 200–300 lines): reads DLT with `dlt-core` (`DltMessageReader`, optional `--fibex`), writes one JSON object per message (offset, storage time, ECU, ticks, session, app/ctx, type, level, verbose flag, arguments, payload text); static binaries for Linux, Windows and macOS from CI; Apache-2.0 notice shipped with the binary.
 5. **`command` connector** (D13).
-6. **DLT connector**: `dlt2jsonl` through `command`, maps lines to records; control messages to `attrs`; FIBEX files via `options`; unmatched non-verbose messages keep message id and payload hex; split/rotated files as one source.
-7. **DLT file transfer** (`FLST/FLDA/FLFI`): reassembled from decoded arguments; known types parsed as artifacts, coredumps as metadata only.
 8. **Remaining artifact parsers** (about 1 day): `dumpsys` (per service and heading), `kernel_panic` (pstore/last_kmsg, also as previous-boot kernel records), tombstone `.pb` when no text is present; fixture `dumpsys car_service`.
-9. Benchmark on a real multi-GB DLT trace: time per stage (dlt-core, JSON decode, pipeline, SQLite), to decide whether more of the pipeline should move to Rust.
 
-Tests: synthetic log pairs with known offset and drift (error < 10 ms for paired timestamps, < 500 ms for marker anchors); DLT fixtures per argument type; a non-verbose sample with FIBEX once available.
+Tests: synthetic log pairs with known offset and drift (error < 10 ms for paired timestamps, < 500 ms for marker anchors).
 
-Done when: a case with a bugreport and a DLT trace shows both on one timeline with confidence, and an agent orders a cross-source event pair correctly in one eval case.
+Done when: a case with two sources shows both on one timeline with confidence, and an agent orders a cross-source event pair correctly in one eval case.
 
-Status (Nov 10, 2026): items 1, 2, 3 and 5 built (multi-source without DLT, as requested: DLT connectors are developed separately as company-specific connectors, through `command` or entry points); items 4, 6, 7 and 9 (`dlt2jsonl`, DLT connector, file transfer, DLT benchmark) and item 8 (remaining artifact parsers) not started. Verified on synthetic data only; the done criterion (a DLT trace, an agent ordering a cross-source pair in an eval case) is not met.
+Status (Nov 10, 2026): items 1, 2, 3 and 5 built; item 8 (remaining artifact parsers) not started. Verified on synthetic data only; the done criterion (an agent ordering a cross-source pair in an eval case) is not met.
 
 - **Clock model** (schema 5, `core/clock.py`): per segment a piecewise mapping `case = native + offset + drift·(native − start)` (`b` = offset, `a` = 1 + drift), with confidence `exact | manual | paired | marker | estimate | assumed`, an error bound and what it rests on. Deviation: `ts` is **not** recomputed in the records; the mapping is applied at query time. Records keep their times as written, so citations, printed times and `from`/`to` of the other tools are unchanged (D11), `ts_raw` stays reproducible from `ts`, and a new alignment costs no rewrite of millions of rows. Piecewise because a monotonic kernel clock stops during suspend.
 - **Automatic alignment** (`core/align.py`), recomputed after each import and when sources, manual entries or marker rules change (signature in `meta`): clocks are the wall clock of each file and each monotonic segment; the reference is the largest wall clock (or one chosen with `align`). Anchors: (1) manual offsets and anchors (two or more fit a drift); (2) paired timestamps: lines unique in both clocks with the same text (a `tag: ` prefix ignored, as dmesg and `logcat -b kernel` differ there) and UTC times printed in kernel lines, converted with the file's time zone; (3) YAML marker rules in rule directories (`marker:`: two regexes with the same named groups as key, `delay`, `tolerance`); (4) the bugreport boot-time estimate (dumpstate time − uptime, ±1 min). Pairs are fitted in order: one piece per stretch where the offset agrees within 500 ms (a new piece where the next pair confirms a new offset), at least 3 pairs and half of the candidates; drift fitted over ≥ 5 pairs spanning ≥ 60 s. Clocks are joined by a shortest path from the reference (worst confidence, then summed error). Two segments of monotonic clocks are never paired with each other (two boots print the same lines at the same uptime). Wall clocks without an anchor are `assumed` as written (shifted by the time-zone difference when both zones are known); monotonic ones without an anchor are not placed.
@@ -255,7 +243,6 @@ Status (Nov 10, 2026): items 1, 2, 3 and 5 built (multi-source without DLT, as r
 - **Tests** (`tests/test_clock.py`, `tests/test_command_connector.py`): fitting (offset with jitter, drift 40 ppm, suspend pieces, outliers, random offsets rejected, invert/compose); a dmesg and a logcat with the same kernel lines, ±0.5 ms jitter: every kernel record within 10 ms of the truth, `paired` (also across a 30 s suspend: two pieces); a marker rule between two devices with +3.2 s and 40 ppm drift: within 10 ms (plan target for markers < 500 ms); UTC kernel line in a bugreport (Europe/Berlin) beating the boot estimate; two boots of one dmesg not paired; manual offset, anchor, reference, reset and their errors; timeline paging (every record exactly once, in order), `from` as a citation, text query; `context(scope='all')`; recompute after a source is deleted; timeline, align and context over MCP. Command connector: records, artifacts, metadata, redaction, unparsed lines, stdin and `{path}`, archive member, non-zero exit, timeout, missing program, definition errors, sniffing, the example connector with the example marker rule.
 - **Performance** (one core, generated 150 MB threadtime logcat, 1.42M records, plus a 20k-line dmesg with no common lines): alignment after the dmesg import about 0.8 s (unique-template scan of both clocks; the same for a forced recompute); `timeline` first page 0.24 s, with tag and text query from `-5m` 0.38 s (CLI wall time, start-up included). Not measured on a multi-GB case.
 - **Not verified:** real multi-device cases, real `logcat -b kernel` next to dmesg (the tag-prefix rule follows how logd splits kernel lines), suspend lines on current kernels, time zones other than in a bugreport, a non-UTC device whose kernel prints local time.
-- Not done: `blocked_ecus` (policy) is still not enforced; it belongs to the DLT connector.
 
 **Removed (Nov 14, 2026):** items 1, 2 and 3 (clock model, automatic and manual alignment, marker rules, `timeline`, `align`, `context(scope='all')`) are no longer in the code; the notes above describe what was built. Item 5 (`command` connector) stays. See [Scope change](#scope-change-nov-14-2026).
 
@@ -269,8 +256,7 @@ Status (Nov 10, 2026): items 1 and 2 built and verified on synthetic data and wi
 item 3 run on **synthetic** cases only: there are no real closed defects here, so the done
 criterion "eval on 10 defects" is **not met** (neither evidence recall on real defects nor any
 agent run, on real or synthetic cases); item 4 prepared as version 0.1.0 (version, changelog,
-docs), **not published to PyPI and not tagged**, as asked. DLT stays out (company-specific
-connectors, as in M5).
+docs), **not published to PyPI and not tagged**, as asked.
 
 - **`diff`** (`tools/diff.py`, CLI `diff <case> --a SPEC --b SPEC`): each side is a record filter
   plus `seg` (one segment of a single source), so "per source or segment" covers two files or
@@ -357,29 +343,29 @@ connectors, as in M5).
   grew from 19,392 to 21,838 bytes (about +600 tokens at bytes/4): `diff`'s schema is 2,340 bytes
   (it carries the filter twice through `a`/`b`), the instruction sentence 106 bytes. Teams that do
   not compare runs can hide it with `allowed_tools`.
-- Not done in M6: DLT (by choice, as in M5); the remaining artifact parsers of M5 item 8;
-  `blocked_ecus`; the M1 ingest target.
+- Not done in M6: the remaining artifact parsers of M5 item 8;
+  the M1 ingest target.
 
 ## Scope change (Nov 14, 2026)
 
-Cases normally hold one log: a logcat (or bugreport), or a DLT trace. Putting several sources on one clock solved a case that does not come up, and its two tools cost tokens in every model request. So the multi-source parts of M5 are removed:
+Cases normally hold one log: a logcat or a bugreport. Putting several sources on one clock solved a case that does not come up, and its two tools cost tokens in every model request. So the multi-source parts of M5 are removed:
 
 - **Removed:** `core/clock.py`, `core/align.py`, `tools/clock.py`; the tools `timeline` and `align` (12 tools remain); `context(scope='all')`; marker rules (a `marker:` file in a rule directory is now an invalid rule file); the clock fields of `list_sources`; the CLI commands `timeline` and `align`; the evaluation's `timeline` queries, `expected.order` and the case `syn-can-busoff` (9 synthetic cases, 17 of 18 citations surfaced).
 - **Schema 6** drops the tables `clock` and `clock_manual` and the `clock_*` keys in `meta`; a case DB of schema 5 migrates on first open. Manual `align` settings in existing cases are lost.
-- **Kept:** several sources per case (the buffers and kernel log of a bugreport, several files), each on its own clock as written; `context(scope='pid')` across the buffers of one file; `diff`, which compares messages and never used the alignment; segments (boots) per source; the `command` connector; the bugreport's boot-time estimate and time zone as source metadata.
+- **Kept:** several sources per case (the buffers and kernel log of a bugreport, several files), each on its own clock as written; `context(scope='pid')` across the buffers of one file; segments (boots) per source; the `command` connector; the bugreport's boot-time estimate and time zone as source metadata.
+- **Also removed (same day):** `detect` and the detector rules, `diff`, and every CLI command except starting the server (10 tools remain; details in the changelog). DLT is dropped: no DLT connector, `dlt2jsonl`, `docs/dlt.md`, DLT Viewer example connector or `blocked_ecus` policy key (decisions D9 and D12 removed). Milestone notes above that mention them describe what was built.
 - **D11:** removing two tools and a `scope` value is a breaking change to the tool list. 0.1.0 was not published or tagged, so the next version stays 0.x; the changelog lists it under Removed.
 
 Next, in this order:
 
-1. **DLT** through a `command` connector with a real decoder (M5 items 4 and 6, or a company decoder): half of the cases are DLT and the server cannot read them. `blocked_ecus` belongs to it.
-2. **Evaluation on real closed defects** (M4 and M6 done criteria, the checkpoint): 5 logcat or bugreport cases and, once item 1 works, DLT cases; agent runs and the shell-only baseline.
-3. Remaining artifact parsers (M5 item 8) and the M1 ingest target only if the evaluation shows they matter.
+1. **Evaluation on real closed defects** (M4 and M6 done criteria, the checkpoint): 5 logcat or bugreport cases; agent runs and the shell-only baseline.
+2. Remaining artifact parsers (M5 item 8) and the M1 ingest target only if the evaluation shows they matter.
 
 ## Cross-cutting
 
-- **Privacy:** no network calls in stdio mode; `serve --http` listens (loopback by default) but makes no outbound calls; case DBs on the user's disk; call log without log content; only synthetic or fully redacted fixtures in the repo.
+- **Privacy:** no network calls in stdio mode; `--http` listens (loopback by default) but makes no outbound calls; case DBs on the user's disk; call log without log content; only synthetic or fully redacted fixtures in the repo.
 - **Versioning:** connector version and redaction-rules hash stored per source; changing either marks sources stale ("reindex recommended"); tool API per D11.
-- **Licences:** repo MIT; `dlt-core` Apache-2.0 (compatible; keep its notice with `dlt2jsonl`); no code from MPL projects.
+- **Licences:** repo MIT; no code from MPL projects.
 - **Portability:** paths, file locking and subprocess handling tested on Windows, since many automotive engineers work there.
 
 ## Risks
@@ -390,24 +376,21 @@ Next, in this order:
 | FTS5 too slow or large on multi-GB logs | Tools time out | Measured in M1; DuckDB fallback behind `store/` |
 | Redaction misses personal data | Logs cannot be used with agents | Default rules reviewed against a real sample; policy can block sources; CLI-only mode |
 | Agents ignore tools or over-call | High cost, weak answers | Server instructions and prompt; tool descriptions tuned from call logs |
-| Python ingest too slow for DLT-heavy cases | Long waits | Stage benchmark in M5; move pipeline stages to Rust behind the same interface |
-| No FIBEX for non-verbose DLT | DLT payloads unreadable | Ask early; DLT Viewer export as fallback |
 | Logs alone don't explain defects | Weak results | Checkpoint after M4; agents combine this server with code search and other tools |
 
 ## Inputs needed before M1
 
 - 5–10 closed defects with logs and known root cause.
 - 10 real log samples covering the formats that defects actually come with.
-- A DLT sample, and whether it is verbose or non-verbose with FIBEX.
 - Fields the default redaction rules must cover.
 
 ## Review outcome (Nov 8, 2026)
 
-1. Python and SQLite FTS5 stay; ingest performance is measured in M1 (and per stage for DLT in M5), DuckDB or more Rust only if targets are missed (D1, D3).
+1. Python and SQLite FTS5 stay; ingest performance is measured in M1, DuckDB or Rust only if targets are missed (D1, D3).
 2. One DB per case; originals not copied; path and hash stored, `relink` for moved files (D7).
 3. No raw mode: redaction always on, at index time, before templates, and over call-log arguments (D5).
 4. Default rules ship in the package; configured rule directories override by name (D8).
 5. Checkpoint: 3 of 5 plus `check_citations` passing; expected answers written before the runs and judged against the fix commit.
-6. No DLT in the first release; dlt-mcp-server covers DLT-only work until M5 (D12).
+6. No DLT in the first release (D12; DLT dropped on Nov 14, 2026).
 7. First artifact parsers: tombstone, ANR, Java crash, dropbox; `dumpsys`, kernel panic and tombstone `.pb` move to M5.
 8. Logcat without a year: New Year rollover increments the year, no new segment.

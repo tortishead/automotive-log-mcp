@@ -1,5 +1,5 @@
 """Token accounting: call-log fields, structured output off by default, slim schemas, and the
-``calls`` analysis (with and without a Claude Code transcript)."""
+call-log analysis (round reports)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ import pytest
 from mcp import Client
 
 from automotive_log_mcp import callreport as cr
-from automotive_log_mcp.cli import main as cli_main
 from automotive_log_mcp.config import Config, ConfigError, load_config
 from automotive_log_mcp.policy import Policy
 from automotive_log_mcp.server import build_server, slim_schema
@@ -116,7 +115,7 @@ def test_default_server_sends_text_only_and_logs_token_fields(config: Config, ca
     assert "server" in log[0] and all("server" not in e for e in log[1:])
     srv = log[0]["server"]
     assert srv["structured"] is False and srv["fixed"]["tools_model_bytes"] > 1000
-    assert set(srv["fixed"]["per_tool"]) >= {"search", "detect"}
+    assert set(srv["fixed"]["per_tool"]) >= {"search", "overview"}
     arts = log[1]
     assert arts["structured_bytes"] == 0 and arts["text_bytes"] == arts["bytes_out"] > 0
     assert arts["tokens_est"] == est_tokens(arts["text_bytes"])
@@ -160,51 +159,7 @@ def test_capped_output_is_logged(home: Path, case_zip: Path) -> None:
 # -- analysis --------------------------------------------------------------------------------------------
 
 
-def _transcript(path: Path, uses: list[tuple[str, dict[str, Any], str]], answer: str) -> Path:
-    """A stream-json-like transcript: one request per tool use, then the answer."""
-    lines: list[dict[str, Any]] = []
-    prompt = 10_000
-    for i, (name, inp, result) in enumerate(uses):
-        lines.append(
-            {
-                "type": "assistant",
-                "message": {
-                    "id": f"m{i}",
-                    "content": [{"type": "tool_use", "id": f"t{i}", "name": name, "input": inp}],
-                    "usage": {"input_tokens": 2, "cache_read_input_tokens": prompt, "output_tokens": 20},
-                },
-            }
-        )
-        err = result.startswith("<tool_use_error>")
-        lines.append(
-            {
-                "type": "user",
-                "message": {
-                    "content": [
-                        {"type": "tool_result", "tool_use_id": f"t{i}", "content": result, "is_error": err}
-                    ]
-                },
-            }
-        )
-        prompt += 20 + len(result) // 2
-    lines.append(
-        {
-            "type": "assistant",
-            "message": {
-                "id": "final",
-                "content": [{"type": "text", "text": answer}],
-                "usage": {"input_tokens": 2, "cache_read_input_tokens": prompt, "output_tokens": 300},
-            },
-        }
-    )
-    lines.append({"type": "result", "subtype": "success", "num_turns": len(uses) + 1, "result": answer})
-    path.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
-    return path
-
-
-def test_analysis_finds_repeats_uncited_and_rejected_calls(
-    config: Config, case_zip: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_analysis_finds_repeats_and_unchecked_answer(config: Config, case_zip: Path) -> None:
     calls: list[tuple[str, dict[str, Any]]] = [
         ("add_source", {"case": "T-1", "path": str(case_zip)}),
         ("list_artifacts", {"case": "T-1"}),
@@ -212,46 +167,20 @@ def test_analysis_finds_repeats_uncited_and_rejected_calls(
         ("search", {"case": "T-1", "query": "failed"}),
         ("read_artifact", {"case": "T-1", "id": "art:1"}),
     ]
-    texts: list[str] = []
 
     async def main() -> None:
         async with Client(build_server(config, Policy())) as client:
             for name, args in calls:
-                r = await client.call_tool(name, args)
-                texts.append(r.content[0].text)  # type: ignore[union-attr]
+                await client.call_tool(name, args)
 
     anyio.run(main)
-    answer = "The HVAC app crashed with a NullPointerException (art:1)."
-    uses = [(f"mcp__automotive-log__{n}", a, t) for (n, a), t in zip(calls, texts, strict=True)]
-    uses.insert(4, ("read_artifact", {"case": "T-1", "id": "art:1"}, "<tool_use_error>Error: No such tool"))
-    tr = _transcript(tmp_path / "run.jsonl", uses, answer)
-
-    sessions = cr.read_calllog(config.call_log)  # type: ignore[arg-type]
-    assert len(sessions) == 1
-    t = cr.read_transcript(tr)
-    assert cr.match_score(t, sessions[0]) == 5
-    report = cr.analyse(sessions[0], t)
-    text = report.text()
-    assert "repeat of #3" in text
-    assert "not cited" in text  # the searches: the answer cites only art:1
-    assert any("never reached the tool" in p for p in report.problems)
+    (session,) = cr.read_calllog(config.call_log)  # type: ignore[arg-type]
+    report = cr.analyse(session)
+    assert "repeat of #3" in report.text()
     assert any("not checked with check_citations" in p for p in report.problems)
-    assert all(c.seen_bytes is not None and c.measured for c in sessions[0].calls)
-    assert "model (transcript): 7 requests" in text
-    assert "tool results re-sent with later requests" in text and "first request re-sent: 7 x" in text
-
-    # the CLI picks the session matching the transcript, and lists sessions
-    assert cli_main(["calls", "--transcript", str(tr)]) == 0
-    out = capsys.readouterr().out
-    assert "repeat of #3" in out and "suggestions:" in out
-    assert cli_main(["calls", "--list"]) == 0
-    assert "5 calls" in capsys.readouterr().out
-    assert cli_main(["calls", "--fixed"]) == 0
-    out = capsys.readouterr().out
-    assert "per request" in out and "search" in out
 
 
-def test_analysis_reads_old_call_log_lines(home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_analysis_reads_old_call_log_lines(home: Path) -> None:
     home.mkdir(parents=True)
     old = [
         {
@@ -275,10 +204,9 @@ def test_analysis_reads_old_call_log_lines(home: Path, capsys: pytest.CaptureFix
         },
     ]
     (home / "calllog.jsonl").write_text("\n".join(json.dumps(x) for x in old) + "\n", encoding="utf-8")
-    assert cli_main(["calls", "--last"]) == 0
-    out = capsys.readouterr().out
+    (s,) = cr.read_calllog(home / "calllog.jsonl")
+    out = cr.analyse(s).text()
     assert "session s-old" in out and "repeat of #1" in out and "1 tool errors" in out
-    assert cli_main(["calls", "--session", "nope"]) == 1
 
 
 # -- one log file per round ------------------------------------------------------------------------------
@@ -316,9 +244,7 @@ def test_round_files_split_after_a_pause(tmp_path: Path) -> None:
     assert files[1].with_suffix(".txt").read_text(encoding="utf-8") == f"report of {files[1].name}\n"
 
 
-def test_server_writes_round_file_with_report(
-    config: Config, case_zip: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_server_writes_round_file_with_report(config: Config, case_zip: Path) -> None:
     async def main() -> None:
         async with Client(build_server(config, Policy())) as client:
             await client.call_tool("add_source", {"case": "T-1", "path": str(case_zip)})
@@ -331,8 +257,6 @@ def test_server_writes_round_file_with_report(
     report = f.with_suffix(".txt").read_text(encoding="utf-8")
     assert "3 calls" in report and "repeat of #2" in report and "problems:" in report
     assert "NullPointerException" not in f.read_text(encoding="utf-8")  # no log content
-    assert cli_main(["calls", "--log", str(f)]) == 0
-    assert "repeat of #2" in capsys.readouterr().out
 
 
 def test_rounds_follow_call_log_setting(home: Path) -> None:

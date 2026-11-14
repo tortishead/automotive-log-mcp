@@ -26,7 +26,7 @@ one copy of [TEMPLATE.md](TEMPLATE.md) per run, named `<case>-<client>-<n>.md`.
        "automotive-log": {
          "type": "stdio",
          "command": "py",
-         "args": ["-m", "automotive_log_mcp", "serve"]
+         "args": ["-m", "automotive_log_mcp"]
        }
      }
    }
@@ -38,8 +38,8 @@ one copy of [TEMPLATE.md](TEMPLATE.md) per run, named `<case>-<client>-<n>.md`.
    the server runs; they are what the baseline uses.
 
    **Claude Code:** `.mcp.json` from [../../examples/mcp-config/claude-code.mcp.json](../../examples/mcp-config/claude-code.mcp.json)
-   (on Windows with `"command": "py", "args": ["-m", "automotive_log_mcp", "serve"]`), or
-   `claude mcp add automotive-log -- py -m automotive_log_mcp serve`. For a run with only the
+   (on Windows with `"command": "py", "args": ["-m", "automotive_log_mcp"]`), or
+   `claude mcp add automotive-log -- py -m automotive_log_mcp`. For a run with only the
    server's tools, start it in a folder without the log files and deny the file and shell tools:
    `claude --strict-mcp-config --mcp-config .mcp.json --disallowedTools "Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch"`.
 
@@ -53,19 +53,9 @@ one copy of [TEMPLATE.md](TEMPLATE.md) per run, named `<case>-<client>-<n>.md`.
    `defect_triage` returns (the same steps) with the case and symptom.
 3. Do not help the agent. If it asks a question, answer only with what the defect report says;
    note every intervention in the template.
-4. When it answers, save the answer as Markdown (`<case>-<client>-<n>.answer.md`) and check it
-   yourself, whether or not the agent called check_citations:
-
-   ```bat
-   py -m automotive_log_mcp check T-4711 eval\agent_runs\local\T-4711-copilot-1.answer.md
-   ```
-
-   ```bash
-   python -m automotive_log_mcp check T-4711 eval/agent_runs/local/T-4711-claude-1.answer.md
-   ```
-
-   Exit status 0 = PASS (every citation well-formed and resolving; warnings for uncited paragraphs
-   and quotes are listed but allowed).
+4. When it answers, save the answer as Markdown (`<case>-<client>-<n>.answer.md`). If the agent
+   did not call check_citations, ask it once to run check_citations on its answer and note the
+   result (PASS = no errors; warnings for uncited paragraphs and quotes are allowed).
 5. Take calls and bytes from the call log:
 
    ```bat
@@ -88,7 +78,7 @@ one copy of [TEMPLATE.md](TEMPLATE.md) per run, named `<case>-<client>-<n>.md`.
 - [ ] **Component**: right / partly (right subsystem, wrong module) / wrong / no answer
 - [ ] **Root-cause direction**: right / partly / wrong
 - [ ] **Root-cause citations**: which of the expected citations the answer cites
-- [ ] **check_citations**: PASS / FAIL (`automotive-log-mcp check`), errors and warnings counted
+- [ ] **check_citations**: PASS / FAIL , errors and warnings counted
 - [ ] Agent called check_citations itself before answering: yes / no
 - [ ] Calls, bytes, errors, check_citations calls (from `callstats.py`)
 - [ ] Wall time from prompt to answer

@@ -1,4 +1,4 @@
-"""``serve --http``: the MCP server over streamable HTTP from the official SDK (D2, M6).
+"""``--http``: the MCP server over streamable HTTP from the official SDK (D2, M6).
 
 Same tools, call log and policy as over stdio, plus:
 
@@ -64,7 +64,7 @@ def load_token(config: Config) -> str:
             raise ConfigError(f"cannot read http.token_file {config.http.token_file}: {e}") from e
     if not token:
         raise ConfigError(
-            f"serve --http needs a bearer token: set {ENV_TOKEN} or http.token_file in config.yaml "
+            f"--http needs a bearer token: set {ENV_TOKEN} or http.token_file in config.yaml "
             '(e.g. python -c "import secrets; print(secrets.token_urlsafe(32))" > token.txt)'
         )
     if len(token) < MIN_TOKEN or any(c.isspace() for c in token):

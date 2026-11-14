@@ -1,5 +1,5 @@
 """M6 HTTP transport: streamable HTTP from the SDK with a bearer token, the path policy for
-add_source (allowed_roots), config and CLI errors. A real uvicorn server on a free port."""
+add_source (allowed_roots), config and command-line errors. A real uvicorn server on a free port."""
 
 from __future__ import annotations
 
@@ -20,8 +20,10 @@ import uvicorn
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+from automotive_log_mcp.app import App
 from automotive_log_mcp.cli import main as cli_main
 from automotive_log_mcp.config import Config, ConfigError, HttpConfig, load_config
+from automotive_log_mcp.core.ingest import IngestError
 from automotive_log_mcp.httpserve import ENV_TOKEN, build_http_app, http_policy, load_token
 from automotive_log_mcp.policy import Policy, load_policy
 from automotive_log_mcp.server import TOOL_NAMES
@@ -169,18 +171,19 @@ def test_dns_rebinding_protection_with_allowed_hosts(http_config: Config) -> Non
         assert r.status_code == 421  # Host 127.0.0.1:<port> is not listed
 
 
-def test_allowed_roots_apply_to_the_cli_and_load_from_the_policy(
-    home: Path, logs: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_allowed_roots_apply_to_ingest_and_load_from_the_policy(
+    home: Path, logs: Path, tmp_path: Path
 ) -> None:
     home.mkdir(parents=True, exist_ok=True)
     (home / "policy.yaml").write_text(f"allowed_roots: [{json.dumps(str(logs))}, sub]\n", encoding="utf-8")
     policy = load_policy(home / "policy.yaml")
     assert policy.allowed_roots == (logs.resolve(), (home / "sub").resolve())
-    assert cli_main(["index", "c", str(logs / "a.log"), "-q"]) == 0
+    app = App.create(load_config(), policy)
+    app.ingestor.add(app.config.case_db("c"), str(logs / "a.log"))
     other = tmp_path / "other.log"
     other.write_text("x\n", encoding="utf-8")
-    assert cli_main(["index", "c", str(other), "-q"]) == 1
-    assert "outside the directories" in capsys.readouterr().err
+    with pytest.raises(IngestError, match="outside the directories"):
+        app.ingestor.add(app.config.case_db("c"), str(other))
     (home / "policy.yaml").write_text("allowed_roots: x\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="allowed_roots"):
         load_policy(home / "policy.yaml")
@@ -218,9 +221,9 @@ def test_token_and_http_config(
             load_config()
     (home / "config.yaml").write_text("{}\n", encoding="utf-8")
     monkeypatch.delenv(ENV_TOKEN)
-    assert cli_main(["serve", "--http"]) == 2
+    assert cli_main(["--http"]) == 2
     assert "needs a bearer token" in capsys.readouterr().err
-    assert cli_main(["serve", "--port", "9000"]) == 2
+    assert cli_main(["--port", "9000"]) == 2
     assert "need --http" in capsys.readouterr().err
 
 

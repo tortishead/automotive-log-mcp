@@ -14,8 +14,8 @@ from mcp import Client, StdioServerParameters
 
 from automotive_log_mcp.server import TOOL_NAMES
 
-SERVE = [sys.executable, "-m", "automotive_log_mcp", "serve", "--structured"]  # structured contract
-SERVE_DEFAULT = [sys.executable, "-m", "automotive_log_mcp", "serve"]
+SERVE = [sys.executable, "-m", "automotive_log_mcp", "--structured"]  # structured contract
+SERVE_DEFAULT = [sys.executable, "-m", "automotive_log_mcp"]
 
 
 def env_for(home: Path) -> dict[str, str]:
@@ -163,10 +163,8 @@ def test_p0_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
 
 
 def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
-    """M4 over stdio: the prompt asks for check_citations; overview and detect orient, an answer
-    built from their citations passes check_citations, a wrong citation fails it."""
-    import re
-
+    """M4 over stdio: the prompt asks for check_citations; overview orients, an answer
+    with known citations passes check_citations, a wrong citation fails it."""
     from .conftest import FIXED_SECRET
     from .test_golden import make_bugreport_zip
 
@@ -190,10 +188,7 @@ def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
             assert "check_citations(case='T-9'" in body and "overview(case='T-9')" in body
             await call("add_source", path=str(z))
             ov, ov_data = await call("overview")
-            assert ov_data["detect"]["java_crash"] == 3 and "levels:" in ov
-            det, _ = await call("detect", rules=["java_crash", "vhal_error"])
-            cites = re.findall(r"\blog:\d+#\d+", det)
-            assert "log:3#1" in cites and "log:1#2" in cites
+            assert ov_data["artifacts"] and "levels:" in ov
             counted, c_data = await call("count", by="level", bucket="1m")
             assert c_data["buckets"] and "bucket 1m" in counted
             answer = (

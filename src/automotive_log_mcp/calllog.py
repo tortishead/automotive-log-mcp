@@ -3,7 +3,7 @@
 Each line records when, which tool, the (redacted) arguments, the outcome, the duration and the
 number of output bytes. Tool output itself is never written. Optional fields (added after M4, all
 derived from sizes, counts and citation ids, never from log text) explain token use; see
-``usage.py`` and the ``calls`` CLI command:
+``usage.py`` and ``callreport.py``:
 
 - ``seq``: call number within the server session (1, 2, …);
 - ``text_bytes``, ``structured_bytes``: the text content and the structured content (compact
@@ -24,8 +24,7 @@ Rounds: a round starts with the server and again after a pause of ``round_gap`` 
 call (an MCP server outlives a chat in VS Code, so a pause is the boundary the server can see).
 Each round is also written to a file of its own in ``rounds_dir``,
 ``<date>_<time>_<session>_r<n>.jsonl``, the same lines as the call log, plus a short report
-``…_r<n>.txt`` rewritten after every call. Hand the ``.jsonl`` over for analysis
-(``automotive-log-mcp calls --log <file>``).
+``…_r<n>.txt`` rewritten after every call.
 
 Arguments pass through a redactor before they are written (D5).
 """

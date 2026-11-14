@@ -1,8 +1,7 @@
 {
   "mcpServers": {
     "automotive-log": {
-      "command": "automotive-log-mcp",
-      "args": ["serve"]
+      "command": "automotive-log-mcp"
     }
   }
 }

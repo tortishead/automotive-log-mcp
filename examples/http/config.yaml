@@ -1,4 +1,4 @@
-# <home>/config.yaml for `automotive-log-mcp serve --http` (all keys optional; defaults shown).
+# <home>/config.yaml for `automotive-log-mcp --http` (all keys optional; defaults shown).
 http:
   host: 127.0.0.1          # loopback: only this machine (SDK DNS-rebinding protection on)
   port: 8765

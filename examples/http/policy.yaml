@@ -3,5 +3,5 @@
 allowed_roots:
   - /srv/logs              # absolute, or relative to this file; ~ is expanded
 # Optional, as over stdio:
-# allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records, overview, detect]
+# allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records, overview]
 # byte_budget: 2000000

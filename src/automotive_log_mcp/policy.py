@@ -7,15 +7,13 @@ no byte budget. Keys:
   never see them. Omitted or null means all tools.
 - ``blocked_sources``: glob patterns matched against source paths and source ids; matching
   sources are refused by ``add_source`` and hidden from every tool (enforced from M1).
-- ``blocked_ecus``: DLT ECU ids hidden from every tool (not enforced yet; planned with the DLT connector).
 - ``byte_budget``: total bytes of tool output per server session; calls beyond it are refused.
 - ``allow_code_connectors``: whether Python entry-point connectors may be loaded (D13).
   Default false; YAML and ``command`` connectors are always allowed.
-- ``allowed_roots``: directories ``add_source`` (and the CLI ``index``) may read from; a path
+- ``allowed_roots``: directories ``add_source`` may read from; a path
   outside them is refused before the server looks at it, also through a symbolic link. Omitted
   or null: any path (stdio, where the agent runs as the user). Over HTTP an omitted list means
-  **no** path: ``serve --http`` refuses every ``add_source`` until roots are listed (files can
-  still be indexed with the CLI on the server).
+  **no** path: ``--http`` refuses every ``add_source`` until roots are listed.
 """
 
 from __future__ import annotations
@@ -33,7 +31,6 @@ from .config import ConfigError, read_yaml_mapping
 _KEYS = {
     "allowed_tools",
     "blocked_sources",
-    "blocked_ecus",
     "byte_budget",
     "allow_code_connectors",
     "allowed_roots",
@@ -44,7 +41,6 @@ _KEYS = {
 class Policy:
     allowed_tools: frozenset[str] | None = None
     blocked_sources: tuple[str, ...] = ()
-    blocked_ecus: frozenset[str] = frozenset()
     byte_budget: int | None = None
     allow_code_connectors: bool = False
     allowed_roots: tuple[Path, ...] | None = None  # None: any path; (): none
@@ -64,9 +60,6 @@ class Policy:
 
     def source_blocked(self, *names: str) -> bool:
         return any(fnmatch.fnmatch(n, pat) for n in names for pat in self.blocked_sources)
-
-    def ecu_blocked(self, ecu: str) -> bool:
-        return ecu in self.blocked_ecus
 
     def check_tools(self, known: Iterable[str]) -> None:
         """Fail loudly when ``allowed_tools`` names a tool that does not exist."""
@@ -117,7 +110,6 @@ def load_policy(path: Path) -> Policy:
         allowed_roots=roots,
         allowed_tools=None if allowed is None else frozenset(_str_list(allowed, "allowed_tools")),
         blocked_sources=tuple(_str_list(data.get("blocked_sources"), "blocked_sources")),
-        blocked_ecus=frozenset(_str_list(data.get("blocked_ecus"), "blocked_ecus")),
         byte_budget=budget,
         allow_code_connectors=code,
     )

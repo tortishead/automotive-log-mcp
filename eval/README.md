@@ -2,7 +2,7 @@
 
 Two levels, on the same cases (implementation plan, M4 item 6 and the checkpoint):
 
-1. **Evidence recall** (no agent): do `detect`, `list_artifacts` and a case's recorded queries
+1. **Evidence recall** (no agent): do `overview`, `list_artifacts` and a case's recorded queries
    show the known root-cause lines on their first page? `evidence_recall.py`, runs in CI on the
    synthetic cases.
 2. **Agent runs** (by hand): an agent in a real MCP client (VS Code Copilot agent mode, Claude
@@ -15,7 +15,7 @@ Two levels, on the same cases (implementation plan, M4 item 6 and the checkpoint
 | `cases.yaml` | the 9 synthetic cases (from the test fixtures and `synthetic/`), with expected answers |
 | `cases.local.yaml` | your real closed defects (git-ignored; create it from the example below) |
 | `evidence_recall.py` | evidence recall over one or more case files; Markdown report, optional JSON |
-| `callstats.py` | calls, bytes and tools per session from the server's call log (for where the tokens went and why a run was expensive, use `automotive-log-mcp calls`, see [docs/reference.md](../docs/reference.md#token-use)) |
+| `callstats.py` | calls, bytes and tools per session from the server's call log (for where the tokens went and why a run was expensive, see the round reports in [docs/reference.md](../docs/reference.md#token-use)) |
 | `agent_runs/` | the agent-run checklist and template; your run notes go in `agent_runs/local/` (git-ignored) |
 | `results/` | reports you write with `--report` (git-ignored) |
 
@@ -53,40 +53,26 @@ against the fix, not against what the tools show.
        fix: abc1234 (repo hvac-app)
    ```
 
-3. Index the files once, into the case named after the id, **in the order listed** (source ids
-   in citations depend on the order):
-
-   ```bat
-   :: Windows
-   py -m automotive_log_mcp index T-4711 C:\defects\T-4711\bugreport-2026-10-11.zip
-   py -m automotive_log_mcp sources T-4711
-   ```
-
-   ```bash
-   # Linux
-   python -m automotive_log_mcp index T-4711 ~/defects/T-4711/bugreport-2026-10-11.zip
-   python -m automotive_log_mcp sources T-4711
-   ```
+3. Index the files once with `add_source`, into the case named after the id, **in the order
+   listed** (source ids in citations depend on the order).
 
 4. Find the root-cause lines **from the fix commit** (the code it changed, the message it fixed)
-   with the CLI, not with the tools under test first: `query`, `artifacts --show`, e.g.
-   `py -m automotive_log_mcp query T-4711 --search "setProperty failed" --level E`. Write their
+   with `search`, `read_artifact` or `get_records`, not with an agent run first. Write their
    citations and a short text each line must contain into `expected.citations`. The text check
    catches citations that drift (a reindex with another connector version, a wrong line).
-   Writing citations after looking at the CLI output is fine; what must not happen is choosing
-   them after seeing what `detect` or an agent found.
+   Writing citations after looking at that output is fine; what must not happen is choosing
+   them after seeing what an agent found.
 
 Five such cases are the checkpoint's minimum ("at least 3 of 5 agent runs point to the right
 component"); the release plan asks for ten.
 
 Recorded `queries` take the tools `search`, `count`, `context`, `list_artifacts`,
-`read_artifact`, `get_records`, `detect`, `overview` and `diff`, with the arguments the
+`read_artifact`, `get_records` and `overview`, with the arguments the
 MCP tools take, e.g.:
 
 ```yaml
 queries:
   - {tool: search, args: {query: "setProperty failed", filter: {level: E}}}
-  - {tool: diff, args: {a: {sources: ["1"], seg: 1}, b: {sources: ["1"], seg: 2}}}
 ```
 
 ## Run evidence recall
@@ -116,9 +102,9 @@ cases and checks their results against the recorded baseline below.
 ## Run the agent evaluation
 
 See [agent_runs/README.md](agent_runs/README.md): the checklist, the client setup for VS Code
-Copilot agent mode (Windows, `py -m automotive_log_mcp serve`) and Claude Code, and how to take
-calls and bytes from the call log with `callstats.py`; `automotive-log-mcp calls --session <id>`
-(Windows: `py -m automotive_log_mcp calls ...`) explains the tokens of one run and suggests changes.
+Copilot agent mode (Windows, `py -m automotive_log_mcp`) and Claude Code, and how to take
+calls and bytes from the call log with `callstats.py`; the round report `….txt` in
+`~/.automotive-log-mcp/rounds/` explains the tokens of one run and suggests changes.
 
 ## Write up
 
@@ -142,7 +128,7 @@ the logs are confidential):
 | `syn-boot-selinux` | `boot-selinux.log` | SELinux denial at boot |
 | `syn-watchdog-audio` | `watchdog-audio.log` | watchdog kill, audio HAL error found by a search |
 | `syn-evs-crash` | `evs-crash/evs.log`, `evs-crash/tombstone_03` | a standalone tombstone file next to a logcat |
-| `syn-wifi-fw-ota` | `wifi-fw-ota.dmesg` | two boots of one kernel log; only `diff` (boot 1 against boot 2) shows the missing firmware |
+| `syn-wifi-fw-ota` | `wifi-fw-ota.dmesg` | two boots of one kernel log; the second fails to load the Wi-Fi firmware |
 | `syn-bt-restart` | `bt-restart.log` | a HAL restart loop, the cause found by a search |
 
 The nine cases (Nov 14, 2026, after `syn-can-busoff` went with the multi-source tools): **17 of 18**

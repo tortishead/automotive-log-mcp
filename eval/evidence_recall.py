@@ -1,7 +1,7 @@
 """Evidence recall: do the tools surface a case's root-cause citations without an agent?
 
 For each case in one or more case files (format in eval/cases.yaml) the script indexes the files
-into a case named after the case id, then runs what an agent sees first: ``detect``,
+into a case named after the case id, then runs what an agent sees first: ``overview``,
 ``list_artifacts`` and the case's recorded ``queries`` (first page each, default arguments). An
 expected citation counts as
 
@@ -43,7 +43,7 @@ from pydantic import BaseModel
 from automotive_log_mcp.app import App
 from automotive_log_mcp.config import CASE_NAME_RE, load_config
 from automotive_log_mcp.policy import Policy, load_policy
-from automotive_log_mcp.tools import DiffSide, Filter, Output, ToolInputError, Tools
+from automotive_log_mcp.tools import Filter, Output, ToolInputError, Tools
 
 CITE = re.compile(r"\b(?:log:\d+#\d+|art:\d+(?:/[a-z0-9_.-]+)?(?::L\d+(?:-L?\d+)?)?)")
 TOOLS = (
@@ -53,9 +53,7 @@ TOOLS = (
     "list_artifacts",
     "read_artifact",
     "get_records",
-    "detect",
     "overview",
-    "diff",
 )
 
 
@@ -166,10 +164,6 @@ def _call(tools: Tools, case: str, tool: str, args: dict[str, Any]) -> Output[Ba
         if "query" in args:
             args["text"] = args.pop("query")
         return tools.count(case, **args)
-    if tool == "diff":
-        for side in ("a", "b"):
-            args[side] = DiffSide.model_validate(args[side])
-        return tools.diff(case, **args)
     return getattr(tools, tool)(case, **args)  # type: ignore[no-any-return]
 
 
@@ -196,7 +190,7 @@ def run_case(app: App, tools: Tools, case: Case) -> CaseResult:
     for f in case.files:
         app.ingestor.add(db, str(f), other_cases=False)  # one bugreport can serve several cases
     res = CaseResult(case, "ok")
-    plan: list[tuple[str, dict[str, Any]]] = [("detect", {}), ("list_artifacts", {})]
+    plan: list[tuple[str, dict[str, Any]]] = [("overview", {}), ("list_artifacts", {})]
     plan += [(q["tool"], q.get("args", {})) for q in case.queries]
     seen: dict[str, list[str]] = {}
     for tool, args in plan:

@@ -2,8 +2,7 @@
   "servers": {
     "automotive-log": {
       "type": "stdio",
-      "command": "automotive-log-mcp",
-      "args": ["serve"]
+      "command": "automotive-log-mcp"
     }
   }
 }

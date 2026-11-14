@@ -204,7 +204,7 @@ class RegexConnector(TextConnector):
 
 
 def load_file(path: Path) -> RegexConnector | CommandConnector | None:
-    """Load one YAML file; None if it is not a connector definition (e.g. a detector rule).
+    """Load one YAML file; None if it is not a connector definition.
     A definition with ``command`` is a :class:`~.command.CommandConnector`."""
     try:
         spec = read_yaml_mapping(path, "regex connector")

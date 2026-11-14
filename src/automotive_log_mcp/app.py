@@ -1,16 +1,14 @@
-"""Wiring shared by the CLI and the MCP server: config, policy, registry, redactor, ingest."""
+"""Wiring for the MCP server: config, policy, registry, redactor, ingest."""
 
 from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, field
-from pathlib import Path
 
 from .config import Config
 from .connectors.base import ConnectorError, Registry, build_registry
-from .core.ingest import CaseWorkers, IngestError, Ingestor, Progress, file_sha256
+from .core.ingest import CaseWorkers, Ingestor, Progress
 from .core.redact import Redactor, redactor_for_home
-from .detect.engine import RuleSet, load_rules
 from .policy import Policy
 from .store import db, query
 
@@ -22,7 +20,6 @@ class App:
     registry: Registry
     redactor: Redactor
     ingestor: Ingestor
-    rules: RuleSet = field(default_factory=lambda: load_rules())
     workers: CaseWorkers = field(init=False)
 
     def __post_init__(self) -> None:
@@ -36,10 +33,9 @@ class App:
             from .config import ConfigError
 
             raise ConfigError(str(e)) from e
-        rules = load_rules(config.rule_dirs)  # ConfigError for an invalid rule file
         redactor = redactor_for_home(config.home)
         ingestor = Ingestor(config, policy, registry, redactor, progress)
-        return cls(config, policy, registry, redactor, ingestor, rules)
+        return cls(config, policy, registry, redactor, ingestor)
 
     def versions(self) -> dict[str, str]:
         return {p.name: p.version for p in self.registry.plugins()}
@@ -85,14 +81,3 @@ class App:
             if c.section is None and c.first is None:
                 return a, None
             return a, query.artifact_lines(conn, a, c)
-
-    def relink(self, case: str, source_id: int, new_path: Path) -> list[int]:
-        path = self.config.case_db(case)
-        if not path.exists():
-            raise IngestError(f"case '{case}' does not exist")
-        new_path = new_path.expanduser().resolve()
-        with db.opened(path) as conn:
-            try:
-                return query.relink(conn, source_id, new_path, file_sha256)
-            except ValueError as e:
-                raise IngestError(str(e)) from None

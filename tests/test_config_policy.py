@@ -56,7 +56,7 @@ def test_policy_missing_file_is_permissive(tmp_path: Path) -> None:
 def test_policy_file(tmp_path: Path) -> None:
     f = tmp_path / "policy.yaml"
     f.write_text(
-        "allowed_tools: [search]\nblocked_sources: ['*/private/*']\nblocked_ecus: [ECU1]\n"
+        "allowed_tools: [search]\nblocked_sources: ['*/private/*']\n"
         "byte_budget: 1000\nallow_code_connectors: true\n",
         encoding="utf-8",
     )
@@ -65,7 +65,6 @@ def test_policy_file(tmp_path: Path) -> None:
     assert not p.tool_allowed("context")
     assert p.source_blocked("/logs/private/a.txt")
     assert not p.source_blocked("/logs/a.txt")
-    assert p.ecu_blocked("ECU1")
     assert p.byte_budget == 1000
     assert p.allow_code_connectors
 

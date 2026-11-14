@@ -9,11 +9,9 @@ text formats and `command` connectors (an external decoder writing JSON lines, f
 company-specific formats) are indexed into one SQLite DB per case, with redaction at index time.
 Tombstones, ANR traces, Java crashes and dropbox entries become artifacts with a summary, a crash
 signature and a record on the timeline. Each source keeps its own clock as written; sources are
-not aligned with each other. Twelve tools work over MCP, over stdio or streamable HTTP with a bearer token: the P0
+not aligned with each other. Ten tools work over MCP, over stdio or streamable HTTP with a bearer token: the P0
 tools `add_source`, `list_sources`, `search`, `context`, `list_artifacts`, `read_artifact`,
-`get_records`, the P1 tools `overview`, `count`, `detect` (10 default detector rules, more from
-rule directories) and `check_citations`, and
-`diff` (what only one run, boot or time window has), all with capped, cited output. An evaluation
+`get_records`, and the P1 tools `overview`, `count` and `check_citations`, all with capped, cited output. An evaluation
 harness ([eval/](../eval/)) checks evidence recall without an agent (9 synthetic cases) and gives a
 checklist for agent runs.
 
@@ -21,11 +19,10 @@ What is **not** shown yet: everything is verified on synthetic fixtures and synt
 cases only, not on real bugreports or real closed defects, and no agent run of the evaluation has
 been done; ingest (about 26–29k lines/s on generated logs) misses the M1 target of 100k lines/s;
 the case DB is 1.34× the input, within the 1.5× target (see [Storage](#storage)). A
-case DB of an older schema is migrated on first open, without a re-import. DLT is not read (a
-company DLT setup can use a `command` connector or [docs/dlt.md](dlt.md)). Changes per
-release: [CHANGELOG.md](../CHANGELOG.md). See [docs/design.md](design.md),
+case DB of an older schema is migrated on first open, without a re-import. Changes per
+release: [CHANGELOG.md](../CHANGELOG.md). See
 [docs/implementation-plan.md](implementation-plan.md), [docs/connectors.md](connectors.md)
-(own formats) and [docs/rules.md](rules.md) (detector rules).
+(own formats).
 
 ## Install
 
@@ -38,25 +35,24 @@ pip install -e ".[dev]"
 ## Run
 
 ```bash
-automotive-log-mcp serve
+automotive-log-mcp
 ```
 
 The server speaks MCP over stdio (over HTTP with `--http`, below). Client configuration snippets are in
-[examples/mcp-config/](../examples/mcp-config/). Tool results are text only by default; `serve
---structured` (or `structured_output: true` in the config) adds `structuredContent` and output
+[examples/mcp-config/](../examples/mcp-config/). Tool results are text only by default; `--structured` (or `structured_output: true` in the config) adds `structuredContent` and output
 schemas, at a token cost (see [Token use](#token-use)). `add_source` indexes in a background thread per
 case: it waits up to 10 s, then reports that indexing continues; `list_sources` shows progress.
 
 ### Run over HTTP
 
-`serve --http` serves the same tools over streamable HTTP (the official MCP SDK's transport, with
+`--http` serves the same tools over streamable HTTP (the official MCP SDK's transport, with
 uvicorn), for a server on a shared machine next to the logs. stdio stays the default.
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))" > ~/.automotive-log-mcp/token.txt
 cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then edit allowed_roots
-automotive-log-mcp serve --http                       # http://127.0.0.1:8765/mcp
-automotive-log-mcp serve --http --host 0.0.0.0 --port 9000
+automotive-log-mcp --http                       # http://127.0.0.1:8765/mcp
+automotive-log-mcp --http --host 0.0.0.0 --port 9000
 ```
 
 - **Token:** every request needs `Authorization: Bearer <token>`; the token is
@@ -64,11 +60,9 @@ automotive-log-mcp serve --http --host 0.0.0.0 --port 9000
   one the server does not start; a missing or wrong token gets 401. One token, no OAuth, no users:
   whoever holds it may call every tool the policy allows.
 - **Path policy:** `add_source` paths are paths on the server's machine. Over HTTP it reads only
-  below `allowed_roots` in `policy.yaml`; without that key it refuses every path (index files with
-  the CLI on the server instead). A path outside the roots is refused before the server looks at
+  below `allowed_roots` in `policy.yaml`; without that key it refuses every path. A path outside the roots is refused before the server looks at
   it (the reply does not say whether it exists), also when a symbolic link inside a root points
-  outside; with roots set, relative paths are refused. `allowed_roots` applies over stdio and to
-  the CLI `index` too when it is set.
+  outside; with roots set, relative paths are refused. `allowed_roots` applies over stdio too when it is set.
 - **Network:** on `127.0.0.1` the SDK's DNS-rebinding protection is on; on another address list
   the Host headers clients use in `http.allowed_hosts`. The server speaks plain HTTP: off loopback
   the token crosses the network in clear text, so put it behind a TLS proxy or use an SSH tunnel
@@ -80,15 +74,9 @@ automotive-log-mcp serve --http --host 0.0.0.0 --port 9000
 
 **A file is indexed once.** Adding a file that is already indexed (same content, by SHA-256) is a
 no-op, also under another case name: then `add_source` names the case that holds it and the agent
-uses that one (a new chat often picks a new case name for the same bugreport). `reindex=true`
-(MCP) or `index --force` (CLI) indexes it again anyway. An import that did not finish, because
+uses that one (a new chat often picks a new case name for the same bugreport). `reindex=true` indexes it again anyway. An import that did not finish, because
 the server was stopped while indexing in the background (chat or VS Code closed), is started
-again from the beginning next time; the reply says so. To avoid that for large files, index
-them once before the chat and tell the agent the case name:
-
-```powershell
-py -m automotive_log_mcp index T-1 C:\logs\bugreport.zip     # Windows; waits until done
-```
+again from the beginning next time; the reply says so.
 
 ## Tools
 
@@ -101,10 +89,8 @@ py -m automotive_log_mcp index T-1 C:\logs\bugreport.zip     # Windows; waits un
 | `list_artifacts(case, type?)` | tombstones, ANRs, Java crashes, dropbox entries grouped by crash signature, in time order; copies of one crash marked `same crash as art:<id>` |
 | `read_artifact(case, id, section?, start_line?, end_line?)` | summary, signature and section list; then a section or a line range, lines numbered `L<n>` |
 | `get_records(case, ids)` | full records: untruncated message, timestamp as written, attributes, template text |
-| `overview(case, filter?)` | records and levels, top tags, pids and messages (templates), clock segments, gaps over 30 s, error bursts, a histogram, detector and artifact counts |
+| `overview(case, filter?)` | records and levels, top tags, pids and messages (templates), clock segments, gaps over 30 s, error bursts, a histogram and artifact counts |
 | `count(case, by, query?, mode, filter?, bucket?, limit)` | records by `tag`, `level`, `pid`, `source` or `template`, optionally matching a query, optionally per time bucket (`'1m'`, at most 60 buckets, empty ones shown) |
-| `detect(case, rules?, filter?, examples)` | hits of the detector rules by severity and time, collapsed by message (or pid), each with a hint what to read next |
-| `diff(case, a, b, min_ratio, limit)` | messages (tag + level + template) only in B, only in A, and those whose share of the side's records changed by `min_ratio` (default 4) or more; sides are filters plus an optional `seg`: two files or runs, two boots, before and after an event; each item cited |
 | `check_citations(case, text)` | checks a Markdown answer: every `log:`/`art:` citation must be well-formed and resolve (errors); uncited paragraphs and quotes not in the cited lines are warnings; `PASS`/`FAIL` |
 
 A search hit looks like the design's line format; collapsed repeats add a count and the last
@@ -154,70 +140,10 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
   matches (as `search` would). Broad text queries (over 300k matches) are counted from every k-th
   match and marked `≈`; a regex scan that hits `caps.regex_scan_rows` gives lower bounds
   (`at least`). Bucket starts are printed so that they can be passed back as `from`.
-- **detect** runs the rules below (or `rules=[...]`); `filter` narrows the records the rules see
-  (a second event of a `followed_by` rule is looked for beyond `to`). The `search` hint of a rule
-  lists every hit.
 - **check_citations** is what the `defect_triage` prompt calls before an answer is final. Citations
   inside fenced code blocks are not checked; paragraphs that say they are a guess ("probably",
   "unknown", "the logs do not show", …) or are shorter than 8 words need no citation. The call log
   keeps only the text's length and hash.
-
-### diff
-
-`diff(case, a={'sources': ['2']}, b={'sources': ['5']})` compares two sets of records: a good and
-a bad run, `{'sources': ['3'], 'seg': 1}` against `seg: 2` (two boots of a kernel log), or one
-source before and after an event (`{'sources': ['2'], 'to': 'log:2#500'}` against `'from'`). Each
-side takes the filter of `search` plus `seg`.
-
-```
-A: source 1: 44 records, 3 messages
-B: source 2: 73 records, 4 messages
-in both: 2; only in B: 2 (E 1); only in A: 1; changed 4× or more: 1
-(message = tag + level + template; changes compare each message's share of its side's records)
-Only in B, most severe first (2):
-  log:2#71  E AudioHal  firmware load failed for <*> (<*>)  ×2
-  log:2#73  I AudioHal  using fallback route speaker
-Changed, largest change first (1):
-  ×3 → ×30 (6×)  log:1#41 / log:2#41  W VehicleHal  retry <*> for prop <*>
-Only in A, most severe first (1):
-  log:1#44  I BootReceiver  boot completed in <*> ms
-```
-
-- A **message** is a tag, a level and a template; templates are shared by all sources of a case,
-  so the same line in two files is the same message. Each item cites its first record per side.
-- **Changed** compares shares, not counts: B's count over B's records against A's count over A's
-  records, so a longer log does not make everything look more frequent; the larger side needs at
-  least 5 records.
-- Times play no part in the comparison: each side's `from`/`to` are read on its own sources'
-  clocks, as in `search`, so the sides may be on different clocks (a dmesg boot against a logcat,
-  two devices) without alignment.
-- Lists are sorted most severe (only-in) or largest change first; each gets a share of the output
-  cap and ends with how many more there are.
-
-### Detector rules
-
-| Rule | Severity | Matches |
-| --- | --- | --- |
-| `java_crash` | high | `AndroidRuntime: FATAL EXCEPTION`, Java crash artifacts |
-| `native_crash` | high | `libc: Fatal signal`, the debuggerd `*** ***` banner, tombstones |
-| `anr` | high | `ActivityManager: ANR in`, ANR artifacts |
-| `watchdog` | high | `Watchdog: Blocked in handler/monitor`, `WATCHDOG KILLING SYSTEM PROCESS` |
-| `boot_not_completed` | high | `boot_progress_start` not followed within 3 min by `boot_progress_enable_screen`, `sf_stop_bootanim` or boot completed |
-| `lmk` | medium | `lowmemorykiller`/`lmkd: Kill '…'`, kernel `Out of memory: Killed process` |
-| `binder_failure` | medium | `!!! FAILED BINDER TRANSACTION !!!`, `DeadObjectException`, kernel `binder: … transaction failed` |
-| `vhal_error` | medium | E/F from VHAL tags (`*VehicleHal*`, `*Vhal*`, …), `status=NOT_AVAILABLE` (and `TRY_AGAIN`, `INTERNAL_ERROR`, `ACCESS_DENIED`, `INVALID_ARG`) at W or above |
-| `service_restart` | medium | `init: Service '…' (pid N) exited/killed/received signal`, `Process … has died`, `Scheduling restart of crashed service` |
-| `selinux_denial` | low | `audit(…): avc: denied`, one line per pid |
-
-Rules are YAML files (format in [docs/rules.md](rules.md)): `match` (a
-regex over message and tag), `level`, `tags`, or `any:` alternatives of these; `followed_by` a
-second event `within` a time (`absent: true`: a hit when it does not follow); `group_by: pid`;
-`severity`, `description`, `note`. The package rules are in
-[src/automotive_log_mcp/rules/detect/](../src/automotive_log_mcp/rules/detect/). YAML files in the
-directories under `rule_dirs` in `config.yaml` add rules; a rule with the name of a package rule
-replaces it (later directories win). `automotive-log-mcp rules` lists the rules in effect and where
-each comes from. Rule patterns are redacted like queries, so a raw value in a pattern matches its
-token.
 
 ### Filter
 
@@ -237,49 +163,6 @@ tag gets a warning with similar tags), `pid`, `tid`, `attrs` (exact match on for
 `to` is inclusive to the precision given: `to: "08:14"` includes all of 08:14. Times are the
 device's wall clock as written (no time-zone conversion).
 
-## Command line (no agent needed)
-
-```bash
-automotive-log-mcp index T-1 ~/bugreports/bugreport-2026-10-11.zip   # file, archive or directory
-automotive-log-mcp sources T-1                                       # formats, counts, time ranges
-automotive-log-mcp query T-1 --search "setProperty failed" --level W --tag 'Hvac*' --limit 20
-automotive-log-mcp query T-1 --regex 'status=\w+_AVAILABLE' --count
-automotive-log-mcp query T-1 --level W --from=-5m --collapse            # same output as the search tool
-automotive-log-mcp artifacts T-1                                     # tombstones, ANRs, crashes, dropbox
-automotive-log-mcp artifacts T-1 --type anr
-automotive-log-mcp artifacts T-1 --show art:6                        # summary and section list
-automotive-log-mcp artifacts T-1 --show art:6/backtrace              # one section, numbered lines
-automotive-log-mcp artifacts T-1 --show art:6/backtrace:L17          # one line (or :L17-L20)
-automotive-log-mcp relink T-1 3 /new/place/bugreport-2026-10-11.zip  # original moved; hash must match
-automotive-log-mcp reindex T-1 3                                     # index an original again
-automotive-log-mcp overview T-1                                      # as the overview tool
-automotive-log-mcp detect T-1 --rule anr --examples 5                # as the detect tool
-automotive-log-mcp count T-1 --by level --bucket 1m --search "setProperty failed"
-automotive-log-mcp check T-1 answer.md                               # check_citations; exit 1 on errors
-automotive-log-mcp rules                                             # detector rules and their origin
-automotive-log-mcp diff T-1 --a 2 --b 5 --level W                    # only in A / only in B / changed
-automotive-log-mcp diff T-1 --a 3:1 --b 3:2                          # two boots (segments) of source 3
-automotive-log-mcp diff T-1 --a 2 --a-to log:2#500 --b 2 --b-from log:2#500   # before / after an event
-```
-
-- `index` options: `--format <connector>` forces a format instead of sniffing; `--force`
-  reindexes a file that is already in the case, or indexes it here although another case holds it
-  (adding the same file again is otherwise a no-op).
-- `query` runs the `search` tool and prints its text: `--search` (FTS5 over message and tag) or
-  `--regex` (neither: every record that passes the filter), `--level` (minimum), `--tag` and
-  `--not-tag` (glob, repeatable), `--source` (id, repeatable), `--pid`, `--tid`, `--from`/`--to` (forms as
-  in [Filter](#filter); write `--from=-5m` for values starting with `-`), `--collapse`, `--limit`,
-  `--cursor`, `--count`. Raw values in the query (a VIN, a MAC) are redacted the same way as the
-  logs, so they still match.
-- Output lines are cited as `log:<source>#<seq>` (artifacts as `art:<id>`), e.g.
-  `log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE`.
-- `sources` flags sources whose original file is missing (use `relink`) and sources indexed with
-  an older connector or redaction rules (`stale: reindex recommended`).
-- `overview`, `detect` and `count` take the same filter flags as `query`; `count --by none` gives
-  totals only. `check` reads a Markdown file (`-` for standard input) and exits with 1 when a
-  citation is malformed or does not resolve. `rules --show <name>` prints a rule's file.
-- `artifacts` lists one line per artifact: citation, type, time, pid, process, signature (in time
-  order). `--show` takes a citation `art:<id>[/<section>][:L<n>[-L<m>]]`.
 
 ## Artifacts
 
@@ -325,7 +208,7 @@ schema 6 drops the clock tables schema 5 added):
 
 Measured on a generated 200 MiB logcat (1.9M records), against schema 3 (message column, five
 indexes): DB 423 → 268 MiB (2.11× → 1.34× the input), same tool output. Reading text costs
-decompression: regex searches and `detect` take 2–3× longer (`detect` 0.9 → 2.6 s, whole-case
+decompression: regex searches take 2–3× longer (whole-case
 `overview` 2.5 → 4.8 s, regex search 0.5 → 1.1 s), `count by template` 0.1 → 0.6 s; text search and
 `context` are unchanged. The generated log repeats few templates, so its text compresses better
 (about 5×) than real logs will.
@@ -343,8 +226,7 @@ decompression: regex searches and `detect` take 2–3× longer (`detect` 0.9 →
 
 Own formats ([docs/connectors.md](connectors.md)): YAML regex connectors and `command`
 connectors (an external program that writes JSON lines: records, artifacts, source metadata) as
-files in a directory listed under `rule_dirs` in `config.yaml` (examples: a DLT Viewer text export
-in [examples/rules/](../examples/rules/dlt_viewer_ascii.yaml), an MCU trace decoder in
+files in a directory listed under `rule_dirs` in `config.yaml` (example: an MCU trace decoder in
 [examples/connectors/](../examples/connectors/)), or Python connectors registered as entry points
 (`automotive_log_mcp.connectors`), loaded only when the policy sets `allow_code_connectors: true`.
 Lines a connector cannot parse are kept as records with no level, never dropped.
@@ -364,7 +246,7 @@ All state lives under `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MC
 | Path | What |
 | --- | --- |
 | `config.yaml` | optional: `cases_dir`, `policy_file`, `call_log` (null disables), `caps` (`max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows`), `rule_dirs`, `structured_output` (default false), `rounds_dir` (default `<home>/rounds`, null disables), `round_gap_minutes` (default 10), `http` (`host`, `port`, `path`, `token_file`, `allowed_hosts`; see [Run over HTTP](#run-over-http)) |
-| `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `blocked_ecus`, `byte_budget`, `allow_code_connectors`, `allowed_roots` (directories `add_source` may read; required over HTTP) |
+| `policy.yaml` | optional: `allowed_tools`, `blocked_sources` (globs on paths and archive members: refused by `add_source`, hidden from tools), `byte_budget`, `allow_code_connectors`, `allowed_roots` (directories `add_source` may read; required over HTTP) |
 | `cases/<case>.db` | one SQLite DB per case; originals are referenced by path and SHA-256, never copied |
 | `secret.key` | redaction key, created on first run; deleting it changes every token of later imports |
 | `calllog.jsonl` | one line per tool call: tool, arguments, status, duration, output bytes, and for token analysis call number, text and structured bytes, estimated tokens, argument hashes, caps hit, result counts and the citation ids in the output; the first call of a session also records the server's fixed cost. Never log content (the text given to `check_citations` is logged as its length, hash and the citation ids it contains) |
@@ -389,27 +271,11 @@ that is rewritten after every call. A round starts with the server and again aft
 `round_gap_minutes` (default 10) without a tool call: VS Code keeps the server running between
 chats, so a pause is the only boundary the server can see; leave a pause, or restart the server,
 between questions you want to compare. To have a round checked, hand over its `.jsonl` (and the
-`.txt` if you like); for a Claude Code run also the session transcript (below). The files hold
+`.txt` if you like). The files hold
 what `calllog.jsonl` holds: tool names, redacted arguments (queries, file paths), sizes, hashes
 and citation ids, no log lines; look at the arguments before you send a file outside your team.
-Whoever gets it runs `automotive-log-mcp calls --log <file>.jsonl [--transcript <session>.jsonl]`.
-
-```powershell
-# Windows (PowerShell)
-py -m automotive_log_mcp calls --list            # recent sessions: calls, ~tokens, errors, citation check
-py -m automotive_log_mcp calls                   # the last session in detail
-py -m automotive_log_mcp calls --session 1e9e5c  # one session (id prefix from --list)
-py -m automotive_log_mcp calls --fixed           # what the server adds to every model request, per tool
-```
-
-```bash
-# Linux / macOS
-automotive-log-mcp calls --list
-automotive-log-mcp calls --transcript ~/.claude/projects/<project>/<session-id>.jsonl
-```
-
-The report lists the calls in order with text and JSON bytes, estimated tokens (`~tok`, bytes/4)
-and, with a transcript, the measured tokens each result added (`tok`); then the totals, the fixed
+The `.txt` report lists the calls in order with text and JSON bytes, estimated tokens (`~tok`, bytes/4)
+then the totals, the fixed
 cost per request, how many input tokens were tool results re-sent with later requests, and
 *problems* (tool errors, calls that never reached the tool, byte budget used up, the run ended
 with an error, answer not checked or failing `check_citations`, exact repeats) and *suggestions*
@@ -430,18 +296,13 @@ its results (log lines, hex, paths), so real numbers are roughly twice the `~tok
   `cache_creation_input_tokens`, `cache_read_input_tokens`, `output_tokens`). For a scripted run,
   `claude -p "<question>" --output-format stream-json --verbose > run.jsonl` gives the same
   messages plus a final `result` line with totals and `total_cost_usd`; `--output-format json`
-  gives only the totals. Pass either file as `--transcript`: `calls` picks the call-log session
-  whose calls match, shows real tokens per request and per tool result, and reads the citations
-  of the final answer even when `check_citations` was not called. The transcript is only read
-  locally; nothing from it is written.
+  gives only the totals.
 - **VS Code Copilot**: not verified here (the VS Code and GitHub docs were not reachable from the
   environment this was built in, and no Copilot was available to try). Check the current VS Code
   Copilot docs for a chat debug view or chat log and for chat export (the Command Palette lists
   what your version has; search it for "chat debug" and "export chat"), and your GitHub Copilot
   settings for premium-request usage. Whether Copilot sends the text, the structured content or
-  both of a tool result to the model is not verified either; `calls` cannot import a Copilot log
-  yet. Without a transcript, `calls --reads both` gives an upper bound and
-  `--reads text` a lower one when structured output is on.
+  both of a tool result to the model is not verified either.
 
 **What was measured** (Claude Code 2.1.322, Sonnet, `claude -p` with only this server, the
 synthetic bugreport `eval/synthetic/bugreport-*.zip`, two runs per question; input tokens summed
@@ -459,13 +320,13 @@ only now; the published input schemas dropped generated titles and `anyOf`/`null
 repeated descriptions (arguments are still validated as before, `null` still accepted); and the
 server instructions steer simple questions to `list_artifacts` → `read_artifact` instead of a
 nine-step walk through every tool. Further savings that need no code: hide tools a team never uses
-with `allowed_tools` in `policy.yaml` (`calls` says how many tokens per request that saves), and
+with `allowed_tools` in `policy.yaml` (the round report says how many tokens per request that saves), and
 start a fresh chat per question, since every request re-sends the whole conversation.
 
 ## Evaluation
 
 [eval/](../eval/README.md) holds the M4 evaluation: `cases.yaml` (closed defects with the expected
-component and root-cause citations, written before any run), `evidence_recall.py` (do `detect`,
+component and root-cause citations, written before any run), `evidence_recall.py` (do `overview`,
 `list_artifacts` and recorded queries show the root-cause lines on their first page; runs in the
 test suite on the 9 synthetic cases), the agent-run checklist in `eval/agent_runs/` and
 `callstats.py` (calls and bytes per session from the call log). Real defects go into the

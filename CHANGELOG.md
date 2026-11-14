@@ -9,16 +9,28 @@ versions; a case DB of an older schema is migrated on first open.
 
 ### Added
 
-- Filter field `tid` (CLI `--tid`): one thread of a process, in every tool that takes a filter.
+- Filter field `tid`: one thread of a process, in every tool that takes a filter.
 
 ### Removed
 
+- **DLT plans and `blocked_ecus`**: the policy key (never enforced; a policy file that still
+  sets it is now an error), docs/dlt.md and the DLT Viewer example connector.
+- **`diff`** (a breaking change to the tool list; 10 tools remain).
+- **`detect` and the detector rules** (a breaking change to the tool list): the
+  tool, the 10 package rules, `overview`'s detector counts (and its `detect` and `exact` fields)
+  and docs/rules.md. `rule_dirs` stays for connectors; detector rule files there are ignored.
+  Evidence recall now starts from `overview` and `list_artifacts`: 16/18 on the synthetic cases
+  (`syn-vhal-abort` lost both lines, `syn-boot-selinux` gained one).
+- **The command line** except starting the server: `automotive-log-mcp` (no `serve` subcommand)
+  runs the MCP server, `--http`, `--host`, `--port`, `--structured` as before. Gone: `index`,
+  `sources`, `query`, `artifacts`, `overview`, `count`, `detect`, `diff`, `check`, `rules`,
+  `calls`, `relink`, `reindex`; use the MCP tools (`add_source(reindex=true)` reindexes). Client
+  configs drop `"args": ["serve"]`.
 - **Multi-source alignment** (a breaking change to the tool list): the tools `timeline` and
   `align`, `context(scope='all')`, the clock model and automatic alignment, marker rules
   (`marker:` files in a rule directory are now an error), the `clock` fields of `list_sources`
-  and the CLI commands `timeline` and `align`. Cases normally hold one logcat or one DLT trace,
-  so the case clock had no use; each source keeps its times as written. `diff` stays (it never
-  used the alignment). Schema 6 drops the clock tables; older case DBs migrate on first open.
+  and the CLI commands `timeline` and `align`. Cases normally hold one logcat or bugreport,
+  so the case clock had no use; each source keeps its times as written. Schema 6 drops the clock tables; older case DBs migrate on first open.
 - The evaluation's `timeline` queries and `expected.order` check, and the synthetic case
   `syn-can-busoff` that needed them (9 synthetic cases remain).
 
@@ -95,8 +107,7 @@ Not published to PyPI and not tagged; install from the repository (`pip install 
 - Verified on synthetic fixtures and synthetic evaluation cases only: no real bugreport, no real
   closed defect, and no agent run of the evaluation (the M4 and M6 done criteria are not met).
 - Ingest runs at about 26–42k lines/s on generated logs (target 100k lines/s).
-- Not read: DLT (use a `command` connector; see [docs/dlt.md](docs/dlt.md)), tombstone `.pb`,
-  `dumpsys` sections, kernel panics / `pstore`. `blocked_ecus` in the policy is not enforced.
+- Not read: DLT, tombstone `.pb`, `dumpsys` sections, kernel panics / `pstore`.
 - HTTP: plain HTTP only (use a TLS proxy or an SSH tunnel off loopback), one token, no OAuth, no
   users; the byte budget and call-log session are per server process.
 - VS Code Copilot has not been tried as a client (over stdio or HTTP); its config snippets are

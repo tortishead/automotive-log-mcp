@@ -14,14 +14,9 @@ time order; 'same crash as' marks copies, which need no second read.
 exception, cause and top of the stack; read a section only if the summary is not enough.
 4. Answer, citing each finding; check_citations(case, text) before answering when asked to cite.
 
-Broader questions: detect(case) for known failure patterns (crash, ANR, watchdog, low memory \
-kill, SELinux, binder, VHAL, service restart, boot not completed); overview(case) for where \
-errors cluster; context(case, at='art:<id>' or 'log:<source>#<seq>') for the lines before an \
-event (scope='pid' follows one process across buffers); search/count with filter level 'W' or \
-'E' and from/to; get_records for messages cut with '…'.
-
-A good and a bad run, or two boots: diff(case, a={'sources': [...]}, b=...) lists what only \
-one side has.
+Broader questions: overview(case) for where errors cluster; context(case, at='art:<id>' or \
+'log:<source>#<seq>') for the lines before an event (scope='pid' follows one process across \
+buffers); search/count with filter level 'W' or 'E' and from/to; get_records for messages cut with '…'.
 
 Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>]; a statement \
 without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \
@@ -35,8 +30,7 @@ Triage the defect in case '{case}' with the automotive-log-mcp tools.
 {symptom}Work in this order and stop as soon as the evidence is clear:
 1. list_sources(case='{case}'). Note the build fingerprint and each source's time range. If the case \
 has no sources, ask for the log files and add them with add_source.
-2. overview(case='{case}') and detect(case='{case}'): where the errors are, and which known failure \
-patterns (crash, ANR, watchdog, low memory kill, VHAL error, service restart, …) occur and when.
+2. overview(case='{case}'): where the errors are and when.
 3. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
 read_artifact the first artifact, then the section it suggests: the backtrace of a tombstone, the \
 exception of a Java crash, the main thread (and lock holder or binder peer) of an ANR.

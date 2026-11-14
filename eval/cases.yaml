@@ -22,7 +22,7 @@
 #     citations    the lines that show the root cause: log:<source>#<seq> or art:<id>[/section][:L<n>],
 #                  each optionally with the text the line must contain ({cite: …, text: …}): the
 #                  harness checks it, which catches citations that drifted (reindex, miscount)
-#   queries    optional: queries a reasonable engineer would run first, beyond detect and
+#   queries    optional: queries a reasonable engineer would run first, beyond overview and
 #              list_artifacts (tool + args, as the MCP tools take them); counted in evidence recall
 #   fix        the fix commit (or "synthetic")
 
@@ -158,7 +158,7 @@ cases:
         - {cite: log:1#15, text: "firmware request failed for qca6390/wlanfw20.mbn"}
         - {cite: log:1#16, text: "probe of 0000:01:00.0 failed"}
     queries:
-      - {tool: diff, args: {a: {sources: ["1"], seg: 1}, b: {sources: ["1"], seg: 2}}}
+      - {tool: search, args: {query: wlan, filter: {level: E}}}
     fix: synthetic
 
   - id: syn-bt-restart
