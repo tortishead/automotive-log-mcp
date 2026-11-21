@@ -183,10 +183,10 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | --- | --- |
 | `config.yaml` | optional, see below |
 | `policy.yaml` | optional, see below |
-| `cases/<case>.db` | one SQLite file per case. Log files are referenced by path and SHA-256, never copied. |
+| `cases/<case>.db` | one SQLite file per case. Log files are referenced by path and SHA-256, never copied. Deleted after 30 days without use (see [Cleanup](#cleanup)). |
 | `secret.key` | redaction key, made on first run. Deleting it changes all tokens of later imports. |
-| `calllog.jsonl` | one line per tool call: tool, redacted arguments, status, time, output size, estimated tokens, citations in the output. No log content. |
-| `rounds/` | the call log split per round, with a report (see [Token use](#token-use)) |
+| `calllog.jsonl` | one line per tool call: tool, redacted arguments, status, time, output size, estimated tokens, citations in the output. No log content. Moved to `calllog.jsonl.1` above 20 MB. |
+| `rounds/` | the call log split per round, with a report (see [Token use](#token-use)). Files older than 30 days are deleted. |
 
 `config.yaml` keys:
 
@@ -198,6 +198,7 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | `rule_dirs` | folders with your own connectors |
 | `structured_output` | also send JSON (default false) |
 | `rounds_dir`, `round_gap_minutes` | round files (default `<home>/rounds`, `null` off) and the pause that starts a new round (default 10) |
+| `retention` | `case_days` (default 30), `rounds_days` (default 30), `call_log_mb` (default 20); `null` turns a rule off, `retention: null` all of them (see [Cleanup](#cleanup)) |
 
 `policy.yaml` keys:
 
@@ -212,6 +213,24 @@ Example:
 
 ```yaml
 allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records]
+```
+
+### Cleanup
+
+When the server starts, it removes what the `retention` settings say is old and prints a line on
+stderr for each removal:
+
+- a case DB (with its `-wal` and `-shm` files) not used for `case_days`. Every tool call or
+  import on a case counts as use. A case is kept if any of its original log files is gone (the DB
+  is then the only copy), if an import in it never finished, or if it cannot be read. Adding the
+  logs again rebuilds a removed case.
+- round files older than `rounds_days`;
+- a call log above `call_log_mb`: it is renamed to `calllog.jsonl.1`, replacing the previous one.
+
+```yaml
+retention:
+  case_days: 90     # keep cases longer
+  call_log_mb: null # never rotate the call log
 ```
 
 ## Storage

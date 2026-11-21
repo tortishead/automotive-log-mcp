@@ -38,6 +38,15 @@ class Caps:
 
 
 @dataclass(frozen=True)
+class Retention:
+    """Automatic cleanup when the server starts; ``None`` turns a rule off (see ``retention.py``)."""
+
+    case_days: int | None = 30  # delete a case DB not used for this many days
+    rounds_days: int | None = 30  # delete round files older than this
+    call_log_mb: int | None = 20  # rotate the call log to ``<name>.1`` above this size
+
+
+@dataclass(frozen=True)
 class Config:
     home: Path
     cases_dir: Path
@@ -51,6 +60,7 @@ class Config:
     # One call-log file per round (and a report next to it), to hand over for analysis.
     rounds_dir: Path | None = None
     round_gap_minutes: int = 10
+    retention: Retention = field(default_factory=Retention)
 
     def case_db(self, case: str) -> Path:
         """Path of a case's DB file. ``case`` must already be validated."""
@@ -71,8 +81,10 @@ _TOP_KEYS = {
     "structured_output",
     "rounds_dir",
     "round_gap_minutes",
+    "retention",
 }
 _CAP_KEYS = {"max_lines", "max_bytes", "max_msg_chars", "regex_scan_rows"}
+_RETENTION_KEYS = {"case_days", "rounds_days", "call_log_mb"}
 
 
 def _path(value: Any, key: str, base: Path) -> Path:
@@ -86,6 +98,22 @@ def _positive_int(value: Any, key: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise ConfigError(f"config key 'caps.{key}' must be a positive integer, got {value!r}")
     return value
+
+
+def _retention(data: Any) -> Retention:
+    if data is None:
+        return Retention(None, None, None)  # ``retention: null``: no automatic cleanup
+    if not isinstance(data, dict):
+        raise ConfigError("config key 'retention' must be a mapping")
+    unknown = set(data) - _RETENTION_KEYS
+    if unknown:
+        raise ConfigError(f"unknown keys under 'retention': {', '.join(sorted(unknown))}")
+    values: dict[str, int | None] = {}
+    for k, v in data.items():
+        if v is not None and (isinstance(v, bool) or not isinstance(v, int) or v <= 0):
+            raise ConfigError(f"config key 'retention.{k}' must be a positive integer or null, got {v!r}")
+        values[k] = v
+    return Retention(**values)
 
 
 def read_yaml_mapping(path: Path, what: str) -> dict[str, Any]:
@@ -166,4 +194,5 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
         structured_output=structured,
         rounds_dir=rounds_dir,
         round_gap_minutes=gap,
+        retention=_retention(data["retention"]) if "retention" in data else Retention(),
     )

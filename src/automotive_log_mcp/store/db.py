@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import os
 import sqlite3
 from collections.abc import Callable, Iterator
 from importlib import resources
@@ -104,12 +105,21 @@ def _migrate(conn: sqlite3.Connection, path: Path) -> None:
         conn.execute("VACUUM")  # schema 4 drops the message column: give the space back
 
 
+def touch(path: Path) -> None:
+    """Mark a case DB as used now: its mtime is what ``retention.py`` reads as the last use
+    (reads alone would not change it)."""
+    with contextlib.suppress(OSError):
+        os.utime(path)
+
+
 def connect(path: Path, create: bool = False) -> sqlite3.Connection:
     """Open a case DB (migrating it if needed). ``create`` makes the file if it is missing."""
     if not path.exists():
         if not create:
             raise StoreError(f"case DB {path} does not exist")
         path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        touch(path)
     try:
         conn = sqlite3.connect(path, check_same_thread=False, factory=CaseConnection)
     except sqlite3.Error as e:
