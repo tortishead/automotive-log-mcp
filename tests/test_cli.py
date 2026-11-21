@@ -83,7 +83,7 @@ def test_errors(case: str, capsys: pytest.CaptureFixture[str]) -> None:
     code, _, err = run(capsys, "serach", case)
     assert code == 2 and "unknown command 'serach'" in err
     with pytest.raises(SystemExit) as exc:
-        main(["--http", "search", case])
+        main(["--structured", "search", case])
     assert exc.value.code == 2
 
 

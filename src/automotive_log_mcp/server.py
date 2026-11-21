@@ -23,8 +23,6 @@ from contextvars import ContextVar
 from pathlib import Path
 from typing import Annotated, Any, ClassVar, Literal, TypeVar
 
-from mcp.server.auth.provider import TokenVerifier
-from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import CallToolResult, TextContent, ToolAnnotations
@@ -268,8 +266,6 @@ class LogServer:
         config: Config,
         policy: Policy,
         session: str | None = None,
-        token_verifier: TokenVerifier | None = None,
-        auth: AuthSettings | None = None,
         wait_for_imports: bool = False,
     ) -> None:
         self.config = config
@@ -296,8 +292,6 @@ class LogServer:
             title="Automotive log analysis",
             version=__version__,
             instructions=INSTRUCTIONS,
-            token_verifier=token_verifier,
-            auth=auth,
         )
         self._register_tools()
 

@@ -12,8 +12,7 @@ no byte budget. Keys:
   Default false; YAML and ``command`` connectors are always allowed.
 - ``allowed_roots``: directories ``add_source`` may read from; a path
   outside them is refused before the server looks at it, also through a symbolic link. Omitted
-  or null: any path (stdio, where the agent runs as the user). Over HTTP an omitted list means
-  **no** path: ``--http`` refuses every ``add_source`` until roots are listed.
+  or null: any path.
 """
 
 from __future__ import annotations

@@ -27,17 +27,6 @@ automotive-log-mcp                # MCP over stdio
 
 Client setup (Claude Code, VS Code Copilot, Cursor, …): [examples/mcp-config/](examples/mcp-config/).
 
-### Over HTTP
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))" > ~/.automotive-log-mcp/token.txt
-cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then set allowed_roots
-automotive-log-mcp --http         # http://127.0.0.1:8765/mcp
-```
-
-Every request needs `Authorization: Bearer <token>`. `add_source` reads only below `allowed_roots`.
-There is no TLS: outside your own machine, use a TLS proxy or an SSH tunnel.
-
 ## Command line
 
 Every tool is also a CLI command, no agent needed. It prints the same text an agent gets.

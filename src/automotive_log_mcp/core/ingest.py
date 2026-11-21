@@ -213,10 +213,7 @@ class Ingestor:
         if self.policy.path_allowed(path):
             return
         if not self.policy.allowed_roots:
-            raise IngestError(
-                "this server reads no paths for add_source: its policy has no allowed_roots (required "
-                "over HTTP); ask for allowed_roots"
-            )
+            raise IngestError("this server reads no paths for add_source: its policy lists no allowed_roots")
         raise IngestError(
             f"{path_str} is outside the directories this server may read (policy allowed_roots: "
             f"{self.policy.roots_text()})"

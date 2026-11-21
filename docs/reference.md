@@ -2,7 +2,7 @@
 
 Details for each part of automotive-log-mcp. Start with the [README](../README.md).
 
-- [Run](#run) · [Command line](#command-line) · [HTTP](#http)
+- [Run](#run) · [Command line](#command-line)
 - [Tools](#tools) · [Filter](#filter) · [Artifacts](#artifacts) · [Formats](#formats)
 - [Redaction](#redaction) · [Files and config](#files-and-config) · [Storage](#storage)
 - [Token use](#token-use) · [Scope](#scope) · [Design](#design) · [Develop](#develop)
@@ -10,8 +10,7 @@ Details for each part of automotive-log-mcp. Start with the [README](../README.m
 ## Run
 
 ```bash
-automotive-log-mcp              # MCP over stdio (default)
-automotive-log-mcp --http       # MCP over HTTP, see below
+automotive-log-mcp              # MCP over stdio
 ```
 
 - Results are plain text. `--structured` (or `structured_output: true` in `config.yaml`) also
@@ -45,36 +44,8 @@ automotive-log-mcp search br crash --json                   # JSON output
   (`--level`, `--from`, `--to`, `--sources`, `--tag`, `--pid`, …). List options repeat
   (`--tag A --tag B`). `--attrs KEY=VALUE` repeats.
 - `<tool> --help` shows every option.
-- Exit code: 0 ok, 1 tool error, 2 wrong usage. Server options
-  (`--http`, `--host`, `--port`, `--structured`) are not allowed with a command.
+- Exit code: 0 ok, 1 tool error, 2 wrong usage. `--structured` is not allowed with a command.
 - Hints in the output name the next call in MCP form, e.g. `read_artifact(id='art:1')`.
-
-### HTTP
-
-`--http` serves the same tools over streamable HTTP, for a server on a shared machine next to the
-logs.
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(32))" > ~/.automotive-log-mcp/token.txt
-cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then set allowed_roots
-automotive-log-mcp --http                       # http://127.0.0.1:8765/mcp
-automotive-log-mcp --http --host 0.0.0.0 --port 9000
-```
-
-- **Token:** every request needs `Authorization: Bearer <token>`. The token comes from
-  `AUTOMOTIVE_LOG_MCP_TOKEN` or from the file `http.token_file` (at least 16 characters). Without a
-  token the server does not start. A wrong token gets 401. There is one token and no users: whoever
-  has it can call every allowed tool.
-- **Paths:** `add_source` reads paths on the server machine, only below `allowed_roots` in
-  `policy.yaml`. Without that key, HTTP refuses every path. A refused path does not reveal whether
-  it exists. Symbolic links that point outside are refused. With roots set, relative paths are
-  refused. `allowed_roots` also applies over stdio when set.
-- **Network:** on `127.0.0.1`, DNS-rebinding protection is on. On another address, list the Host
-  names clients use in `http.allowed_hosts`. There is no TLS: outside loopback the token is sent in
-  clear text. Use a TLS proxy or an SSH tunnel (`ssh -L 8765:127.0.0.1:8765 logs-host`).
-- The call log, byte budget and `allowed_tools` work as over stdio. They belong to the server
-  process, so all clients of one server share them.
-- Client setup: [examples/mcp-config/](../examples/mcp-config/README.md#over-http).
 
 ## Tools
 
@@ -227,7 +198,6 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | `rule_dirs` | folders with your own connectors |
 | `structured_output` | also send JSON (default false) |
 | `rounds_dir`, `round_gap_minutes` | round files (default `<home>/rounds`, `null` off) and the pause that starts a new round (default 10) |
-| `http` | `host`, `port`, `path`, `token_file`, `allowed_hosts` (see [HTTP](#http)) |
 
 `policy.yaml` keys:
 
@@ -237,7 +207,7 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | `blocked_sources` | globs on paths and archive members: refused by `add_source`, hidden from tools |
 | `byte_budget` | total output bytes per server session; later calls are refused |
 | `allow_code_connectors` | allow Python connectors (default false) |
-| `allowed_roots` | folders `add_source` may read (required over HTTP) |
+| `allowed_roots` | folders `add_source` may read (default: any) |
 
 Example:
 
@@ -314,7 +284,7 @@ definitions at all.
 - Built-in connectors ship in the package. Your own come as YAML, a command, or a Python package.
 - No UI, no ticket-system link, no model calls from the server, no multi-user mode, no native
   symbolization.
-- No network calls over stdio. HTTP listens on loopback by default and never calls out.
+- Runs over stdio only and makes no network calls.
 - Tool names and parameters follow semver.
 
 ## Develop
