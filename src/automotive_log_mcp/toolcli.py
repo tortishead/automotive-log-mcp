@@ -213,6 +213,31 @@ def _clean(message: str, name: str) -> str:
     return "\n".join(lines)
 
 
+def _join_dash_values(parser: argparse.ArgumentParser, argv: Sequence[str]) -> list[str]:
+    """``--from -5m`` as ``--from=-5m``: argparse takes a value that starts with '-' for an option
+    unless it reads as a negative number, and relative times ('-5m', '-1h30m') do not."""
+    takes_value = {
+        flag
+        for action in parser._actions
+        if action.option_strings and action.nargs is None and action.const is None
+        for flag in action.option_strings
+    }
+    out: list[str] = []
+    it = iter(argv)
+    for arg in it:
+        if arg in takes_value:
+            value = next(it, None)
+            if value is not None and value.startswith("-") and value[1:2].isdigit():
+                out.append(f"{arg}={value}")
+                continue
+            out.append(arg)
+            if value is not None:
+                out.append(value)
+            continue
+        out.append(arg)
+    return out
+
+
 def run_tool(config: Config, policy: Policy, command: str, argv: Sequence[str]) -> int:
     """Parse one command's arguments, call its tool and print the result."""
     name = normalize(command)
@@ -228,7 +253,7 @@ def run_tool(config: Config, policy: Policy, command: str, argv: Sequence[str]) 
     except ToolError as e:
         print(f"{PROG}: {e}", file=sys.stderr)
         return 2
-    ns = parser.parse_args(argv)
+    ns = parser.parse_args(_join_dash_values(parser, argv))
     if name == "add_source" and not ns.quiet:
         server.app.ingestor.progress = lambda m: print(m, file=sys.stderr)
     try:

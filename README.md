@@ -79,6 +79,7 @@ files are never copied or changed.
 
 | Doc | Content |
 | --- | --- |
+| [docs/walkthrough.md](docs/walkthrough.md) | one session that uses every tool, with real output |
 | [docs/reference.md](docs/reference.md) | tools, filters, config, storage, token use |
 | [docs/connectors.md](docs/connectors.md) | add your own log format |
 

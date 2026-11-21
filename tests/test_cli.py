@@ -48,6 +48,12 @@ def test_search_with_filter_options(case: str, capsys: pytest.CaptureFixture[str
     assert "log:1#2" in out and "setProperty failed" in out
 
 
+def test_relative_time_values(case: str, capsys: pytest.CaptureFixture[str]) -> None:
+    code, out, err = run(capsys, "count", case, "--by", "level", "--from", "-10m", "--to", "-1m", "--json")
+    assert code == 0, err
+    assert json.loads(out)["total"] > 0
+
+
 def test_dashed_name_and_json(case: str, capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = run(capsys, "list-sources", case, "--json")
     assert code == 0
