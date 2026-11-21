@@ -30,6 +30,19 @@ automotive-log-mcp                # MCP over stdio
 
 Client configuration: [examples/mcp-config/](examples/mcp-config/).
 
+### Run a tool from the command line
+
+Every tool is also a command, with the same output an agent gets:
+
+```bash
+automotive-log-mcp add_source br ~/bugs/bugreport.zip
+automotive-log-mcp list_artifacts br
+automotive-log-mcp search br "setProperty failed" --level E --from -5m
+automotive-log-mcp check_citations br answer.md   # exit 1 on FAIL
+```
+
+`automotive-log-mcp <tool> --help` lists the options; `--json` prints structured content.
+
 ### Run over HTTP
 
 ```bash
@@ -72,7 +85,7 @@ referenced by path and hash, never copied or changed.
 
 | Document | What |
 | --- | --- |
-| [docs/reference.md](docs/reference.md) | every tool, filter form, config key, storage, token use |
+| [docs/reference.md](docs/reference.md) | every tool, the CLI, filter form, config key, storage, token use |
 | [docs/connectors.md](docs/connectors.md) | add your own log format |
 | [docs/implementation-plan.md](docs/implementation-plan.md) | milestones, status, next steps |
 | [eval/](eval/README.md) | evaluation harness and cases |

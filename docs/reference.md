@@ -78,6 +78,35 @@ uses that one (a new chat often picks a new case name for the same bugreport). `
 the server was stopped while indexing in the background (chat or VS Code closed), is started
 again from the beginning next time; the reply says so.
 
+
+### Run a tool from the command line
+
+Every tool is also a command, for use without an agent: `automotive-log-mcp <tool> <case> ...`.
+The commands are built from the tools' input schemas and call the same MCP tool, so validation,
+`allowed_tools`, the byte budget and the call log (session `cli-<pid>`) apply as over MCP, and the
+text printed is the text an agent reads.
+
+```bash
+automotive-log-mcp add_source br ~/bugs/bugreport.zip      # waits until indexed; progress on stderr (-q: none)
+automotive-log-mcp list-sources br                          # '-' and '_' both work
+automotive-log-mcp search br "setProperty failed" --level E --tag 'Hvac*' --from -5m
+automotive-log-mcp count br --by none --bucket 1m           # by=null
+automotive-log-mcp read_artifact br art:1/exception
+automotive-log-mcp get_records br log:1#2 log:3#1
+automotive-log-mcp check_citations br answer.md             # '-': stdin; exit 1 on FAIL
+automotive-log-mcp search br crash --json                   # structured content
+```
+
+- Required parameters are positional (`case`, `path`, `at`, `id`, `ids`); `query` is an optional
+  positional; `check_citations` reads `text` from a file.
+- Every other parameter is an option, `not_tags` as `--not-tags`. The filter's fields are options
+  of the command itself (`--level`, `--from`, `--to`, `--sources`, `--tag`, `--pid`, …); list
+  options repeat and also take the singular (`--tag A --tag B`); `--attrs KEY=VALUE` repeats.
+- `automotive-log-mcp <tool> --help` lists the options with the tool's own descriptions.
+- Exit status: 0, 1 for a tool error or a `check_citations` FAIL, 2 for a usage error. Server
+  options (`--http`, `--host`, `--port`, `--structured`) are refused with a command.
+- Replies still name follow-up calls in MCP form, e.g. `read_artifact(id='art:1')`.
+
 ## Tools
 
 | Tool | What it returns |

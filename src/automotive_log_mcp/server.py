@@ -280,8 +280,10 @@ class LogServer:
         session: str | None = None,
         token_verifier: TokenVerifier | None = None,
         auth: AuthSettings | None = None,
+        wait_for_imports: bool = False,
     ) -> None:
         self.config = config
+        self.wait_for_imports = wait_for_imports  # add_source waits until the import is done (CLI)
         self.policy = policy
         self.app = App.create(config, policy)
         self.tools = Tools(self.app)
@@ -429,7 +431,7 @@ class LogServer:
                 raise ToolError(str(e)) from None
             future = self.app.workers.submit(case, config.case_db(case), path, format, reindex)
             try:
-                result = future.result(timeout=ADD_WAIT_S)
+                result = future.result(timeout=None if self.wait_for_imports else ADD_WAIT_S)
             except TimeoutError:
                 return _text(
                     f"Indexing {path} into case '{case}' continues in the background. "

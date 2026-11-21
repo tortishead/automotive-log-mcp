@@ -39,7 +39,8 @@ automotive-log-mcp/
     server.py                 # MCP tools, instructions, prompts, arg validation, caps
     httpserve.py              # M6: --http (streamable HTTP, bearer token)
     tools/                    # tool logic, one module per tool family (diff: M6)
-    cli.py                    # entry point: starts the server (stdio or --http)
+    cli.py                    # entry point: starts the server (stdio or --http), or runs a tool
+    toolcli.py                # every tool as a command, built from its input schema
     config.py                 # paths, caps, rule dirs, policy file
     policy.py                 # allowed tools, blocked sources, byte budget
     calllog.py                # JSONL call log
