@@ -1,4 +1,4 @@
-"""MCP tools, server instructions and prompts.
+"""MCP tools and server instructions.
 
 Every tool is registered with its full parameter schema, an output schema and annotations; the
 tool logic is in the ``tools`` package. Every call passes through the policy (allowed tools, byte
@@ -18,7 +18,6 @@ from __future__ import annotations
 import functools
 import hashlib
 import inspect
-import re
 import threading
 import time
 import uuid
@@ -41,7 +40,7 @@ from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
 from .policy import ByteBudget, Policy
-from .prompts import INSTRUCTIONS, TRIAGE_PROMPT
+from .prompts import INSTRUCTIONS
 from .store import query
 from .store.db import StoreError
 from .tools import (
@@ -310,7 +309,6 @@ class LogServer:
             auth=auth,
         )
         self._register_tools()
-        self._register_prompts()
 
     # -- plumbing ---------------------------------------------------------------------------
 
@@ -666,20 +664,6 @@ class LogServer:
             self._tool(functions.pop(name), hints, title)
         if functions:
             raise RuntimeError(f"tools without a TOOL_SPECS entry: {', '.join(functions)}")
-
-    # -- prompts ----------------------------------------------------------------------------
-
-    def _register_prompts(self) -> None:
-        @self.mcp.prompt(title="Defect triage")
-        def defect_triage(
-            case: Annotated[str, Field(description="Case name.")],
-            symptom: Annotated[str, Field(description="What went wrong, as the defect report says it.")] = "",
-        ) -> str:
-            """Analyse a defect from the logs of a case, citing every finding."""
-            if not re.fullmatch(CASE_RE, case):
-                raise ValueError(f"invalid case name {case!r}")
-            symptom_line = f"Reported symptom: {symptom}\n\n" if symptom else ""
-            return TRIAGE_PROMPT.format(case=case, symptom=symptom_line)
 
 
 _FILTER_KEYS = frozenset(f.alias or n for n, f in Filter.model_fields.items()) | set(Filter.model_fields)

@@ -45,8 +45,7 @@ def test_lists_all_p0_tools_with_annotations(config: Config) -> None:
             assert "from" in search["$defs"]["Filter"]["properties"]
             assert tools["list_sources"].output_schema is not None
 
-            prompts = (await client.list_prompts()).prompts
-            assert [p.name for p in prompts] == ["defect_triage"]
+            assert (await client.list_prompts()).prompts == []
 
     run(main)
 
@@ -164,14 +163,3 @@ def test_call_log_can_be_disabled(home: Path) -> None:
 
     run(main)
     assert not (home / "calllog.jsonl").exists()
-
-
-def test_defect_triage_prompt(config: Config) -> None:
-    async def main() -> None:
-        async with Client(build_server(structured(config), Policy())) as client:
-            result = await client.get_prompt("defect_triage", {"case": "c1", "symptom": "HVAC freezes"})
-            text = result.messages[0].content.text  # type: ignore[union-attr]
-            assert "c1" in text
-            assert "HVAC freezes" in text
-
-    run(main)

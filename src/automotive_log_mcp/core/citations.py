@@ -24,7 +24,7 @@ _TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{3,}")
 _QUOTE = re.compile(r"`([^`\n]{10,300})`|\"([^\"\n]{10,300})\"|“([^”\n]{10,300})”")
 
 # Words that mark a paragraph as an explicit guess, a gap in the evidence or a next step:
-# such paragraphs need no citation (the triage prompt asks for them).
+# such paragraphs need no citation.
 HEDGES = (
     "guess",
     "assum",

@@ -1,7 +1,7 @@
-"""Texts the server sends: its instructions (with every model request) and the triage prompt."""
+"""The server instructions, sent with every model request."""
 
 INSTRUCTIONS = """\
-Tools for analysing a defect from automotive logs (Android bugreport, logcat, kernel logs, other \
+Tools for reading automotive logs and traces (Android bugreport, logcat, kernel logs, other \
 formats from connectors). The \
 server parses, indexes and searches; reasoning is yours. Each call re-sends the whole \
 conversation, so make few, narrow calls and stop once the evidence answers the question.
@@ -22,33 +22,4 @@ Cite findings exactly as printed: log:<source>#<seq> or art:<id>[/section][:L<n>
 without a citation is a guess. Outputs are capped (about 50 lines / 8 KB): narrow with level, \
 from/to, tags or pid instead of paging. Printed timestamps work as from/to, as do '-5m', '+30s' \
 and 'log:3#120-30s'. Redacted values are stable tokens (<MAC:3fa2c1d0>); ≈ marks estimated counts.
-"""
-
-TRIAGE_PROMPT = """\
-Triage the defect in case '{case}' with the automotive-log-mcp tools.
-
-{symptom}Work in this order and stop as soon as the evidence is clear:
-1. list_sources(case='{case}'). Note the build fingerprint and each source's time range. If the case \
-has no sources, ask for the log files and add them with add_source.
-2. overview(case='{case}'): where the errors are and when.
-3. list_artifacts(case='{case}'). For each group whose time and process fit the symptom, \
-read_artifact the first artifact, then the section it suggests: the backtrace of a tombstone, the \
-exception of a Java crash, the main thread (and lock holder or binder peer) of an ANR.
-4. context(case='{case}', at='art:<id>', before=30, after=10) for what happened just before the \
-crash; scope='pid' to follow the crashing process across buffers.
-5. search(case='{case}', query=..., filter={{'level': 'W', 'from': ..., 'to': ...}}) for errors \
-and warnings in the minutes before the defect: start from the component or process in the \
-symptom, then widen. Keep collapse on; repeated messages show ×count. count(..., bucket='1m') shows \
-when a message starts or stops.
-6. get_records for any message cut with '…' that matters.
-7. Before you answer: check_citations(case='{case}', text=<your answer in Markdown>). Fix every \
-error it reports (a citation that is malformed or does not resolve) and either cite or mark as a \
-guess every paragraph it warns about; run it again until it passes. Only then give the answer.
-
-Answer with:
-- What failed (component, process) and when (timestamp as printed).
-- The chain of evidence, oldest first, each step with its citation (log:<source>#<seq> or \
-art:<id>/<section>:L<n>) exactly as the tools printed it.
-- The constant text from 'code search' for the lines a developer should look up in the code.
-- What the logs do not show, and what you are guessing (without a citation it is a guess).
 """

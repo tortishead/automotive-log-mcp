@@ -1,7 +1,7 @@
 # automotive-log-mcp
 
-An MCP server that helps an agent find the cause of a defect in automotive logs. Every finding
-points to a log line or a crash file.
+An MCP server for automotive logs and traces. It indexes, searches and reads logs, and every
+output line points to a log line or a crash file.
 
 - **Reads** logcat, kernel logs, Android bugreports (zip or text), archives, syslog, and your own
   formats.
@@ -14,7 +14,7 @@ points to a log line or a crash file.
 - **Hides personal data** (VINs, MACs, IPs, GPS, …) when it indexes a log. No tool returns the raw
   values.
 
-Status: version 0.1.0, not published. Tested on synthetic logs only, not yet on real defects.
+Status: version 0.1.0, not published. Tested on synthetic logs only, not yet on real logs.
 
 ## Install
 

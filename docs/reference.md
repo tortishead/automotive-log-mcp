@@ -307,7 +307,7 @@ over a run):
 | --- | --- |
 | fixed cost per request (tool definitions + instructions) | 14.7 KB, about 6.9k |
 | "Which process crashed and why?" | about 34k, 3 requests |
-| root cause, every finding cited and checked | about 63k, 5 requests |
+| a longer question, every finding cited and checked | about 63k, 5 requests |
 
 **To save tokens:** hide tools you do not use with `allowed_tools`; keep structured output off
 (Claude Code then gets JSON only, 1.6× the size of the text); start a new chat per question,

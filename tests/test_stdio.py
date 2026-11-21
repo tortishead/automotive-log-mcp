@@ -134,8 +134,6 @@ def test_p0_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
                 assert len(text.encode("utf-8")) <= 8192
                 return text
 
-            prompt = await client.get_prompt("defect_triage", {"case": "T-9", "symptom": "HVAC app crashes"})
-            assert "list_artifacts" in str(prompt.messages[0].content)
             await call("add_source", path=str(z))
             seen = await call("list_artifacts", type="java_crash")
             assert "NullPointerException com.example.hvac" in seen
@@ -163,7 +161,7 @@ def test_p0_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
 
 
 def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
-    """M4 over stdio: the prompt asks for check_citations; overview orients, an answer
+    """P1 tools over stdio: overview orients, an answer
     with known citations passes check_citations, a wrong citation fails it."""
     from .conftest import FIXED_SECRET
     from .test_golden import make_bugreport_zip
@@ -183,9 +181,6 @@ def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
                 assert len(text.encode("utf-8")) <= 8192
                 return text, r.structured_content or {}
 
-            prompt = await client.get_prompt("defect_triage", {"case": "T-9", "symptom": "HVAC app crashes"})
-            body = str(prompt.messages[0].content)
-            assert "check_citations(case='T-9'" in body and "overview(case='T-9')" in body
             await call("add_source", path=str(z))
             ov, ov_data = await call("overview")
             assert ov_data["artifacts"] and "levels:" in ov

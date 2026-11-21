@@ -1,3 +1,3 @@
-"""MCP server for defect analysis on automotive logs, with every finding cited to a log line."""
+"""MCP server for automotive logs and traces, with every output line cited to its log line."""
 
 __version__ = "0.1.0"
