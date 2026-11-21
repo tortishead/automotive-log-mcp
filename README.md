@@ -27,6 +27,26 @@ automotive-log-mcp                # MCP over stdio
 
 Client setup (Claude Code, VS Code Copilot, Cursor, …): [examples/mcp-config/](examples/mcp-config/).
 
+## Tools
+
+| Tool | Returns |
+| --- | --- |
+| `add_source` | indexes a file, folder or zip into a case |
+| `list_sources` | the case's sources: format, line count, time range |
+| `overview` | levels, top tags and messages, gaps, error bursts |
+| `list_artifacts` | crashes and ANRs, grouped by crash |
+| `read_artifact` | a crash's summary, then a section or lines |
+| `search` | lines that match words or a regex, in time order |
+| `context` | lines around a line or a crash |
+| `get_records` | full lines, nothing cut |
+| `count` | lines per tag, level, pid, source or message, optionally per time slot |
+
+A search hit:
+
+```
+log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE  ×37 until 10-11 08:14:51.003 (log:2#19001)
+```
+
 ## Command line
 
 Every tool is also a CLI command, no agent needed. It prints the same text an agent gets.
@@ -48,26 +68,6 @@ automotive-log-mcp count br --by tag --bucket 1m
 - Exit code: 0 ok, 1 tool error, 2 wrong usage.
 
 More: [Command line](docs/reference.md#command-line).
-
-## Tools
-
-| Tool | Returns |
-| --- | --- |
-| `add_source` | indexes a file, folder or zip into a case |
-| `list_sources` | the case's sources: format, line count, time range |
-| `overview` | levels, top tags and messages, gaps, error bursts |
-| `list_artifacts` | crashes and ANRs, grouped by crash |
-| `read_artifact` | a crash's summary, then a section or lines |
-| `search` | lines that match words or a regex, in time order |
-| `context` | lines around a line or a crash |
-| `get_records` | full lines, nothing cut |
-| `count` | lines per tag, level, pid, source or message, optionally per time slot |
-
-A search hit:
-
-```
-log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE  ×37 until 10-11 08:14:51.003 (log:2#19001)
-```
 
 ## Files
 
