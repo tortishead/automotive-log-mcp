@@ -291,19 +291,10 @@ estimate. The server cannot see the client's own prompt, other servers or the mo
 - **VS Code Copilot:** look for "chat debug" and "export chat" in the Command Palette,
   and at premium-request usage in your GitHub settings.
 
-**Measured** (Claude Code, Sonnet, only this server, a test bugreport, input tokens summed over a
-run, with 10 tools; `check_citations` is gone since, which saves about 1.6 KB per request):
-
-| | Tokens |
-| --- | --- |
-| fixed cost per request (tool definitions + instructions) | 14.7 KB, about 6.9k |
-| "Which process crashed and why?" | about 34k, 3 requests |
-| a longer question, every finding cited | about 63k, 5 requests |
-
 **To save tokens:** hide tools you do not use with `allowed_tools`; keep structured output off
 (Claude Code then gets JSON only, 1.6× the size of the text); start a new chat per question,
-because every request re-sends the whole chat. Using the CLI instead of MCP, with short
-instructions, costs an estimated 0.5k tokens per request instead of 6.9k.
+because every request re-sends the whole chat. The CLI with short instructions sends no tool
+definitions at all.
 
 ## Scope
 
