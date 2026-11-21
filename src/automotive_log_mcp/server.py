@@ -2,7 +2,7 @@
 
 Every tool is registered with its full parameter schema, an output schema and annotations; the
 tool logic is in the ``tools`` package. Every call passes through the policy (allowed tools, byte
-budget) and is written to the call log with redacted arguments (D5); the text given to
+budget) and is written to the call log with redacted arguments; the text given to
 ``check_citations`` is logged only as its length and hash (it quotes log content), plus the
 citation ids it contains. Each call-log line also holds sizes, counts and hashes that explain
 token use (see ``calllog.py``).

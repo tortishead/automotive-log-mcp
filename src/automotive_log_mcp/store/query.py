@@ -804,7 +804,7 @@ def segment_of(conn: sqlite3.Connection, sid: int, seq: int) -> tuple[int, int] 
 
 # -- artifacts --------------------------------------------------------------------------------
 
-# art:<id>[/<section>][:L<line>[-L<line>]] (D6); 'art:' may be left out on the command line.
+# art:<id>[/<section>][:L<line>[-L<line>]]; 'art:' may be left out on the command line.
 ART_CITE = re.compile(r"(?:art:)?(\d+)(?:/([a-z0-9_.-]+))?(?::L(\d+)(?:-L?(\d+))?)?")
 
 

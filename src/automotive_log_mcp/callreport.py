@@ -3,7 +3,7 @@
 The round reports use this to say, for a run that failed or used many tokens, where
 the tokens went and what to change: calls in order with bytes and estimated tokens, the fixed
 cost per model request, repeated calls, capped outputs, output never cited in the answer, errors,
-and suggestions. The call log holds sizes, hashes and citation ids, never log content (D5).
+and suggestions. The call log holds sizes, hashes and citation ids, never log content.
 """
 
 from __future__ import annotations

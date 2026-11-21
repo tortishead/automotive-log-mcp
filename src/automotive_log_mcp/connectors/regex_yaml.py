@@ -1,4 +1,4 @@
-"""Config-driven text connectors: one YAML file describes a line format with a regex (D13).
+"""Config-driven text connectors: one YAML file describes a line format with a regex.
 
 Example (``syslog.yaml`` ships in the package)::
 

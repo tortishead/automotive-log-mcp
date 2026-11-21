@@ -1,4 +1,4 @@
-"""Connector protocols and the registry (D13).
+"""Connector protocols and the registry.
 
 Two kinds of plug-ins turn bytes into data:
 

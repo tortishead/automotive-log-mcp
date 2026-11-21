@@ -1,4 +1,4 @@
-"""Message templates by regex masking (D4).
+"""Message templates by regex masking.
 
 Variable parts (UUIDs, hex numbers, paths, decimal numbers) become ``<*>``; redaction tokens
 ``<KIND:xxxxxxxx>`` become ``<KIND>``. Messages that differ only in such parts share a template,

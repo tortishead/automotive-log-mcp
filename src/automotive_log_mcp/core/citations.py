@@ -1,7 +1,7 @@
 """Citations in a Markdown answer: find them, check their form, split the text into paragraphs.
 
 Used by the ``check_citations`` tool (which resolves them against the case) and the evaluation.
-A citation is ``log:<source>#<seq>`` or ``art:<id>[/<section>][:L<n>[-L<m>]]`` (D6). Anything
+A citation is ``log:<source>#<seq>`` or ``art:<id>[/<section>][:L<n>[-L<m>]]``. Anything
 else that starts with ``log:`` or ``art:`` followed by a character that can start an id
 (digit, '#', '/') is a malformed citation; prose like "state of the art: …" is not a citation.
 """

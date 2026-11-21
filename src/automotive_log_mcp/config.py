@@ -39,7 +39,7 @@ class Caps:
 
 @dataclass(frozen=True)
 class HttpConfig:
-    """``--http``: streamable HTTP with a bearer token (D2, M6)."""
+    """``--http``: streamable HTTP with a bearer token."""
 
     host: str = "127.0.0.1"
     port: int = 8765
@@ -67,7 +67,7 @@ class Config:
     http: HttpConfig = field(default_factory=HttpConfig)
 
     def case_db(self, case: str) -> Path:
-        """Path of a case's DB file (D7). ``case`` must already be validated."""
+        """Path of a case's DB file. ``case`` must already be validated."""
         return self.cases_dir / f"{case}.db"
 
 

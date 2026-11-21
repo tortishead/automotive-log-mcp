@@ -1,10 +1,9 @@
 # Connectors
 
-How to add a log format (for example a company-specific ECU or vendor log). A connector only turns
-bytes into records; search, collapse, redaction, and citations then work on it like on any
-other source (design: one tool API, per-format connectors behind it).
+How to add your own log format, for example an ECU or vendor log. A connector only turns bytes
+into records. Search, redaction and citations then work on it like on any other source.
 
-Three ways, from least to most code:
+Three kinds, from least to most code:
 
 | Kind | Where | When | Policy |
 | --- | --- | --- | --- |
@@ -12,13 +11,13 @@ Three ways, from least to most code:
 | `command` connector | a `.yaml` file plus any program (any language) | binary formats, an existing decoder, logic a regex cannot express | always allowed |
 | Python entry point | an installed Python package | full control, streaming parse in-process, containers (formats holding several logs) | `allow_code_connectors: true` |
 
-Rule directories are listed under `rule_dirs` in `config.yaml`; one directory may hold regex
-and command connectors side by side (`connector:` with `line:` for a regex connector or
-`command:` for a command connector; YAML files without `connector:` are ignored). An invalid file stops the server at startup with the file name and the
-reason.
+List rule folders under `rule_dirs` in `config.yaml`. A folder can hold both kinds of YAML file:
+`connector:` with `line:` is a regex connector, with `command:` a command connector. YAML files
+without `connector:` are ignored. An invalid file stops the server at startup, with the file
+name and the reason.
 
-A connector named like an existing one is an error unless it says `replace: true` (D13). Bump
-`version` whenever the output changes: sources indexed with an older version are flagged
+A connector with the name of an existing one is an error unless it says `replace: true`. Raise
+`version` whenever the output changes: sources indexed with an older version show
 `stale: reindex recommended` in `list_sources`.
 
 ## The record model
@@ -47,7 +46,7 @@ copies of one crash), `ts`, `ts_raw`, `pid`, `tid`, `process`, `level` (default 
 Each gets a record on the timeline (`[art:<id>] <headline>` in the current source, unless a
 record carries it) and is read with `read_artifact`.
 
-Everything is redacted at index time (D5), so a connector never needs to redact.
+Everything is redacted at index time, so a connector never needs to redact.
 
 ## YAML regex connector
 

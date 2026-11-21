@@ -1,4 +1,4 @@
-# Evaluation cases (implementation plan, M4 item 6).
+# Evaluation cases (see eval/README.md).
 #
 # Each case is a closed defect: the log files, the symptom as the defect report states it, and the
 # expected answer: the component at fault and the root-cause citations. Write the expected answer

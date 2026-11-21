@@ -8,7 +8,7 @@ no byte budget. Keys:
 - ``blocked_sources``: glob patterns matched against source paths and source ids; matching
   sources are refused by ``add_source`` and hidden from every tool (enforced from M1).
 - ``byte_budget``: total bytes of tool output per server session; calls beyond it are refused.
-- ``allow_code_connectors``: whether Python entry-point connectors may be loaded (D13).
+- ``allow_code_connectors``: whether Python entry-point connectors may be loaded.
   Default false; YAML and ``command`` connectors are always allowed.
 - ``allowed_roots``: directories ``add_source`` may read from; a path
   outside them is refused before the server looks at it, also through a symbolic link. Omitted

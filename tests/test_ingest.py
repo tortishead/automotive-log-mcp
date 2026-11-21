@@ -140,7 +140,7 @@ def test_after_indexing_no_rule_matches_records_templates_or_meta(app: App, tmp_
         texts += [a for (a,) in conn.execute("SELECT attrs FROM records WHERE attrs IS NOT NULL")]
         texts += [m for (m,) in conn.execute("SELECT meta FROM sources WHERE meta IS NOT NULL")]
         texts += [n for (n,) in conn.execute("SELECT name FROM processes")]
-        # Artifacts (M2): everything they store as text.
+        # Artifacts: everything they store as text.
         for row in conn.execute(
             "SELECT name, member, ts_raw, process, signature, headline, summary, fields FROM artifacts"
         ):

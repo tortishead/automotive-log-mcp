@@ -31,7 +31,7 @@ def test_fixture_golden(app: App, tmp_path: Path, rel: str) -> None:
     check_golden(rel.replace("/", "__"), dump_case(app, "g"))
 
 
-PROTO_TOMBSTONE = b"\x0a\x1b\x08\x84\x07\x10\x93\x07\x1a\x0bAudioStream\x00\x01\x02"  # not parsed (M5)
+PROTO_TOMBSTONE = b"\x0a\x1b\x08\x84\x07\x10\x93\x07\x1a\x0bAudioStream\x00\x01\x02"  # not parsed
 WTF = """\
 Process: system_server
 Subsystem: CarService

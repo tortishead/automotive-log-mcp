@@ -2,7 +2,7 @@
 
 All wall-clock times are kept as written (local time of the device), as ns since the epoch
 computed as if the written time were UTC. The source's time zone is stored in its metadata; the
-clock model (M5) maps to real UTC. This keeps printed timestamps round-trippable.
+clock model maps to real UTC. This keeps printed timestamps round-trippable.
 """
 
 from __future__ import annotations

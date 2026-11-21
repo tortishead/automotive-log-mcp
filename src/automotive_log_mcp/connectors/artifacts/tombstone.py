@@ -20,7 +20,7 @@ older bugreports and native-crash dropbox entries. Layout (debuggerd)::
     --------- tail end of log main   (log buffers)
 
 Sections: ``header``, ``registers``, ``backtrace``, ``memory``, ``memory_map``, ``threads``,
-``open_files``, ``log``. Protobuf tombstones (``.pb``) are M5.
+``open_files``, ``log``. Protobuf tombstones (``.pb``) are not parsed yet.
 """
 
 from __future__ import annotations

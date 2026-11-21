@@ -26,7 +26,7 @@ Each round is also written to a file of its own in ``rounds_dir``,
 ``<date>_<time>_<session>_r<n>.jsonl``, the same lines as the call log, plus a short report
 ``…_r<n>.txt`` rewritten after every call.
 
-Arguments pass through a redactor before they are written (D5).
+Arguments pass through a redactor before they are written.
 """
 
 from __future__ import annotations

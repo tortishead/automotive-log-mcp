@@ -1,46 +1,42 @@
 # Evaluation
 
-Two levels, on the same cases (implementation plan, M4 item 6 and the checkpoint):
+Does the server help an agent find the cause of real defects? Two checks, on the same cases:
 
-1. **Evidence recall** (no agent): do `overview`, `list_artifacts` and a case's recorded queries
-   show the known root-cause lines on their first page? `evidence_recall.py`, runs in CI on the
-   synthetic cases.
-2. **Agent runs** (by hand): an agent in a real MCP client (VS Code Copilot agent mode, Claude
-   Code, …) triages each case with the `defect_triage` prompt; you record whether it found the
-   right component, whether `check_citations` passes on its answer, and its calls and bytes from
-   the call log. Checklist and template in [agent_runs/](agent_runs/).
+1. **Evidence recall** (no agent): do `overview`, `list_artifacts` and each case's saved queries
+   show the known root-cause lines on their first page? Script: `evidence_recall.py`. Runs in the
+   test suite on the synthetic cases.
+2. **Agent runs** (by hand): an agent in a real client triages each case. You note whether it
+   found the right component, whether `check_citations` passes, and how many calls and bytes it
+   used.
 
-| File | What |
+| File | Content |
 | --- | --- |
-| `cases.yaml` | the 9 synthetic cases (from the test fixtures and `synthetic/`), with expected answers |
-| `cases.local.yaml` | your real closed defects (git-ignored; create it from the example below) |
-| `evidence_recall.py` | evidence recall over one or more case files; Markdown report, optional JSON |
-| `callstats.py` | calls, bytes and tools per session from the server's call log (for where the tokens went and why a run was expensive, see the round reports in [docs/reference.md](../docs/reference.md#token-use)) |
-| `agent_runs/` | the agent-run checklist and template; your run notes go in `agent_runs/local/` (git-ignored) |
-| `results/` | reports you write with `--report` (git-ignored) |
+| `cases.yaml` | 9 synthetic cases with expected answers |
+| `cases.local.yaml` | your real defects (git-ignored, you create it) |
+| `evidence_recall.py` | evidence recall over one or more case files |
+| `callstats.py` | calls, bytes and tools per session, from the call log |
+| `agent_runs/TEMPLATE.md` | notes for one agent run; copies go in `agent_runs/local/` (git-ignored) |
+| `results/` | your reports (git-ignored) |
 
-**Status:** the harness and both procedures are built and checked on the 9 synthetic cases
-only. The M4 and M6 done criteria ("both evaluations run on 5 / 10 closed defects and written up")
-need your real defects; no agent run has been done on any case yet. The synthetic cases test the
-harness, not the server's value: their expected citations come from how the logs were written.
+Status: only the synthetic cases have been run. They test the script, not the server: their
+expected lines come from how the logs were written. No agent run has been done.
 
 ## Add a real case
 
-A case is a **closed** defect whose root cause is known from its fix commit. Write the expected
-answer **before** you run anything on it (neither the recall script nor an agent), and judge it
-against the fix, not against what the tools show.
+Use a **closed** defect whose cause is known from its fix commit. Write the expected answer
+**before** you run anything on it, and judge against the fix, not against what the tools show.
 
-1. Copy the defect's logs somewhere stable (the case DB references them by path and hash; it
-   never copies them). Keep them out of this repository.
-2. Create `eval/cases.local.yaml` (git-ignored) with one entry per defect:
+1. Put the defect's logs in a stable place outside this repo. Cases reference files by path; they
+   do not copy them.
+2. Add the case to `eval/cases.local.yaml`:
 
    ```yaml
    version: 1
    cases:
-     - id: T-4711                       # the ticket id; letters, digits, '.', '_', '-'
+     - id: T-4711                       # ticket id: letters, digits, '.', '_', '-'
        title: HVAC app crash on temperature change
-       symptom: The climate app closes when the temperature is set (as the ticket says it)
-       files:                           # indexed in this order into a fresh case named after id
+       symptom: The climate app closes when the temperature is set   # as the ticket says it
+       files:                           # indexed in this order
          - C:/defects/T-4711/bugreport-2026-10-11.zip
        expected:
          component: com.example.hvac (HvacController)
@@ -53,86 +49,100 @@ against the fix, not against what the tools show.
        fix: abc1234 (repo hvac-app)
    ```
 
-3. Index the files once with `add_source`, into the case named after the id, **in the order
-   listed** (source ids in citations depend on the order).
+3. Index the files with `add_source` into a case named after the id, **in the listed order**
+   (source ids depend on the order).
+4. Find the root-cause lines **from the fix commit** with `search`, `read_artifact` or
+   `get_records`. Write each citation and a short text the line must contain. The text check
+   catches citations that drift. Never pick citations after seeing what an agent found.
 
-4. Find the root-cause lines **from the fix commit** (the code it changed, the message it fixed)
-   with `search`, `read_artifact` or `get_records`, not with an agent run first. Write their
-   citations and a short text each line must contain into `expected.citations`. The text check
-   catches citations that drift (a reindex with another connector version, a wrong line).
-   Writing citations after looking at that output is fine; what must not happen is choosing
-   them after seeing what an agent found.
-
-Five such cases are the checkpoint's minimum ("at least 3 of 5 agent runs point to the right
-component"); the release plan asks for ten.
-
-Recorded `queries` take the tools `search`, `count`, `context`, `list_artifacts`,
-`read_artifact`, `get_records` and `overview`, with the arguments the
-MCP tools take, e.g.:
-
-```yaml
-queries:
-  - {tool: search, args: {query: "setProperty failed", filter: {level: E}}}
-```
+`queries` take the tools `search`, `count`, `context`, `list_artifacts`, `read_artifact`,
+`get_records` and `overview`, with their MCP arguments.
 
 ## Run evidence recall
 
-```bat
-:: Windows (from the repository root; your cases stay indexed in your normal home)
-py eval\evidence_recall.py eval\cases.yaml eval\cases.local.yaml --home %USERPROFILE%\.automotive-log-mcp --report eval\results\recall.md --json eval\results\recall.json
-```
-
 ```bash
-# Linux
 python eval/evidence_recall.py eval/cases.yaml eval/cases.local.yaml --home ~/.automotive-log-mcp \
   --report eval/results/recall.md --json eval/results/recall.json
 ```
 
-Without `--home` the cases are indexed into a temporary home that is deleted afterwards (the
-synthetic cases in CI run that way). With `--home`, a case that already exists is reused (files
-already in it are not indexed again), so the agent runs below see the same source ids.
+On Windows use `py eval\evidence_recall.py …` with `--home %USERPROFILE%\.automotive-log-mcp`.
 
-The report lists per case: recall, which expected citations were printed exactly, which only by
-their artifact (`art:<id>`, the next `read_artifact` shows the line), which were missed, which
-tool printed them, and the bytes of each call. Expected citations that do not resolve, or whose
-line does not contain the given text, are listed and make the script exit with 1.
-`--min-recall 1` also fails on any miss. The test suite (`tests/test_eval.py`) runs the synthetic
-cases and checks their results against the recorded baseline below.
+- Without `--home`, cases go into a temporary home that is deleted after. With `--home`, existing
+  cases are reused, so agent runs later see the same source ids.
+- The report shows per case: recall, which expected lines were printed (exactly or via their
+  artifact), which were missed, which tool printed them, and the bytes per call.
+- The script exits with 1 if an expected citation does not exist or its line lacks the text.
+  `--min-recall 1` also fails on any miss.
 
-## Run the agent evaluation
+Synthetic result: 17 of 18 root-cause lines found (13 exact, 4 via their artifact). The miss is
+`syn-boot-selinux` `log:1#4`.
 
-See [agent_runs/README.md](agent_runs/README.md): the checklist, the client setup for VS Code
-Copilot agent mode (Windows, `py -m automotive_log_mcp`) and Claude Code, and how to take
-calls and bytes from the call log with `callstats.py`; the round report `….txt` in
-`~/.automotive-log-mcp/rounds/` explains the tokens of one run and suggests changes.
+## Agent runs
 
-## Write up
+### Set up once
 
-For the checkpoint, put together (in `eval/results/` or the ticket system, not in this repo if
-the logs are confidential):
+1. Install the server into the Python the client starts: `python -m pip install -e .`
+   (Windows: `py -m pip install -e .`).
+2. Index each case (step 3 above, or run `evidence_recall.py --home …` once).
+3. Set up the client. Keep the call log on (it is by default).
+   - **VS Code Copilot (agent mode):** `.vscode/mcp.json` in the workspace you open:
 
-- the evidence-recall report (`recall.md`),
-- one filled-in run template per agent run (`agent_runs/local/<case>-<client>.md`),
-- the summary table from `agent_runs/README.md` (right component in how many of 5, check_citations
-  passing on how many answers, median calls and bytes, baseline numbers if you ran it),
-- the go / adjust / stop decision with the reason (plan, "Checkpoint").
+     ```json
+     {"servers": {"automotive-log": {"type": "stdio", "command": "py", "args": ["-m", "automotive_log_mcp"]}}}
+     ```
 
-## The synthetic cases
+     Start the server from the MCP view and pick **Agent** mode in Chat. Under *Configure Tools*,
+     turn on the `automotive-log` tools and turn **off** tools that read files directly
+     (terminal, file search).
+   - **Claude Code:** use [examples/mcp-config/claude-code.mcp.json](../examples/mcp-config/claude-code.mcp.json)
+     and block the file and shell tools, in a folder without the logs:
+     `claude --strict-mcp-config --mcp-config .mcp.json --disallowedTools "Bash,Read,Grep,Glob,Edit,Write,WebFetch,WebSearch"`.
 
-| Case | Files | What it exercises |
+### One run
+
+1. Start a **new** chat and note the time (UTC).
+2. Run the triage prompt with the case id and the symptom exactly as in the case file: VS Code
+   `/mcp.automotive-log.defect_triage`, Claude Code `/mcp__automotive-log__defect_triage`.
+3. Do not help. If the agent asks, answer only with what the ticket says, and note it.
+4. Save the answer as `<case>-<client>-<n>.answer.md`. If the agent did not run
+   `check_citations`, ask it once and note the result.
+5. Get calls and bytes:
+
+   ```bash
+   python eval/callstats.py --case T-4711 --since 2026-11-10T09:00 --markdown
+   ```
+
+   The round report in `~/.automotive-log-mcp/rounds/` explains the tokens of the run.
+6. Judge the answer against the expected component and cause, and fill in a copy of
+   [agent_runs/TEMPLATE.md](agent_runs/TEMPLATE.md).
+
+### Baseline (optional)
+
+Same case and prompt, but the agent gets the unpacked logs and only shell and file tools, no
+server (Claude Code: `claude --strict-mcp-config` in a folder with the logs). Count its calls and
+bytes read from the transcript. Does the server beat it?
+
+### Decide
+
+| case | client | component | root cause | expected cites found | check_citations | calls | bytes | baseline calls / bytes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| | | | | | | | | |
+
+- **Go** if at least 3 of 5 runs find the right component, `check_citations` passes on every
+  answer, and the server beats the baseline on calls or bytes (if run).
+- **Adjust** if agents spend many calls getting oriented, or recall is low.
+- **Stop** if the logs alone rarely explain the defects.
+
+## Synthetic cases
+
+| Case | Files | Tests |
 | --- | --- | --- |
-| `syn-hvac-crash` | fixture bugreport | Java crash artifact, VHAL error before it |
+| `syn-hvac-crash` | fixture bugreport | Java crash, VHAL error before it |
 | `syn-radio-anr` | fixture bugreport | ANR lock holder in a binder call |
 | `syn-vhal-abort` | `vhal-abort.log` | VHAL abort after a bus timeout |
-| `syn-lmk-media` | `lmk-media.log` | low memory kill of another app |
+| `syn-lmk-media` | `lmk-media.log` | low-memory kill of another app |
 | `syn-boot-selinux` | `boot-selinux.log` | SELinux denial at boot |
-| `syn-watchdog-audio` | `watchdog-audio.log` | watchdog kill, audio HAL error found by a search |
-| `syn-evs-crash` | `evs-crash/evs.log`, `evs-crash/tombstone_03` | a standalone tombstone file next to a logcat |
-| `syn-wifi-fw-ota` | `wifi-fw-ota.dmesg` | two boots of one kernel log; the second fails to load the Wi-Fi firmware |
-| `syn-bt-restart` | `bt-restart.log` | a HAL restart loop, the cause found by a search |
-
-The nine cases (Nov 14, 2026, after `syn-can-busoff` went with the multi-source tools): **17 of 18**
-root-cause citations surfaced (13 exact, 4 through their artifact), and every expected citation
-resolves to a line with its text. The miss is `syn-boot-selinux`
-`log:1#4` (since M4: no rule covers the daemon's own "Permission denied" line). Whether an agent
-finds the same evidence, and in how many calls, is not measured: no agent run was done.
+| `syn-watchdog-audio` | `watchdog-audio.log` | watchdog kill; audio HAL error found by search |
+| `syn-evs-crash` | `evs-crash/` | a tombstone file next to a logcat |
+| `syn-wifi-fw-ota` | `wifi-fw-ota.dmesg` | two boots; the second fails to load Wi-Fi firmware |
+| `syn-bt-restart` | `bt-restart.log` | a HAL restart loop; cause found by search |

@@ -1,4 +1,4 @@
-"""``--http``: the MCP server over streamable HTTP from the official SDK (D2, M6).
+"""``--http``: the MCP server over streamable HTTP from the official SDK.
 
 Same tools, call log and policy as over stdio, plus:
 

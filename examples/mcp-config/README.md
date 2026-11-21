@@ -1,29 +1,27 @@
-# MCP client configuration
+# Client setup
 
-The snippets in the first table start the server as `automotive-log-mcp` over stdio. If the command is not on
-the client's `PATH` (e.g. installed in a virtualenv), use the full path to the executable, or
-`python -m automotive_log_mcp` with the virtualenv's `python`. To use another home
-directory, add `"env": {"AUTOMOTIVE_LOG_MCP_HOME": "/path/to/home"}` to the server entry.
+These files start the server as `automotive-log-mcp` over stdio. If the command is not on the
+client's `PATH` (for example, in a virtualenv), use its full path, or `python -m automotive_log_mcp`
+with the virtualenv's Python. For another home folder, add
+`"env": {"AUTOMOTIVE_LOG_MCP_HOME": "/path/to/home"}` to the server entry.
 
-| Client | File | Where it goes |
+| Client | File | Put it in |
 | --- | --- | --- |
-| Claude Code | [claude-code.mcp.json](claude-code.mcp.json) | `.mcp.json` in the project root, or `claude mcp add automotive-log -- automotive-log-mcp` |
-| Claude Desktop | [claude-desktop.json](claude-desktop.json) | merge into `claude_desktop_config.json` (Settings → Developer → Edit Config) |
-| VS Code (GitHub Copilot agent mode) | [vscode-copilot.mcp.json](vscode-copilot.mcp.json) | `.vscode/mcp.json` in the workspace |
+| Claude Code | [claude-code.mcp.json](claude-code.mcp.json) | `.mcp.json` in the project, or run `claude mcp add automotive-log -- automotive-log-mcp` |
+| Claude Desktop | [claude-desktop.json](claude-desktop.json) | `claude_desktop_config.json` (Settings → Developer → Edit Config) |
+| VS Code Copilot (agent mode) | [vscode-copilot.mcp.json](vscode-copilot.mcp.json) | `.vscode/mcp.json` in the workspace |
 | Cursor | [cursor.mcp.json](cursor.mcp.json) | `.cursor/mcp.json` in the project, or `~/.cursor/mcp.json` |
 
-On Windows, the same snippets work; `automotive-log-mcp` resolves to `automotive-log-mcp.exe`
-in the virtualenv's `Scripts` folder.
+On Windows the same files work.
 
 ## Over HTTP
 
-With `automotive-log-mcp --http` running (see the README, [Run over HTTP](../../README.md#run-over-http)),
-clients connect to `http://127.0.0.1:8765/mcp` and send the token as `Authorization: Bearer …`:
+Start the server with `automotive-log-mcp --http` (see [HTTP](../../docs/reference.md#http)).
+Clients connect to `http://127.0.0.1:8765/mcp` and send `Authorization: Bearer <token>`.
 
-| Client | File | Verified |
+| Client | File | Tested |
 | --- | --- | --- |
-| Claude Code | [claude-code.http.mcp.json](claude-code.http.mcp.json) (`${AUTOMOTIVE_LOG_MCP_TOKEN}` is read from the client's environment) | yes, Claude Code 2.1.322 (`claude -p --mcp-config`) |
-| VS Code (GitHub Copilot agent mode) | [vscode-copilot.http.mcp.json](vscode-copilot.http.mcp.json) (asks for the token once, stored by VS Code) | no: written from the VS Code MCP config format, not tried |
+| Claude Code | [claude-code.http.mcp.json](claude-code.http.mcp.json) (reads `${AUTOMOTIVE_LOG_MCP_TOKEN}` from the environment) | yes |
+| VS Code Copilot | [vscode-copilot.http.mcp.json](vscode-copilot.http.mcp.json) (asks for the token once) | no |
 
-Server-side examples: [../http/config.yaml](../http/config.yaml) and
-[../http/policy.yaml](../http/policy.yaml).
+Server examples: [../http/config.yaml](../http/config.yaml), [../http/policy.yaml](../http/policy.yaml).

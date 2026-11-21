@@ -1,4 +1,4 @@
-"""Redaction at index time (D5).
+"""Redaction at index time.
 
 Every message, tag and string attribute passes through :meth:`Redactor.redact` before it is
 stored or templated, and so do call-log arguments. A matched value is replaced by a token

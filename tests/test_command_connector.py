@@ -1,4 +1,4 @@
-"""M5 command connector: an external program writes JSON lines (D13)."""
+"""M5 command connector: an external program writes JSON lines."""
 
 from __future__ import annotations
 

@@ -1,18 +1,20 @@
 # automotive-log-mcp
 
-An MCP server that lets any agent analyse a defect from automotive logs, with every finding cited
-to a log line or artifact.
+An MCP server that helps an agent find the cause of a defect in automotive logs. Every finding
+points to a log line or a crash file.
 
-- **Reads:** logcat, kernel logs, Android bugreports (zip or text), archives, BSD syslog, and your
-  own formats through YAML or an external decoder.
-- **Finds:** tombstones, ANRs, Java crashes and dropbox entries as artifacts with a summary and a
-  crash signature.
-- **Cites:** every output line carries `log:<source>#<seq>` or `art:<id>`; `check_citations`
-  verifies an answer before it is given.
-- **Stays small:** outputs are capped (50 lines / 8 KB) and repeated messages collapse to one line.
-- **Redacts** VINs, MACs, IPs, GPS and more at index time; no tool can return the raw value.
+- **Reads** logcat, kernel logs, Android bugreports (zip or text), archives, syslog, and your own
+  formats.
+- **Finds** tombstones, ANRs, Java crashes and dropbox entries, and groups copies of the same
+  crash.
+- **Cites** every output line as `log:<source>#<line>` or `art:<id>`. `check_citations` checks an
+  answer before it is given.
+- **Keeps output small:** at most 50 lines or 8 KB per call; repeated lines are shown once with a
+  count.
+- **Hides personal data** (VINs, MACs, IPs, GPS, …) when it indexes a log. No tool returns the raw
+  values.
 
-Status: **0.1.0**, not published. Verified on synthetic logs only, not yet on real defects.
+Status: version 0.1.0, not published. Tested on synthetic logs only, not yet on real defects.
 
 ## Install
 
@@ -28,11 +30,11 @@ pip install -e ".[dev]"
 automotive-log-mcp                # MCP over stdio
 ```
 
-Client configuration: [examples/mcp-config/](examples/mcp-config/).
+Client setup (Claude Code, VS Code Copilot, Cursor, …): [examples/mcp-config/](examples/mcp-config/).
 
-### Run a tool from the command line
+### From the command line
 
-Every tool is also a command, with the same output an agent gets:
+Every tool is also a command. It prints the same text an agent gets.
 
 ```bash
 automotive-log-mcp add_source br ~/bugs/bugreport.zip
@@ -41,35 +43,35 @@ automotive-log-mcp search br "setProperty failed" --level E --from -5m
 automotive-log-mcp check_citations br answer.md   # exit 1 on FAIL
 ```
 
-`automotive-log-mcp <tool> --help` lists the options; `--json` prints structured content.
+`automotive-log-mcp <tool> --help` lists the options. `--json` prints JSON.
 
-### Run over HTTP
+### Over HTTP
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))" > ~/.automotive-log-mcp/token.txt
-cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then edit allowed_roots
+cp examples/http/config.yaml examples/http/policy.yaml ~/.automotive-log-mcp/   # then set allowed_roots
 automotive-log-mcp --http         # http://127.0.0.1:8765/mcp
 ```
 
 Every request needs `Authorization: Bearer <token>`. `add_source` reads only below `allowed_roots`.
-The server speaks plain HTTP: off loopback, put it behind a TLS proxy or an SSH tunnel.
+There is no TLS: outside your own machine, use a TLS proxy or an SSH tunnel.
 
 ## Tools
 
-| Tool | What it returns |
+| Tool | Returns |
 | --- | --- |
-| `add_source` | indexes a file, directory or zip into a case |
-| `list_sources` | sources with format, record count, time range, fingerprint |
-| `search` | records matching words or a regex, in time order |
-| `context` | lines around a record or an artifact |
-| `list_artifacts` | crashes and ANRs, grouped by signature |
-| `read_artifact` | an artifact's summary, then a section or line range |
-| `get_records` | full records, messages not cut |
+| `add_source` | indexes a file, folder or zip into a case |
+| `list_sources` | the case's sources: format, line count, time range |
 | `overview` | levels, top tags and messages, gaps, error bursts |
-| `count` | records by tag, level, pid, source or template, optionally per time bucket |
-| `check_citations` | whether every citation in an answer resolves |
+| `list_artifacts` | crashes and ANRs, grouped by crash |
+| `read_artifact` | a crash's summary, then a section or lines |
+| `search` | lines that match words or a regex, in time order |
+| `context` | lines around a line or a crash |
+| `get_records` | full lines, nothing cut |
+| `count` | lines per tag, level, pid, source or message, optionally per time slot |
+| `check_citations` | whether every citation in an answer is valid |
 
-A hit looks like this:
+A search hit:
 
 ```
 log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, status=NOT_AVAILABLE  ×37 until 10-11 08:14:51.003 (log:2#19001)
@@ -77,19 +79,17 @@ log:2#18233  10-11 08:12:03.412  E 1234/1250 HvacCtrl  setProperty failed, statu
 
 ## Files
 
-State lives in `~/.automotive-log-mcp/` (override with `AUTOMOTIVE_LOG_MCP_HOME`): one SQLite DB
-per case, `config.yaml`, `policy.yaml`, the redaction key and the call log. Original logs are
-referenced by path and hash, never copied or changed.
+Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP_HOME`): one
+SQLite file per case, `config.yaml`, `policy.yaml`, the redaction key and the call log. Your log
+files are never copied or changed.
 
-## More
+## Docs
 
-| Document | What |
+| Doc | Content |
 | --- | --- |
-| [docs/reference.md](docs/reference.md) | every tool, the CLI, filter form, config key, storage, token use |
+| [docs/reference.md](docs/reference.md) | tools, filters, config, storage, token use |
 | [docs/connectors.md](docs/connectors.md) | add your own log format |
-| [docs/implementation-plan.md](docs/implementation-plan.md) | milestones, status, next steps |
-| [eval/](eval/README.md) | evaluation harness and cases |
-| [CHANGELOG.md](CHANGELOG.md) | changes per release |
+| [eval/README.md](eval/README.md) | how to evaluate on real defects |
 
 ## Develop
 

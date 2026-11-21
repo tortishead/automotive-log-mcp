@@ -1,8 +1,8 @@
-"""Artifact parsers (M2): tombstone (text), anr, java_crash, dropbox; dumpstate_section metadata.
+"""Artifact parsers: tombstone (text), anr, java_crash, dropbox; dumpstate_section metadata.
 
 ``tombstone``, ``anr`` and ``dropbox`` are also connectors (files in a bugreport zip, sections of
 the bugreport text); ``java_crash`` is reached through dropbox entries and logcat
-``FATAL EXCEPTION`` records. ``dumpsys``, ``kernel_panic`` and tombstone ``.pb`` are M5.
+``FATAL EXCEPTION`` records. ``dumpsys``, ``kernel_panic`` and tombstone ``.pb`` are not parsed yet.
 
 :func:`complete` runs once per imported file, after every member has been read: it fills what
 only the whole bugreport knows (process names from the process list, the binder peer of an ANR).

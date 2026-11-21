@@ -1,4 +1,4 @@
-"""The ``command`` connector: an external program turns a file into JSON lines (D13, M5).
+"""The ``command`` connector: an external program turns a file into JSON lines.
 
 For formats that are easiest to decode with an existing tool or in another language (a binary
 ECU trace, a vendor log), a YAML file in a rule directory names the program; the server runs it
@@ -38,7 +38,7 @@ import):
   (``timezone``: the device's zone, kept with the source).
 
 A program that exits with a non-zero status fails the import with the end of its standard error.
-Everything it outputs is redacted like any other source (D5).
+Everything it outputs is redacted like any other source.
 """
 
 from __future__ import annotations

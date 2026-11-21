@@ -1,7 +1,7 @@
 """The evaluation harness on the synthetic cases (eval/cases.yaml), as CI runs it.
 
 The recorded baseline is what evidence recall gave when the cases were first run; a change in it
-(better or worse) should be a deliberate update here and in the plan's M4 status.
+(better or worse) should be a deliberate update here and in eval/README.md.
 """
 
 from __future__ import annotations

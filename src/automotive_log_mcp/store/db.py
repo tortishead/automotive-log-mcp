@@ -1,4 +1,4 @@
-"""Case DBs: open and migrate, and the batch writer (D3).
+"""Case DBs: open and migrate, and the batch writer.
 
 One SQLite file per case, WAL journal, ``synchronous=NORMAL``. Writers commit every 50k records,
 with the FTS rows in the same transaction, so readers (other connections) always see a
@@ -37,7 +37,7 @@ FTS5_HELP = (
 
 
 def check_fts5() -> None:
-    """Fail with a clear message when FTS5 is unavailable (M0 item 5)."""
+    """Fail with a clear message when FTS5 is unavailable."""
     conn = sqlite3.connect(":memory:")
     try:
         conn.execute("CREATE VIRTUAL TABLE fts5_check USING fts5(x)")
@@ -155,7 +155,7 @@ class BatchWriter:
     statements (e.g. progress counters) committed in the same transaction as each batch.
 
     (A writer thread overlapping parse and write was measured and did not help: binding rows in
-    ``executemany`` holds the GIL. See docs/implementation-plan.md, M1 status.)
+    ``executemany`` holds the GIL.)
     """
 
     def __init__(self, conn: sqlite3.Connection, batch_rows: int | None = None) -> None:

@@ -1,10 +1,10 @@
 """Ingest pipeline: sniff -> container -> connector -> levels -> redact -> templates -> segments -> writer.
 
 ``Ingestor.add`` indexes one original file (or each file of a directory) into a case DB. The
-original is referenced by absolute path and SHA-256, never copied (D7). Adding a file whose hash
+original is referenced by absolute path and SHA-256, never copied. Adding a file whose hash
 is already in the case is a no-op that returns the existing sources; ``force`` reindexes.
 
-Redaction runs before templating, so no raw value reaches ``records`` or ``templates`` (D5).
+Redaction runs before templating, so no raw value reaches ``records`` or ``templates``.
 Unparseable lines become records with ``level=None`` and the raw (redacted) text.
 
 Artifacts (tombstones, ANR traces, Java crashes, dropbox entries) get their record on the
@@ -13,7 +13,7 @@ source, or the record they were parsed from (``attrs.art``). The artifact rows t
 written at the end of the file, after :func:`connectors.artifacts.complete` has added what only
 the whole bugreport knows (process names, binder peers); everything they store is redacted.
 
-:class:`CaseWorkers` runs imports in one background thread per case (D10); queries use their own
+:class:`CaseWorkers` runs imports in one background thread per case; queries use their own
 connections and see the committed prefix of a running import.
 """
 
@@ -787,7 +787,7 @@ class Ingestor:
             )
 
 
-# -- background indexing (D10) ----------------------------------------------------------------
+# -- background indexing ----------------------------------------------------------------
 
 
 @dataclass
