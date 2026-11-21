@@ -24,7 +24,9 @@ class Filter(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     sources: list[str] | None = Field(
-        default=None, description="Source ids to include, as list_sources prints them."
+        default=None,
+        description="Sources to include: ids as list_sources prints them ('3', 'log:3'), or globs on "
+        "the source name or path, case-insensitive ('*ivi*', '*/sys/*', '*:crash').",
     )
     from_: str | None = Field(
         default=None,

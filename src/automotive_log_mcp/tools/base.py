@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import fnmatch
 import re
 import sqlite3
 from collections.abc import Iterator
@@ -33,6 +34,8 @@ from .timespec import (
     parse_log_cite,
     sources_span,
 )
+
+_SOURCES_LISTED = 10  # sources named in the error of a sources glob that matches nothing
 
 
 @dataclass
@@ -119,16 +122,7 @@ class ToolBase:
         f = f or Filter.model_validate({})
         visible_ids = [s.id for s in ctx.sources]
         if f.sources:
-            ids: list[int] = []
-            for s in f.sources:
-                text = s.strip().removeprefix("log:")
-                if not text.isdigit() or int(text) not in ctx.by_id:
-                    raise ToolInputError(
-                        f"unknown source {s!r}; sources in case '{ctx.case}': "
-                        f"{id_ranges(visible_ids) or 'none'} (see list_sources)"
-                    )
-                ids.append(int(text))
-            rf.sources = sorted(set(ids))
+            rf.sources = self.resolve_sources(ctx, f.sources, warnings)
         elif ctx.hidden:
             rf.sources = visible_ids
         selected = [ctx.by_id[i] for i in (rf.sources if rf.sources is not None else visible_ids)]
@@ -181,6 +175,47 @@ class ToolBase:
                 attrs[k] = redact(v) if isinstance(v, str) else v
             rf.attrs = attrs
         return rf
+
+    def resolve_sources(self, ctx: CaseCtx, specs: list[str], warnings: list[str]) -> list[int]:
+        """Source ids from ids (``'3'``, ``'log:3'``) and globs on the source name or path
+        (case-insensitive, e.g. ``'*ivi*'``). A glob that matches nothing is a warning while
+        another entry matches, else an error that lists the sources."""
+        ids: set[int] = set()
+        unmatched: list[str] = []
+        for spec in specs:
+            text = spec.strip()
+            num = text.removeprefix("log:")
+            if num.isdigit():
+                if int(num) not in ctx.by_id:
+                    raise ToolInputError(
+                        f"unknown source {spec!r}; sources in case '{ctx.case}': "
+                        f"{id_ranges([s.id for s in ctx.sources]) or 'none'} (see list_sources)"
+                    )
+                ids.add(int(num))
+                continue
+            pat = text.lower()
+            hit = [
+                s.id
+                for s in ctx.sources
+                if fnmatch.fnmatchcase(s.name.lower(), pat) or fnmatch.fnmatchcase(s.path.lower(), pat)
+            ]
+            if hit:
+                ids.update(hit)
+            else:
+                unmatched.append(text)
+        if unmatched:
+            pats = ", ".join(repr(p) for p in unmatched)
+            if not ids:
+                shown = ctx.sources[:_SOURCES_LISTED]
+                names = "; ".join(f"log:{s.id} {s.name}" for s in shown)
+                more = len(ctx.sources) - len(shown)
+                raise ToolInputError(
+                    f"sources {pats} match no source name or path in case '{ctx.case}' "
+                    "(globs, case-insensitive, e.g. '*ivi*'); sources: "
+                    f"{names or 'none'}{f'; … {more} more (see list_sources)' if more > 0 else ''}"
+                )
+            warnings.append(f"sources {pats} match no source name or path; filtered by the others")
+        return sorted(ids)
 
     def resolve_time(self, ctx: CaseCtx, spec: str, role: str, span: Span, other: Bound | None) -> Bound:
         """A from/to value as a bound on the wall clock or on the monotonic clock."""

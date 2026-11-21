@@ -147,7 +147,7 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main â
 
 ### Filter
 
-`sources`, `from`/`to`, `level` (minimum), `tags`/`not_tags` (globs, case-sensitive; an unknown
+`sources` (ids as `list_sources` prints them, or globs on the source name or path, case-insensitive: `*ivi*`, `*/sys/*`, `*:crash`; a path glob also sees the parent directories, so `*/ivi/*` is safer than `*ivi*`), `from`/`to`, `level` (minimum), `tags`/`not_tags` (globs, case-sensitive; an unknown
 tag gets a warning with similar tags), `pid`, `tid`, `attrs` (exact match on format attributes, e.g.
 `{"uid": "1000"}` or `{"art": 3}`). `from`/`to` accept:
 

@@ -170,6 +170,21 @@ def test_filter_errors(br: Tools, flt: dict[str, Any], match: str) -> None:
         br.search("br", "pid", filter=Filter.model_validate(flt))
 
 
+def test_sources_globs(br: Tools) -> None:
+    rows = br.app.list_sources("br") or []
+    crash = [s.id for s in rows if s.name.endswith(":crash")]
+    tomb = sorted(s.id for s in rows if "tombstone" in s.name)
+    out = br.search("br", None, filter=F(sources=["*:CRASH"]), collapse=False)
+    assert {int(c.split("#")[0][4:]) for c in cites(out)} == set(crash)
+    out = br.search("br", None, filter=F(sources=["*/tombstones/*", "log:1"]), collapse=False)
+    assert {int(c.split("#")[0][4:]) for c in cites(out)} <= {1, *tomb}
+    out = br.search("br", None, filter=F(sources=["*tombstone*", "*nothing*"]), collapse=False)
+    assert "'*nothing*' match no source name or path" in out.text
+    assert {int(c.split("#")[0][4:]) for c in cites(out)} == set(tomb)
+    with pytest.raises(ToolInputError, match=r"match no source name or path in case 'br'.*log:1 "):
+        br.search("br", None, filter=F(sources=["*ivi*"]))
+
+
 def test_ambiguous_year(app: App, tmp_path: Path) -> None:
     p = tmp_path / "y.log"
     p.write_text(
