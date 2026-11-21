@@ -1,7 +1,7 @@
 """Every MCP tool as a command: ``automotive-log-mcp <tool> <case> ...``.
 
 The commands are built from the tools' input schemas, and each call goes through the same MCP tool
-(argument validation, policy, byte budget, call log), so the CLI and the server cannot drift apart:
+(argument validation, policy, call log), so the CLI and the server cannot drift apart:
 
 - required parameters are positional (``case``, ``path``, ``at``, ``id``, ``ids``); ``query`` is an
   optional positional;

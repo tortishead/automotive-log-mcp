@@ -252,11 +252,6 @@ def analyse(s: Session) -> Report:
             f"{len(errors)} tool errors: "
             + "; ".join(f"#{c.seq} {c.tool}: {(c.error or '')[:90]}" for c in errors[:3])
         )
-    refused = [c for c in calls if c.status == "refused"]
-    if refused:
-        problems.append(
-            f"{len(refused)} calls refused: the policy byte_budget was used up at #{refused[0].seq}"
-        )
     repeats = [c for c in calls if any(f.startswith("repeat") for f in flags.get(c.seq, []))]
     if repeats:
         wasted = sum(cost(c) for c in repeats)

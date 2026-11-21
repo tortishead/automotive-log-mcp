@@ -136,19 +136,6 @@ def test_policy_unknown_tool_is_an_error(config: Config) -> None:
         build_server(structured(config), Policy(allowed_tools=frozenset({"srch"})))
 
 
-def test_byte_budget_refuses_after_limit(config: Config) -> None:
-    async def main() -> None:
-        async with Client(build_server(structured(config), Policy(byte_budget=10))) as client:
-            first = await client.call_tool("list_sources", {"case": "c1"})
-            assert not first.is_error
-            second = await client.call_tool("list_sources", {"case": "c1"})
-            assert second.is_error
-            assert "budget" in second.content[0].text  # type: ignore[union-attr]
-
-    run(main)
-    assert [line["status"] for line in calllog_lines(config)] == ["ok", "refused"]
-
-
 def test_call_log_can_be_disabled(home: Path) -> None:
     home.mkdir(parents=True)
     (home / "config.yaml").write_text("call_log: null\n", encoding="utf-8")

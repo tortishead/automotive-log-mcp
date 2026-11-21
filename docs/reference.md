@@ -25,7 +25,7 @@ automotive-log-mcp              # MCP over stdio
 ### Command line
 
 Every tool is a command: `automotive-log-mcp <tool> <case> ...`. It calls the same MCP tool, so
-checks, `allowed_tools`, the byte budget and the call log (session `cli-<pid>`) all apply, and the
+checks, `allowed_tools` and the call log (session `cli-<pid>`) all apply, and the
 output is what an agent sees.
 
 ```bash
@@ -205,7 +205,6 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | --- | --- |
 | `allowed_tools` | only these tools are offered |
 | `blocked_sources` | globs on paths and archive members: refused by `add_source`, hidden from tools |
-| `byte_budget` | total output bytes per server session; later calls are refused |
 | `allow_code_connectors` | allow Python connectors (default false) |
 | `allowed_roots` | folders `add_source` may read (default: any) |
 
@@ -213,7 +212,6 @@ Example:
 
 ```yaml
 allowed_tools: [list_sources, search, context, list_artifacts, read_artifact, get_records]
-byte_budget: 500000
 ```
 
 ## Storage
@@ -242,7 +240,7 @@ want to compare.
 The report lists each call with its size and estimated tokens, the totals, the fixed cost per
 request, and:
 
-- **problems:** tool errors, byte budget used up, repeated calls;
+- **problems:** tool errors, repeated calls;
 - **suggestions:** tools to hide with `allowed_tools`, results to narrow, the largest results.
 
 The files hold tool names, redacted arguments (queries, paths), sizes and citations, no log

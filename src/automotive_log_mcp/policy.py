@@ -1,13 +1,12 @@
-"""Policy file: which tools an agent may call and how much it may read.
+"""Policy file: which tools an agent may call and which files it may read.
 
-``policy.yaml`` (path from config) is optional; without it every tool is allowed and there is
-no byte budget. Keys:
+``policy.yaml`` (path from config) is optional; without it every tool is allowed and any path
+may be read. Keys:
 
 - ``allowed_tools``: list of tool names; tools not listed are not registered at all, so agents
   never see them. Omitted or null means all tools.
 - ``blocked_sources``: glob patterns matched against source paths and source ids; matching
   sources are refused by ``add_source`` and hidden from every tool (enforced from M1).
-- ``byte_budget``: total bytes of tool output per server session; calls beyond it are refused.
 - ``allow_code_connectors``: whether Python entry-point connectors may be loaded.
   Default false; YAML and ``command`` connectors are always allowed.
 - ``allowed_roots``: directories ``add_source`` may read from; a path
@@ -19,9 +18,8 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import threading
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path, PurePath
 from typing import Any
 
@@ -30,7 +28,6 @@ from .config import ConfigError, read_yaml_mapping
 _KEYS = {
     "allowed_tools",
     "blocked_sources",
-    "byte_budget",
     "allow_code_connectors",
     "allowed_roots",
 }
@@ -40,7 +37,6 @@ _KEYS = {
 class Policy:
     allowed_tools: frozenset[str] | None = None
     blocked_sources: tuple[str, ...] = ()
-    byte_budget: int | None = None
     allow_code_connectors: bool = False
     allowed_roots: tuple[Path, ...] | None = None  # None: any path; (): none
 
@@ -92,9 +88,6 @@ def load_policy(path: Path) -> Policy:
         raise ConfigError(f"unknown policy keys in {path}: {', '.join(sorted(unknown))}")
 
     allowed = data.get("allowed_tools")
-    budget = data.get("byte_budget")
-    if budget is not None and (isinstance(budget, bool) or not isinstance(budget, int) or budget <= 0):
-        raise ConfigError(f"policy key 'byte_budget' must be a positive integer, got {budget!r}")
     code = data.get("allow_code_connectors", False)
     if not isinstance(code, bool):
         raise ConfigError("policy key 'allow_code_connectors' must be true or false")
@@ -109,23 +102,5 @@ def load_policy(path: Path) -> Policy:
         allowed_roots=roots,
         allowed_tools=None if allowed is None else frozenset(_str_list(allowed, "allowed_tools")),
         blocked_sources=tuple(_str_list(data.get("blocked_sources"), "blocked_sources")),
-        byte_budget=budget,
         allow_code_connectors=code,
     )
-
-
-@dataclass
-class ByteBudget:
-    """Counts output bytes for one server session against ``Policy.byte_budget``."""
-
-    limit: int | None
-    used: int = 0
-    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
-
-    def exhausted(self) -> bool:
-        with self._lock:
-            return self.limit is not None and self.used >= self.limit
-
-    def add(self, n: int) -> None:
-        with self._lock:
-            self.used += n

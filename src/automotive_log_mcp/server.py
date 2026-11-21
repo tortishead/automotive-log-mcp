@@ -1,8 +1,8 @@
 """MCP tools and server instructions.
 
 Every tool is registered with its full parameter schema, an output schema and annotations; the
-tool logic is in the ``tools`` package. Every call passes through the policy (allowed tools, byte
-budget) and is written to the call log with redacted arguments. Each call-log line also holds
+tool logic is in the ``tools`` package. Only tools the policy allows are registered, and every
+call is written to the call log with redacted arguments. Each call-log line also holds
 sizes, counts and hashes that explain token use (see ``calllog.py``).
 
 Structured content: off by default. Clients that get both a text and ``structuredContent`` may
@@ -34,7 +34,7 @@ from .calllog import CallLog
 from .config import CASE_NAME_RE, Config
 from .core import format as fmt
 from .core.ingest import AddResult, IngestError
-from .policy import ByteBudget, Policy
+from .policy import Policy
 from .prompts import INSTRUCTIONS
 from .store import query
 from .store.db import StoreError
@@ -282,7 +282,6 @@ class LogServer:
             round_gap=config.round_gap_minutes * 60.0,
             reporter=_round_report,
         )
-        self.budget = ByteBudget(policy.byte_budget)
         self.structured = config.structured_output
         self._seq = 0
         self._seq_lock = threading.Lock()
@@ -314,7 +313,7 @@ class LogServer:
             return self._seq
 
     def _guard(self, fn: _F) -> _F:
-        """Apply the byte budget and write one call-log line per call."""
+        """Write one call-log line per call."""
         name = fn.__name__
         sig = inspect.signature(fn)
 
@@ -328,7 +327,7 @@ class LogServer:
             base["args_hash"], base["near_hash"] = args_hashes(name, log_args)
 
             def log(
-                status: Literal["ok", "error", "refused"],
+                status: Literal["ok", "error"],
                 n: int,
                 error: str | None = None,
                 extra: dict[str, Any] | None = None,
@@ -344,13 +343,6 @@ class LogServer:
                     self._server_info,
                 )
 
-            if self.budget.exhausted():
-                msg = (
-                    f"Byte budget of {self.budget.limit} bytes for this session is used up "
-                    "(policy byte_budget). Answer with the evidence you have."
-                )
-                log("refused", 0, msg)
-                raise ToolError(msg)
             stats: dict[str, Any] = {}
             caps: list[str] = []
             t_stats, t_caps = _STATS.set(stats), fmt.CAP_HITS.set(caps)
@@ -365,7 +357,6 @@ class LogServer:
             text = _result_text(result)
             n = _result_bytes(result)
             extra = _call_extra(result, text, caps)
-            self.budget.add(n)
             log("ok", n, None, {**extra, **stats})
             return result
 

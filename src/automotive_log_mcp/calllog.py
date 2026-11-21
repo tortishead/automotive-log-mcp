@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 Redactor = Callable[[str], str]
-Status = Literal["ok", "error", "refused"]
+Status = Literal["ok", "error"]
 
 
 def _no_redaction(s: str) -> str:
