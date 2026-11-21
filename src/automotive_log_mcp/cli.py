@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from . import __version__
-from .config import ConfigError, load_config
+from .config import Config, ConfigError, load_config
 from .policy import load_policy
 from .store.db import StoreError, check_fts5
 from .toolcli import commands_help
@@ -52,6 +52,17 @@ def _split(argv: Sequence[str]) -> tuple[list[str], str | None, list[str]]:
     return list(argv), None, []
 
 
+def _cleanup(config: Config) -> None:
+    """Retention rules at server start; never fatal. Messages go to stderr (stdout is MCP)."""
+    from .retention import cleanup
+
+    try:
+        for line in cleanup(config):
+            print(f"automotive-log-mcp: {line}", file=sys.stderr)
+    except Exception as e:
+        print(f"automotive-log-mcp: cleanup skipped: {e}", file=sys.stderr)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = _parser()
     head, command, rest = _split(sys.argv[1:] if argv is None else argv)
@@ -71,6 +82,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         from .server import build_server
 
         server = build_server(config, policy)
+        _cleanup(config)
     except (ConfigError, StoreError) as e:
         # stdout belongs to the MCP protocol; errors go to stderr.
         print(f"automotive-log-mcp: {e}", file=sys.stderr)

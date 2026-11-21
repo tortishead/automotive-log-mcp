@@ -281,6 +281,7 @@ class Ingestor:
                     continue
                 rows = self._indexed_in(other, sha)
                 if rows and all(st == "done" for _, st in rows):
+                    db.touch(other)  # the agent is sent there: a use of that case
                     ids = [sid for sid, _ in rows]
                     return FileResult(str(path), sha, ids, existing=True, other_case=other.stem)
         conn = db.connect(case_db, create=True)
