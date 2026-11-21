@@ -120,15 +120,6 @@ class CiteSet:
     def __bool__(self) -> bool:
         return bool(self.logs or self.arts)
 
-    def overlaps(self, other: CiteSet) -> bool:
-        if self.arts & other.arts:
-            return True
-        for src, ranges in self.logs.items():
-            for lo, hi in other.logs.get(src, ()):
-                if any(a <= hi and lo <= b for a, b in ranges):
-                    return True
-        return False
-
 
 # -- the fixed cost of the server ---------------------------------------------------------------------
 

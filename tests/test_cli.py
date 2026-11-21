@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 
@@ -74,18 +73,6 @@ def test_attrs_key_value(case: str, capsys: pytest.CaptureFixture[str]) -> None:
     code, out, _ = run(capsys, "search", case, "--attrs", "art=1", "--json")
     assert code == 0
     assert [h["cite"] for h in json.loads(out)["hits"]] == ["log:3#1"]
-
-
-def test_check_citations_exit_status(
-    case: str, tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    good = tmp_path / "good.md"
-    good.write_text("The HVAC controller crashed with a NullPointerException log:3#1.\n", encoding="utf-8")
-    code, out, _ = run(capsys, "check_citations", case, str(good))
-    assert code == 0 and out.startswith("PASS")
-    monkeypatch.setattr("sys.stdin", io.StringIO("The HVAC controller crashed log:3#99.\n"))
-    code, out, _ = run(capsys, "check_citations", case, "-")
-    assert code == 1 and out.startswith("FAIL")
 
 
 def test_errors(case: str, capsys: pytest.CaptureFixture[str]) -> None:

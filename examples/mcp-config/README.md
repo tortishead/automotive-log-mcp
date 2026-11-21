@@ -19,9 +19,9 @@ On Windows the same files work.
 Start the server with `automotive-log-mcp --http` (see [HTTP](../../docs/reference.md#http)).
 Clients connect to `http://127.0.0.1:8765/mcp` and send `Authorization: Bearer <token>`.
 
-| Client | File | Tested |
-| --- | --- | --- |
-| Claude Code | [claude-code.http.mcp.json](claude-code.http.mcp.json) (reads `${AUTOMOTIVE_LOG_MCP_TOKEN}` from the environment) | yes |
-| VS Code Copilot | [vscode-copilot.http.mcp.json](vscode-copilot.http.mcp.json) (asks for the token once) | no |
+| Client | File |
+| --- | --- |
+| Claude Code | [claude-code.http.mcp.json](claude-code.http.mcp.json) (reads `${AUTOMOTIVE_LOG_MCP_TOKEN}` from the environment) |
+| VS Code Copilot | [vscode-copilot.http.mcp.json](vscode-copilot.http.mcp.json) (asks for the token once) |
 
 Server examples: [../http/config.yaml](../http/config.yaml), [../http/policy.yaml](../http/policy.yaml).

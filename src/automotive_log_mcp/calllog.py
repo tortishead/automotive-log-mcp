@@ -15,8 +15,7 @@ derived from sizes, counts and citation ids, never from log text) explain token 
   near-duplicate calls;
 - ``capped``: which output caps were hit (``lines``, ``bytes``, ``limit``); ``results``,
   ``total``, ``exact``: items returned, matches in all, and whether counts are exact;
-- ``cites``: citation ids in the output, compacted to ranges (``log:3#1-5``, ``art:4``), and for
-  ``check_citations`` ``answer_cites`` (the ids the answer cites) and ``ok``;
+- ``cites``: citation ids in the output, compacted to ranges (``log:3#1-5``, ``art:4``);
 - ``round``: the round number within the session; ``server`` (first call of each round): version,
   whether structured output is on, and the fixed bytes the server adds to every model request.
 

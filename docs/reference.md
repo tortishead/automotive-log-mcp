@@ -5,7 +5,7 @@ Details for each part of automotive-log-mcp. Start with the [README](../README.m
 - [Run](#run) · [Command line](#command-line) · [HTTP](#http)
 - [Tools](#tools) · [Filter](#filter) · [Artifacts](#artifacts) · [Formats](#formats)
 - [Redaction](#redaction) · [Files and config](#files-and-config) · [Storage](#storage)
-- [Token use](#token-use) · [Status](#status) · [Design](#design) · [Develop](#develop)
+- [Token use](#token-use) · [Scope](#scope) · [Design](#design) · [Develop](#develop)
 
 ## Run
 
@@ -36,17 +36,16 @@ automotive-log-mcp search br "setProperty failed" --level E --tag 'Hvac*' --from
 automotive-log-mcp count br --by none --bucket 1m           # 'none' means null
 automotive-log-mcp read_artifact br art:1/exception
 automotive-log-mcp get_records br log:1#2 log:3#1
-automotive-log-mcp check_citations br answer.md             # '-' reads stdin
 automotive-log-mcp search br crash --json                   # JSON output
 ```
 
 - Required parameters are positional (`case`, `path`, `at`, `id`, `ids`). `query` is an optional
-  positional. `check_citations` reads its text from a file.
+  positional.
 - All other parameters are options (`not_tags` → `--not-tags`). Filter fields are options too
   (`--level`, `--from`, `--to`, `--sources`, `--tag`, `--pid`, …). List options repeat
   (`--tag A --tag B`). `--attrs KEY=VALUE` repeats.
 - `<tool> --help` shows every option.
-- Exit code: 0 ok, 1 tool error or `check_citations` FAIL, 2 wrong usage. Server options
+- Exit code: 0 ok, 1 tool error, 2 wrong usage. Server options
   (`--http`, `--host`, `--port`, `--structured`) are not allowed with a command.
 - Hints in the output name the next call in MCP form, e.g. `read_artifact(id='art:1')`.
 
@@ -90,7 +89,6 @@ automotive-log-mcp --http --host 0.0.0.0 --port 9000
 | `context(case, at, before, after, scope)` | lines around `log:<s>#<n>` or `art:<id>`; `scope='pid'` follows one process across all buffers of a file |
 | `get_records(case, ids)` | full lines: whole message, time as written, attributes, message template |
 | `count(case, by, query?, mode, filter?, bucket?, limit)` | lines per `tag`, `level`, `pid`, `source` or `template`; optional query; optional time slots (`'1m'`, up to 60) |
-| `check_citations(case, text)` | checks a Markdown answer; prints `PASS` or `FAIL` |
 
 Example hits. A repeated line shows a count and its last time. A line that belongs to a crash
 names it:
@@ -125,7 +123,7 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
   at most `regex_scan_rows` lines are scanned. If that limit is hit, the result says so and counts
   are minimums.
 
-### overview, count, check_citations
+### overview and count
 
 - **overview** is the first call after `list_sources`. A gap is over 30 s with no line. An error
   burst is a run of 10-s slots where E/F lines are above 5× the median and above 10. The
@@ -133,11 +131,6 @@ log:3#1  01-01 00:00:01.000  E 1234/1250 AndroidRuntime  FATAL EXCEPTION: main �
 - **count** without a query counts every line that passes the filter. With a query it counts
   matches. Over 300k text matches are sampled and marked `≈`. Slot start times can be passed back
   as `from`.
-- **check_citations**: every `log:`/`art:` citation must be valid and exist (else error).
-  Paragraphs without a citation, and quotes not found in the cited lines, are warnings. Citations
-  in code blocks are skipped. Paragraphs under 8 words, or that say they are a guess ("probably",
-  "unknown", "the logs do not show"), need no citation. The call log keeps only the text's length
-  and hash.
 
 ### Filter
 
@@ -279,10 +272,8 @@ want to compare.
 The report lists each call with its size and estimated tokens, the totals, the fixed cost per
 request, and:
 
-- **problems:** tool errors, byte budget used up, answer not checked or failing
-  `check_citations`, repeated calls;
-- **suggestions:** tools to hide with `allowed_tools`, results to narrow, results the answer never
-  used, the largest results.
+- **problems:** tool errors, byte budget used up, repeated calls;
+- **suggestions:** tools to hide with `allowed_tools`, results to narrow, the largest results.
 
 The files hold tool names, redacted arguments (queries, paths), sizes and citations, no log
 lines. Check the arguments before you share a file outside your team.
@@ -297,30 +288,27 @@ estimate. The server cannot see the client's own prompt, other servers or the mo
   model response has `message.usage`. For a scripted run,
   `claude -p "<question>" --output-format stream-json --verbose > run.jsonl` adds a final `result`
   line with totals and cost.
-- **VS Code Copilot:** not checked. Look for "chat debug" and "export chat" in the Command Palette,
+- **VS Code Copilot:** look for "chat debug" and "export chat" in the Command Palette,
   and at premium-request usage in your GitHub settings.
 
-**Measured** (Claude Code, Sonnet, only this server, a synthetic test bugreport, input tokens summed
-over a run):
+**Measured** (Claude Code, Sonnet, only this server, a test bugreport, input tokens summed over a
+run, with 10 tools; `check_citations` is gone since, which saves about 1.6 KB per request):
 
 | | Tokens |
 | --- | --- |
 | fixed cost per request (tool definitions + instructions) | 14.7 KB, about 6.9k |
 | "Which process crashed and why?" | about 34k, 3 requests |
-| a longer question, every finding cited and checked | about 63k, 5 requests |
+| a longer question, every finding cited | about 63k, 5 requests |
 
 **To save tokens:** hide tools you do not use with `allowed_tools`; keep structured output off
 (Claude Code then gets JSON only, 1.6× the size of the text); start a new chat per question,
 because every request re-sends the whole chat. Using the CLI instead of MCP, with short
 instructions, costs an estimated 0.5k tokens per request instead of 6.9k.
 
-## Status
+## Scope
 
-- Built: the 10 tools, stdio and HTTP, the CLI, redaction, policy, call log and round reports.
-- Tested on synthetic logs only, not yet on real logs.
-- **Not met:** indexing speed (26–29k lines/s; the target was 100k).
-- **Not built:** tombstone `.pb`, `dumpsys` and kernel panic parsers.
-- Removed on purpose: aligning sources on one clock, `timeline`, `align`, `diff`, `detect`, DLT.
+- **Not parsed:** tombstone `.pb`, `dumpsys` and kernel panics.
+- Left out on purpose: aligning sources on one clock, `timeline`, `align`, `diff`, `detect`, DLT.
   Real cases usually hold one log, and every extra tool costs tokens in every request.
 
 ## Design

@@ -32,9 +32,7 @@ TOOLS = (
     "get_records",
     "overview",
     "count",
-    "check_citations",
 )
-NO_CITE_TOOLS = frozenset({"add_source", "list_sources", "check_citations"})
 BIG_CALL_TOKENS = 1500  # a single result above this is worth a look
 MANY_CALLS = 12  # a simple question should need far fewer
 MAX_ROWS = 40
@@ -58,8 +56,6 @@ class Call:
     results: int | None
     total: int | None
     cites: CiteSet
-    answer_cites: CiteSet | None
-    ok: bool | None
     args_hash: str
     near_hash: str
 
@@ -104,10 +100,6 @@ class Session:
             return None
         return int(fixed["instructions_bytes"]) + int(fixed.get("tools_model_bytes", 0))
 
-    def last_check(self) -> Call | None:
-        checks = [c for c in self.calls if c.tool == "check_citations" and c.status == "ok"]
-        return checks[-1] if checks else None
-
 
 def _call(e: dict[str, Any], n: int) -> Call:
     args = _dict(e.get("args"))
@@ -115,7 +107,6 @@ def _call(e: dict[str, Any], n: int) -> Call:
     h, near = (e.get("args_hash"), e.get("near_hash"))
     if not h or not near:
         h, near = args_hashes(tool, args)
-    ac = e.get("answer_cites")
     sb = e.get("structured_bytes")
     return Call(
         seq=n,  # position in the round (the logged seq counts over the whole server session)
@@ -131,8 +122,6 @@ def _call(e: dict[str, Any], n: int) -> Call:
         results=e.get("results") if isinstance(e.get("results"), int) else None,
         total=e.get("total") if isinstance(e.get("total"), int) else None,
         cites=CiteSet.parse(e.get("cites") or []),
-        answer_cites=CiteSet.parse(ac) if isinstance(ac, list) else None,
-        ok=e.get("ok") if isinstance(e.get("ok"), bool) else None,
         args_hash=str(h),
         near_hash=str(near),
     )
@@ -230,16 +219,6 @@ def analyse(s: Session) -> Report:
         if c.status != "ok":
             flags.setdefault(c.seq, []).append(c.status)
 
-    # what the answer cites
-    check = s.last_check()
-    answer = check.answer_cites if check else None
-    uncited: list[Call] = []
-    if answer:
-        for c in calls:
-            if c.status == "ok" and c.tool not in NO_CITE_TOOLS and c.cites and not c.cites.overlaps(answer):
-                uncited.append(c)
-                flags.setdefault(c.seq, []).append("not cited")
-
     lines.append(
         f"{'#':>3} {'tool':<15} {'args':<34} {'text':>6} {'json':>6} {'~tok':>5} {'items':>5}  flags"
     )
@@ -278,12 +257,6 @@ def analyse(s: Session) -> Report:
         problems.append(
             f"{len(refused)} calls refused: the policy byte_budget was used up at #{refused[0].seq}"
         )
-    if check is None:
-        problems.append("the answer was not checked with check_citations")
-    elif check.ok is False:
-        problems.append(
-            f"the last check_citations (#{check.seq}) reported errors: the answer has bad citations"
-        )
     repeats = [c for c in calls if any(f.startswith("repeat") for f in flags.get(c.seq, []))]
     if repeats:
         wasted = sum(cost(c) for c in repeats)
@@ -314,13 +287,6 @@ def analyse(s: Session) -> Report:
     pages = [c for c in calls if c.args.get("cursor")]
     if len(pages) >= 2:
         tips.append(f"{len(pages)} calls paged with a cursor: narrow the query instead")
-    if uncited:
-        tok = sum(cost(c) for c in uncited)
-        top = Counter(c.tool for c in uncited).most_common(3)
-        tips.append(
-            f"{len(uncited)} calls (~{_tok(tok)} tokens) gave output the answer never cites "
-            f"({', '.join(f'{t} {n}x' for t, n in top)}): candidates to skip or narrow"
-        )
     big = sorted((c for c in calls if cost(c) > BIG_CALL_TOKENS), key=lambda c: -cost(c))
     if big:
         tips.append(

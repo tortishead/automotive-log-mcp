@@ -248,24 +248,6 @@ class OverviewResult(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class CitationIssue(BaseModel):
-    line: int = Field(description="Line of the checked text.")
-    cite: str | None = None
-    message: str
-
-
-class CheckCitationsResult(BaseModel):
-    case: str
-    ok: bool = Field(description="True when every citation is well-formed and resolves (warnings allowed).")
-    citations: int
-    distinct: int
-    resolved: int
-    paragraphs: int
-    uncited: int = Field(description="Paragraphs with a finding but no citation (warnings).")
-    errors: list[CitationIssue] = Field(default_factory=list)
-    warnings: list[CitationIssue] = Field(default_factory=list)
-
-
 ResultT = TypeVar("ResultT", bound=BaseModel, covariant=True)
 
 

@@ -37,13 +37,10 @@ def case_zip(config: Config, tmp_path: Path) -> Path:
 # -- helpers ---------------------------------------------------------------------------------------------
 
 
-def test_compact_cites_and_overlap() -> None:
+def test_compact_cites() -> None:
     out = compact_cites([(3, 1), (3, 2), (3, 3), (3, 9), (1, 5)], [4, 2, 4])
     assert out == ["art:2", "art:4", "log:1#5", "log:3#1-3", "log:3#9"]
-    cs = CiteSet.parse(out)
-    assert cs.overlaps(CiteSet.from_text("see log:3#2 here"))
-    assert cs.overlaps(CiteSet.from_text("art:4/backtrace:L17"))
-    assert not cs.overlaps(CiteSet.from_text("log:3#4 and log:2#1 and art:5"))
+    assert CiteSet.parse(out)
     assert not CiteSet.from_text("no citations")
 
 
@@ -104,14 +101,10 @@ def test_default_server_sends_text_only_and_logs_token_fields(config: Config, ca
             assert not r.is_error
             await client.call_tool("search", {"case": "T-1", "query": "failed", "limit": 1})
             await client.call_tool("search", {"case": "T-1", "query": "failed"})
-            r = await client.call_tool(
-                "check_citations", {"case": "T-1", "text": "The HVAC app crashed (art:1, log:3#1)."}
-            )
-            assert not r.is_error
 
     anyio.run(main)
     log = calllog(config)
-    assert [e["seq"] for e in log] == [1, 2, 3, 4, 5, 6]
+    assert [e["seq"] for e in log] == [1, 2, 3, 4, 5]
     assert "server" in log[0] and all("server" not in e for e in log[1:])
     srv = log[0]["server"]
     assert srv["structured"] is False and srv["fixed"]["tools_model_bytes"] > 1000
@@ -123,9 +116,6 @@ def test_default_server_sends_text_only_and_logs_token_fields(config: Config, ca
     s1, s2, s3 = log[2], log[3], log[4]
     assert s1["args_hash"] == s3["args_hash"]  # explicit null cursor and default: the same call
     assert s2["args_hash"] != s1["args_hash"] and s2["near_hash"] == s1["near_hash"]
-    check = log[5]
-    assert check["answer_cites"] == ["art:1", "log:3#1"] and check["ok"] is True
-    assert "HVAC" not in json.dumps(check)  # the answer text is never logged
 
 
 def test_structured_on_logs_structured_bytes(config: Config, case_zip: Path) -> None:
@@ -159,7 +149,7 @@ def test_capped_output_is_logged(home: Path, case_zip: Path) -> None:
 # -- analysis --------------------------------------------------------------------------------------------
 
 
-def test_analysis_finds_repeats_and_unchecked_answer(config: Config, case_zip: Path) -> None:
+def test_analysis_finds_repeats(config: Config, case_zip: Path) -> None:
     calls: list[tuple[str, dict[str, Any]]] = [
         ("add_source", {"case": "T-1", "path": str(case_zip)}),
         ("list_artifacts", {"case": "T-1"}),
@@ -177,7 +167,6 @@ def test_analysis_finds_repeats_and_unchecked_answer(config: Config, case_zip: P
     (session,) = cr.read_calllog(config.call_log)  # type: ignore[arg-type]
     report = cr.analyse(session)
     assert "repeat of #3" in report.text()
-    assert any("not checked with check_citations" in p for p in report.problems)
 
 
 def test_analysis_reads_old_call_log_lines(home: Path) -> None:

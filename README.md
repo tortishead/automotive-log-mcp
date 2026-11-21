@@ -7,14 +7,9 @@ output line points to a log line or a crash file.
   formats.
 - **Finds** tombstones, ANRs, Java crashes and dropbox entries, and groups copies of the same
   crash.
-- **Cites** every output line as `log:<source>#<line>` or `art:<id>`. `check_citations` checks an
-  answer before it is given.
+- **Cites** every output line as `log:<source>#<line>` or `art:<id>`.
 - **Keeps output small:** at most 50 lines or 8 KB per call; repeated lines are shown once with a
   count.
-- **Hides personal data** (VINs, MACs, IPs, GPS, …) when it indexes a log. No tool returns the raw
-  values.
-
-Status: version 0.1.0, not published. Tested on synthetic logs only, not yet on real logs.
 
 ## Install
 
@@ -40,7 +35,6 @@ Every tool is also a command. It prints the same text an agent gets.
 automotive-log-mcp add_source br ~/bugs/bugreport.zip
 automotive-log-mcp list_artifacts br
 automotive-log-mcp search br "setProperty failed" --level E --from -5m
-automotive-log-mcp check_citations br answer.md   # exit 1 on FAIL
 ```
 
 `automotive-log-mcp <tool> --help` lists the options. `--json` prints JSON.
@@ -69,7 +63,6 @@ There is no TLS: outside your own machine, use a TLS proxy or an SSH tunnel.
 | `context` | lines around a line or a crash |
 | `get_records` | full lines, nothing cut |
 | `count` | lines per tag, level, pid, source or message, optionally per time slot |
-| `check_citations` | whether every citation in an answer is valid |
 
 A search hit:
 

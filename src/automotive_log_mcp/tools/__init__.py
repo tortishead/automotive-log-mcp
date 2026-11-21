@@ -11,7 +11,7 @@ Layout, from the bottom up (a module imports only those above it):
 - :mod:`.text`: small text helpers;
 - :mod:`.base`: :class:`ToolBase`, one call's case view, record lines, filters and times;
 - one module per tool family (:mod:`.search`, :mod:`.records`, :mod:`.artifacts`, :mod:`.count`,
-  :mod:`.overview`, :mod:`.citecheck`), each a mixin over :class:`ToolBase`.
+  :mod:`.overview`), each a mixin over :class:`ToolBase`.
 
 Filter times (``from``/``to``) accept every timestamp the tools print, plus relative times and
 citations; see :meth:`ToolBase.resolve_time`.
@@ -21,11 +21,9 @@ from __future__ import annotations
 
 from .artifacts import ArtifactTools
 from .base import CaseCtx, ToolBase
-from .citecheck import CitationTools
 from .count import CountTools
 from .models import (
     CaseNotFoundError,
-    CheckCitationsResult,
     ContextResult,
     CountResult,
     Filter,
@@ -46,7 +44,6 @@ from .text import looks_like_regex
 __all__ = [
     "CaseCtx",
     "CaseNotFoundError",
-    "CheckCitationsResult",
     "ContextResult",
     "CountResult",
     "Filter",
@@ -70,6 +67,5 @@ class Tools(
     ArtifactTools,
     CountTools,
     OverviewTools,
-    CitationTools,
 ):
     """Every read tool over one :class:`~automotive_log_mcp.app.App`."""

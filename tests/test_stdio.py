@@ -161,8 +161,7 @@ def test_p0_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
 
 
 def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
-    """P1 tools over stdio: overview orients, an answer
-    with known citations passes check_citations, a wrong citation fails it."""
+    """overview and count over stdio."""
     from .conftest import FIXED_SECRET
     from .test_golden import make_bugreport_zip
 
@@ -186,17 +185,5 @@ def test_p1_workflow_over_stdio(home: Path, tmp_path: Path) -> None:
             assert ov_data["artifacts"] and "levels:" in ov
             counted, c_data = await call("count", by="level", bucket="1m")
             assert c_data["buckets"] and "bucket 1m" in counted
-            answer = (
-                "# HVAC crash\n\nsetProperty failed (log:1#2), then the app crashed (log:3#1, "
-                "art:1/exception:L3).\n"
-            )
-            ok, ok_data = await call("check_citations", text=answer)
-            assert ok_data["ok"] is True and ok.startswith("PASS")
-            bad, bad_data = await call("check_citations", text=answer.replace("log:3#1", "log:3#7"))
-            assert bad_data["ok"] is False and "log:3#7 does not resolve" in bad
 
     anyio.run(main)
-    lines = [json.loads(x) for x in (home / "calllog.jsonl").read_text(encoding="utf-8").splitlines()]
-    checks = [x for x in lines if x["tool"] == "check_citations"]
-    assert len(checks) == 2 and all(x["args"]["text"].startswith("<") for x in checks)
-    assert "setProperty" not in json.dumps(checks)

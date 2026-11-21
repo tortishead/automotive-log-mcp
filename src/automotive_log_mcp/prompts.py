@@ -12,7 +12,7 @@ Simple questions (what crashed, and why): 3-4 calls.
 time order; 'same crash as' marks copies, which need no second read.
 3. read_artifact(case, id='art:<id>') for the crash that fits: its summary has the signal or \
 exception, cause and top of the stack; read a section only if the summary is not enough.
-4. Answer, citing each finding; check_citations(case, text) before answering when asked to cite.
+4. Answer, citing each finding.
 
 Broader questions: overview(case) for where errors cluster; context(case, at='art:<id>' or \
 'log:<source>#<seq>') for the lines before an event (scope='pid' follows one process across \

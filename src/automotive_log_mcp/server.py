@@ -2,10 +2,8 @@
 
 Every tool is registered with its full parameter schema, an output schema and annotations; the
 tool logic is in the ``tools`` package. Every call passes through the policy (allowed tools, byte
-budget) and is written to the call log with redacted arguments; the text given to
-``check_citations`` is logged only as its length and hash (it quotes log content), plus the
-citation ids it contains. Each call-log line also holds sizes, counts and hashes that explain
-token use (see ``calllog.py``).
+budget) and is written to the call log with redacted arguments. Each call-log line also holds
+sizes, counts and hashes that explain token use (see ``calllog.py``).
 
 Structured content: off by default. Clients that get both a text and ``structuredContent`` may
 forward only the JSON to the model (Claude Code 2.1 does), which is 1.5-2x the bytes of the text
@@ -16,7 +14,6 @@ and drops its footer hints ('capped: narrow with …'). ``structured_output: tru
 from __future__ import annotations
 
 import functools
-import hashlib
 import inspect
 import threading
 import time
@@ -44,7 +41,6 @@ from .prompts import INSTRUCTIONS
 from .store import query
 from .store.db import StoreError
 from .tools import (
-    CheckCitationsResult,
     ContextResult,
     CountResult,
     Filter,
@@ -157,10 +153,6 @@ def _result_stats(data: BaseModel) -> dict[str, Any]:
         stats["total"] = total
     if getattr(data, "exact", True) is False:
         stats["exact"] = False
-    if isinstance(data, CheckCitationsResult):
-        stats["ok"] = data.ok
-        stats["results"] = len(data.errors)
-        stats["warnings"] = len(data.warnings)
     return stats
 
 
@@ -261,7 +253,6 @@ TOOL_SPECS: tuple[tuple[str, ToolAnnotations, str], ...] = (
     ("get_records", READ_ONLY, "Get full records"),
     ("overview", READ_ONLY, "Case overview"),
     ("count", READ_ONLY, "Count records"),
-    ("check_citations", READ_ONLY, "Check the citations of an answer"),
 )
 TOOL_NAMES = tuple(name for name, _, _ in TOOL_SPECS)
 
@@ -340,12 +331,6 @@ class LogServer:
             bound = sig.bind_partial(*args, **kwargs)
             log_args = _jsonable(dict(bound.arguments))
             base: dict[str, Any] = {"seq": seq}
-            if name == "check_citations" and isinstance(log_args.get("text"), str):
-                text = log_args["text"]  # an answer quotes log content: keep only its size and hash
-                digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
-                log_args["text"] = f"<{len(text)} chars, sha256 {digest}>"
-                logs, arts = cite_ids(text)
-                base["answer_cites"] = compact_cites(logs, arts)[:MAX_LOG_CITES]
             base["args_hash"], base["near_hash"] = args_hashes(name, log_args)
 
             def log(
@@ -630,21 +615,6 @@ class LogServer:
             value with an example citation (≈: estimated from a sample)."""
             return _output(lambda: tools.count(case, by, query, mode, filter, bucket, limit), self.structured)
 
-        def check_citations(
-            case: Case,
-            text: Annotated[
-                str,
-                Field(
-                    min_length=1,
-                    max_length=200_000,
-                    description="The answer in Markdown, with citations as the tools print them.",
-                ),
-            ],
-        ) -> Annotated[CallToolResult, CheckCitationsResult]:
-            """Check an answer's citations: each must be well-formed and resolve (errors); uncited
-            findings and quotes not in the cited lines are warnings. 'PASS' when there are no errors."""
-            return _output(lambda: tools.check_citations(case, text), self.structured)
-
         functions = {
             f.__name__: f
             for f in (
@@ -657,7 +627,6 @@ class LogServer:
                 get_records,
                 overview,
                 count,
-                check_citations,
             )
         }
         for name, hints, title in TOOL_SPECS:

@@ -10,7 +10,7 @@ results, not on missed targets, so the numbers are always reported.
 - M1 ingest: lines/s (target >= 100k) and DB size (target <= 1.5x input).
 - M3 tools: every tool's text output under 8 KB with a broad query; latency: text search < 1 s,
   context < 200 ms, filtered regex < 5 s.
-- M4 tools (overview, count, check_citations): text under 8 KB; latency is reported (the
+- M4 tools (overview, count): text under 8 KB; latency is reported (the
   plan sets no target for them).
 """
 
@@ -166,12 +166,6 @@ def _calls(tools: Tools) -> list[tuple[str, str, float | None, Call]]:
             None,
             lambda t: t.count("perf", by="pid", text=r"status=\w+_AVAILABLE", mode="regex", filter=hvac),
         ),
-        (
-            "check_citations",
-            "answer with 40 citations",
-            None,
-            lambda t: t.check_citations("perf", _answer(mid)),
-        ),
     ]
 
 
@@ -179,15 +173,6 @@ def _middle(tools: Tools) -> str:
     rows = tools.app.list_sources("perf") or []
     main = max(rows, key=lambda s: s.records)
     return f"log:{main.id}#{main.records // 2}"
-
-
-def _answer(mid: str) -> str:
-    sid, seq = mid[4:].split("#")
-    paras = [
-        f"Finding {i}: `setProperty failed` at log:{sid}#{int(seq) + i} and log:{sid}#{int(seq) + 1000 * i}."
-        for i in range(20)
-    ]
-    return "# Answer\n\n" + "\n\n".join(paras) + "\n\nThe rest is a guess.\n"
 
 
 def _ids(mid: str) -> list[str]:

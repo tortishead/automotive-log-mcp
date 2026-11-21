@@ -50,7 +50,7 @@ def test_tools_package_has_no_import_cycle() -> None:
 
 def test_tool_specs_are_the_tool_names() -> None:
     names = [name for name, _, _ in TOOL_SPECS]
-    assert tuple(names) == TOOL_NAMES and len(set(names)) == len(names) == 10
+    assert tuple(names) == TOOL_NAMES and len(set(names)) == len(names) == 9
     assert set(callreport.TOOLS) == set(TOOL_NAMES)  # calls joins transcripts by these names
 
 

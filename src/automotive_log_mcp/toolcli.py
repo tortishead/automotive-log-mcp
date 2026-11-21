@@ -4,14 +4,14 @@ The commands are built from the tools' input schemas, and each call goes through
 (argument validation, policy, byte budget, call log), so the CLI and the server cannot drift apart:
 
 - required parameters are positional (``case``, ``path``, ``at``, ``id``, ``ids``); ``query`` is an
-  optional positional; ``text`` (check_citations) is a file, ``-`` for standard input;
+  optional positional;
 - every other parameter is an option, ``not_tags`` as ``--not-tags``; lists repeat (``--tag A --tag
   B``, the singular is accepted); the record filter's fields are options of the command itself
   (``--level E --from -5m``); ``--attrs KEY=VALUE`` repeats; a parameter that takes null as a value
   takes ``none`` (``count --by none``);
 - ``--json`` prints the structured content instead of the text.
 
-Exit status: 0 on success, 1 for a tool error or a check_citations FAIL, 2 for a usage error.
+Exit status: 0 on success, 1 for a tool error, 2 for a usage error.
 """
 
 from __future__ import annotations
@@ -35,7 +35,6 @@ from .server import TOOL_SPECS, LogServer
 
 PROG = "automotive-log-mcp"
 _POSITIONAL_OPTIONAL = frozenset({"query"})  # optional, but the obvious thing to type after the case
-_FILE_PARAMS = frozenset({"text"})  # read from a file or standard input
 _PATH_PARAMS = frozenset({"path"})  # made absolute against the working directory
 
 
@@ -89,16 +88,6 @@ def _kv(text: str) -> tuple[str, Any]:
     return key, _scalar(value)
 
 
-def _read_text(value: str) -> str:
-    if value == "-":
-        return sys.stdin.read()
-    try:
-        with open(value, encoding="utf-8") as f:
-            return f.read()
-    except OSError as e:
-        raise ToolError(f"cannot read {value}: {e.strerror or e}") from None
-
-
 def _help(node: dict[str, Any]) -> str:
     text = str(node.get("description", "")).replace("%", "%%")
     if "default" in node and node["default"] not in (None, ""):
@@ -129,11 +118,7 @@ def _add(
         kw["choices"] = [*node["enum"], "none"] if nullable else list(node["enum"])
         if nullable:
             convert = lambda v: None if v == "none" else v  # noqa: E731
-    if key in _FILE_PARAMS:
-        kw["metavar"] = "FILE"
-        kw["help"] += " Give a file, or '-' for standard input."
-        convert = _read_text
-    elif key in _PATH_PARAMS:
+    if key in _PATH_PARAMS:
         convert = os.path.abspath
 
     if required:
@@ -235,7 +220,7 @@ def run_tool(config: Config, policy: Policy, command: str, argv: Sequence[str]) 
         print(f"{PROG}: unknown command '{command}'\n\n{commands_help()}", file=sys.stderr)
         return 2
     _utf8_stdout()
-    # Structured content always (the text is the same): --json and check_citations' verdict use it.
+    # Structured content always (the text is the same), for --json.
     config = replace(config, structured_output=True)
     server = LogServer(config, policy, session=f"cli-{os.getpid()}", wait_for_imports=True)
     try:
@@ -259,6 +244,4 @@ def run_tool(config: Config, policy: Policy, command: str, argv: Sequence[str]) 
     else:
         content = getattr(result, "content", [])
         print("\n".join(c.text for c in content if getattr(c, "type", None) == "text"))
-    if name == "check_citations" and isinstance(structured, dict) and structured.get("ok") is False:
-        return 1
     return 0
