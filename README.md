@@ -27,18 +27,6 @@ automotive-log-mcp                # MCP over stdio
 
 Client setup (Claude Code, VS Code Copilot, Cursor, …): [examples/mcp-config/](examples/mcp-config/).
 
-### From the command line
-
-Every tool is also a command. It prints the same text an agent gets.
-
-```bash
-automotive-log-mcp add_source br ~/bugs/bugreport.zip
-automotive-log-mcp list_artifacts br
-automotive-log-mcp search br "setProperty failed" --level E --from -5m
-```
-
-`automotive-log-mcp <tool> --help` lists the options. `--json` prints JSON.
-
 ### Over HTTP
 
 ```bash
@@ -49,6 +37,28 @@ automotive-log-mcp --http         # http://127.0.0.1:8765/mcp
 
 Every request needs `Authorization: Bearer <token>`. `add_source` reads only below `allowed_roots`.
 There is no TLS: outside your own machine, use a TLS proxy or an SSH tunnel.
+
+## Command line
+
+Every tool is also a CLI command, no agent needed. It prints the same text an agent gets.
+
+```bash
+automotive-log-mcp add_source br ~/bugs/bugreport.zip          # index a log into case "br"
+automotive-log-mcp list_sources br
+automotive-log-mcp overview br
+automotive-log-mcp list_artifacts br                           # crashes and ANRs
+automotive-log-mcp read_artifact br art:1                        # summary, then a section
+automotive-log-mcp search br "setProperty failed" --level E --from -5m
+automotive-log-mcp context br log:3#120 --before 20
+automotive-log-mcp count br --by tag --bucket 1m
+```
+
+- `automotive-log-mcp --help` lists the commands; `automotive-log-mcp <tool> --help` lists a
+  command's options.
+- `--json` prints JSON instead of text.
+- Exit code: 0 ok, 1 tool error, 2 wrong usage.
+
+More: [Command line](docs/reference.md#command-line).
 
 ## Tools
 
