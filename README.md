@@ -89,7 +89,6 @@ files are never copied or changed.
 | --- | --- |
 | [docs/reference.md](docs/reference.md) | tools, filters, config, storage, token use |
 | [docs/connectors.md](docs/connectors.md) | add your own log format |
-| [eval/README.md](eval/README.md) | how to evaluate on real defects |
 
 ## Develop
 

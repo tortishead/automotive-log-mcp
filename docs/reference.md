@@ -300,7 +300,7 @@ estimate. The server cannot see the client's own prompt, other servers or the mo
 - **VS Code Copilot:** not checked. Look for "chat debug" and "export chat" in the Command Palette,
   and at premium-request usage in your GitHub settings.
 
-**Measured** (Claude Code, Sonnet, only this server, the synthetic bugreport, input tokens summed
+**Measured** (Claude Code, Sonnet, only this server, a synthetic test bugreport, input tokens summed
 over a run):
 
 | | Tokens |
@@ -317,16 +317,11 @@ instructions, costs an estimated 0.5k tokens per request instead of 6.9k.
 ## Status
 
 - Built: the 10 tools, stdio and HTTP, the CLI, redaction, policy, call log and round reports.
-- Tested on synthetic logs and 9 synthetic eval cases only (17 of 18 root-cause lines found).
-- **Not done:** evaluation on real closed defects; any agent run; the shell-only baseline.
+- Tested on synthetic logs only, not yet on real logs.
 - **Not met:** indexing speed (26–29k lines/s; the target was 100k).
-- **Not built:** tombstone `.pb`, `dumpsys` and kernel panic parsers. Build them only if real
-  defects need them.
+- **Not built:** tombstone `.pb`, `dumpsys` and kernel panic parsers.
 - Removed on purpose: aligning sources on one clock, `timeline`, `align`, `diff`, `detect`, DLT.
   Real cases usually hold one log, and every extra tool costs tokens in every request.
-
-Next: run the evaluation on 5 real defects ([eval/README.md](../eval/README.md)). Go on if at
-least 3 of 5 agent runs find the right component and `check_citations` passes on every answer.
 
 ## Design
 
