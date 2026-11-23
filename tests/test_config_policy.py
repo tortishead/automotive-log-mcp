@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sqlite3
 from pathlib import Path
 
@@ -29,6 +30,20 @@ def test_relative_paths_resolve_against_config_file(tmp_path: Path, home: Path) 
     assert c.rule_dirs == (cfg.parent / "rules",)
     assert c.caps.max_lines == 20
     assert c.caps.max_bytes == 8192
+
+
+def test_rule_dirs_from_env(tmp_path: Path, home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = tmp_path / "cfg" / "c.yaml"
+    cfg.parent.mkdir()
+    cfg.write_text("rule_dirs: [rules]\n", encoding="utf-8")
+    a, b = tmp_path / "a", tmp_path / "b"
+    monkeypatch.chdir(tmp_path)
+    # absolute, relative (to the current directory), empty and repeated entries
+    value = os.pathsep.join([str(a), "b", "", str(cfg.parent / "rules"), str(a)])
+    monkeypatch.setenv("AUTOMOTIVE_LOG_MCP_RULE_DIRS", value)
+    assert load_config(cfg).rule_dirs == (cfg.parent / "rules", a, b)
+    # without a config file too
+    assert load_config().rule_dirs == (a, b, cfg.parent / "rules")
 
 
 @pytest.mark.parametrize(

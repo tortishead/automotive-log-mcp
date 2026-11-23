@@ -26,6 +26,7 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     h = tmp_path / "home"
     monkeypatch.setenv("AUTOMOTIVE_LOG_MCP_HOME", str(h))
     monkeypatch.delenv("AUTOMOTIVE_LOG_MCP_CONFIG", raising=False)
+    monkeypatch.delenv("AUTOMOTIVE_LOG_MCP_RULE_DIRS", raising=False)
     return h
 
 

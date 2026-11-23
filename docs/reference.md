@@ -195,7 +195,7 @@ Everything lives in `~/.automotive-log-mcp/` (change it with `AUTOMOTIVE_LOG_MCP
 | `cases_dir`, `policy_file` | other locations |
 | `call_log` | path; `null` turns it off |
 | `caps` | `max_lines`, `max_bytes`, `max_msg_chars`, `regex_scan_rows` (see [Output rules](#output-rules)) |
-| `rule_dirs` | folders with your own connectors |
+| `rule_dirs` | folders with your own connectors; `AUTOMOTIVE_LOG_MCP_RULE_DIRS` adds more (`:`-separated, `;` on Windows) |
 | `structured_output` | also send JSON (default false) |
 | `rounds_dir`, `round_gap_minutes` | round files (default `<home>/rounds`, `null` off) and the pause that starts a new round (default 10) |
 | `retention` | `case_days` (default 30), `rounds_days` (default 30), `call_log_mb` (default 20); `null` turns a rule off, `retention: null` all of them (see [Cleanup](#cleanup)) |

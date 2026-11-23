@@ -3,7 +3,9 @@
 These files start the server as `automotive-log-mcp` over stdio. If the command is not on the
 client's `PATH` (for example, in a virtualenv), use its full path, or `python -m automotive_log_mcp`
 with the virtualenv's Python. For another home folder, add
-`"env": {"AUTOMOTIVE_LOG_MCP_HOME": "/path/to/home"}` to the server entry.
+`"env": {"AUTOMOTIVE_LOG_MCP_HOME": "/path/to/home"}` to the server entry. For your own
+connectors, add `"AUTOMOTIVE_LOG_MCP_RULE_DIRS": "/path/to/rules"` there (several folders separated
+by `:`, or `;` on Windows).
 
 | Client | File | Put it in |
 | --- | --- | --- |

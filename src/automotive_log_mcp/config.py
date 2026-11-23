@@ -5,6 +5,10 @@ Configuration is read from ``<home>/config.yaml`` (or the file named by ``--conf
 typos fail loudly instead of being ignored.
 
 ``<home>`` is ``~/.automotive-log-mcp`` unless ``AUTOMOTIVE_LOG_MCP_HOME`` is set.
+
+``AUTOMOTIVE_LOG_MCP_RULE_DIRS`` adds rule directories to the ones in ``rule_dirs``: a list of
+paths separated by ``os.pathsep`` (``:`` on Linux/macOS, ``;`` on Windows). Relative entries resolve
+against the current directory; empty entries are skipped.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ import yaml
 
 ENV_HOME = "AUTOMOTIVE_LOG_MCP_HOME"
 ENV_CONFIG = "AUTOMOTIVE_LOG_MCP_CONFIG"
+ENV_RULE_DIRS = "AUTOMOTIVE_LOG_MCP_RULE_DIRS"
 
 
 CASE_NAME_RE = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
@@ -116,6 +121,30 @@ def _retention(data: Any) -> Retention:
     return Retention(**values)
 
 
+def env_rule_dirs() -> list[Path]:
+    """Rule directories from ``AUTOMOTIVE_LOG_MCP_RULE_DIRS`` (``os.pathsep``-separated)."""
+    value = os.environ.get(ENV_RULE_DIRS, "")
+    dirs: list[Path] = []
+    for entry in value.split(os.pathsep):
+        entry = entry.strip()
+        if entry:
+            p = Path(entry).expanduser()
+            dirs.append(p if p.is_absolute() else Path.cwd() / p)
+    return dirs
+
+
+def _unique(paths: list[Path]) -> tuple[Path, ...]:
+    """Drop repeats (a folder listed in both places would load its connectors twice)."""
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for p in paths:
+        key = Path(os.path.normpath(p))
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+    return tuple(out)
+
+
 def read_yaml_mapping(path: Path, what: str) -> dict[str, Any]:
     try:
         text = path.read_text(encoding="utf-8")
@@ -190,7 +219,7 @@ def load_config(config_file: Path | None = None, home: Path | None = None) -> Co
         else home / "policy.yaml",
         call_log=call_log,
         caps=caps,
-        rule_dirs=tuple(_path(d, "rule_dirs[]", base) for d in rule_dirs_data),
+        rule_dirs=_unique([*(_path(d, "rule_dirs[]", base) for d in rule_dirs_data), *env_rule_dirs()]),
         structured_output=structured,
         rounds_dir=rounds_dir,
         round_gap_minutes=gap,

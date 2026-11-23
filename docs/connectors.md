@@ -11,7 +11,9 @@ Three kinds, from least to most code:
 | `command` connector | a `.yaml` file plus any program (any language) | binary formats, an existing decoder, logic a regex cannot express | always allowed |
 | Python entry point | an installed Python package | full control, streaming parse in-process, containers (formats holding several logs) | `allow_code_connectors: true` |
 
-List rule folders under `rule_dirs` in `config.yaml`. A folder can hold both kinds of YAML file:
+List rule folders under `rule_dirs` in `config.yaml`, or in the environment variable
+`AUTOMOTIVE_LOG_MCP_RULE_DIRS` (paths separated by `:` on Linux/macOS, `;` on Windows; relative
+paths resolve against the server's current directory). Folders from both are used, config first. A folder can hold both kinds of YAML file:
 `connector:` with `line:` is a regex connector, with `command:` a command connector. YAML files
 without `connector:` are ignored. An invalid file stops the server at startup, with the file
 name and the reason.
@@ -113,7 +115,7 @@ replace: false                     # true: replace a connector with the same nam
   import with the end of its standard error; the source is listed as `failed` with that error.
 - Example: [examples/connectors/](../examples/connectors/) (`mcu_trace.yaml`, the decoder
   `mcu2jsonl.py` and a sample file). Copy the directory into a rule directory or list it under
-  `rule_dirs`.
+  `rule_dirs` (or in `AUTOMOTIVE_LOG_MCP_RULE_DIRS`).
 
 ## Python entry point
 
